@@ -1,3 +1,5 @@
 phidata[aws]>=2.5.*,<2.6
+composio-phidata
+ollama
 
--r ../requirements.txt
+-r ./phidata.txt

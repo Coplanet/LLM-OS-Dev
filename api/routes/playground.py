@@ -1,16 +1,17 @@
 from os import getenv
+
 from phi.playground import Playground
 
-from agents.example import get_example_agent
+from leaders.generic import get_leader as get_generic_leader
 
 ######################################################
 # Router for the agent playground
 ######################################################
 
-example_agent = get_example_agent(debug_mode=True)
+generic_leader = get_generic_leader()
 
 # Create a playground instance
-playground = Playground(agents=[example_agent])
+playground = Playground(agents=[generic_leader])
 
 # Log the playground endpoint with phidata.app
 if getenv("RUNTIME_ENV") == "dev":

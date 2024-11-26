@@ -1,4 +1,30 @@
+import os
+from enum import Enum, unique
+from typing import Optional
+
+from composio_phidata import Action as ComposioAction
+from composio_phidata import ComposioToolSet
+from phi.model.ollama import Ollama
+from phi.model.openai import OpenAIChat
 from pydantic_settings import BaseSettings
+
+from workspace.settings import ws_settings
+
+
+@unique
+class GPTModels(Enum):
+    GPT4 = "gpt-4o"
+
+
+@unique
+class OllamaModels(Enum):
+    LLAMA3_2 = "llama3.2"
+
+
+@unique
+class Defaults(Enum):
+    TEMPERATURE: float = 0
+    MAX_COMPLETION_TOKENS: int = 16000
 
 
 class AgentSettings(BaseSettings):
@@ -7,11 +33,44 @@ class AgentSettings(BaseSettings):
     Reference: https://pydantic-docs.helpmanual.io/usage/settings/
     """
 
-    gpt_4: str = "gpt-4o"
+    gpt_4: str = GPTModels.GPT4.value
     embedding_model: str = "text-embedding-3-small"
-    default_max_completion_tokens: int = 16000
-    default_temperature: float = 0
+    default_max_completion_tokens: int = Defaults.MAX_COMPLETION_TOKENS.value
+    default_temperature: float = Defaults.TEMPERATURE.value
+
+    debug_mode: bool = False
+    show_tool_calls: bool = True
+    composio_tools: Optional[ComposioToolSet] = None
+
+    def __init__(self, *args, **kwargs):
+        # pass arguments to the parent constructor
+        super().__init__(*args, **kwargs)
+
+        # initialize composio_tools if not already set
+        self.composio_tools = self.composio_tools or ComposioToolSet()
+
+        # update debug_mode and show_tool_calls using helper methods
+        self.debug_mode = self._get_boolean_env("AGENTS_DEBUG_MODE", self.debug_mode)
+        self.show_tool_calls = self._get_boolean_env(
+            "SHOW_TOOL_CALLS", self.show_tool_calls
+        )
+
+    def _getenv(self, key, default: Optional[str] = None) -> str:
+        return os.getenv(key, default)
+
+    def _get_boolean_env(self, key, default: bool = False) -> bool:
+        return self._getenv(key, "true" if default else "false").lower() == "true"
+
+    class Models:
+        ollama3_2 = Ollama(id="llama3.2", host=ws_settings.ollama_host)
+        gpt4 = OpenAIChat(
+            id=GPTModels.GPT4.value,
+            max_tokens=Defaults.MAX_COMPLETION_TOKENS.value,
+            temperature=Defaults.TEMPERATURE.value,
+        )
 
 
 # Create an AgentSettings object
 agent_settings = AgentSettings()
+
+__all__ = ["agent_settings", "ComposioAction", "Defaults", "OllamaModels", "GPTModels"]

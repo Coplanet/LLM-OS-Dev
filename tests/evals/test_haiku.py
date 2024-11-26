@@ -2,12 +2,12 @@ from typing import Optional
 
 from phi.eval import Eval, EvalResult
 
-from agents.example import get_example_agent
+from leaders.generic import get_leader
 
 
 def test_haiku():
     evaluation = Eval(
-        agent=get_example_agent(),
+        agent=get_leader(),
         question="Share a haiku",
         expected_answer="Any haiku",
     )

@@ -1,16 +1,33 @@
+import os
 from pathlib import Path
+from typing import Optional
 
 from phi.workspace.settings import WorkspaceSettings
+
 
 #
 # -*- Define workspace settings using a WorkspaceSettings object
 # these values can also be set using environment variables or a .env file
 #
-ws_settings = WorkspaceSettings(
-    # Workspace name: used for naming cloud resources
-    ws_name="agent",
+class CitexSettings(WorkspaceSettings):
     # Path to the workspace root
-    ws_root=Path(__file__).parent.parent.resolve(),
+    ws_root: Path = Path(__file__).parent.parent.resolve()
+    ollama_host: Optional[str] = os.getenv("OLLAMA_HOST", "localhost")
+    gpt_api_key: Optional[str] = os.getenv("OPENAI_API_KEY", None)
+    resend_api_key: Optional[str] = os.getenv("RESEND_API_KEY", None)
+
+    @property
+    def scratch_dir(self):
+        return self.ws_root.joinpath("scratch")
+
+    @property
+    def knowledgebase_dir(self):
+        return self.ws_root.joinpath("knowledgebase")
+
+
+ws_settings = CitexSettings(
+    # Workspace name: used for naming cloud resources
+    ws_name="citex-llm-os",
     # -*- Development env settings
     dev_env="dev",
     # -*- Development Apps

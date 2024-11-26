@@ -1,27 +1,27 @@
 import base64
-from os import getenv
 from io import BytesIO
+from os import getenv
 from typing import List
 
 import nest_asyncio
 import streamlit as st
-from PIL import Image
 from phi.agent import Agent
 from phi.document import Document
 from phi.document.reader import Reader
-from phi.document.reader.website import WebsiteReader
+from phi.document.reader.csv_reader import CSVReader
+from phi.document.reader.docx import DocxReader
 from phi.document.reader.pdf import PDFReader
 from phi.document.reader.text import TextReader
-from phi.document.reader.docx import DocxReader
-from phi.document.reader.csv_reader import CSVReader
+from phi.document.reader.website import WebsiteReader
 from phi.tools.streamlit.components import (
     check_password,
     get_openai_key_sidebar,
     get_username_sidebar,
 )
 from phi.utils.log import logger
+from PIL import Image
 
-from agents.example import get_example_agent
+from leaders.generic import get_leader as get_generic_leader
 
 nest_asyncio.apply()
 st.set_page_config(
@@ -36,8 +36,8 @@ st.markdown(
 
 def restart_agent():
     logger.debug("---*--- Restarting Agent ---*---")
-    st.session_state["example_agent"] = None
-    st.session_state["example_agent_session_id"] = None
+    st.session_state["generic_leader"] = None
+    st.session_state["generic_leader_session_id"] = None
     st.session_state["uploaded_image"] = None
     if "url_scrape_key" in st.session_state:
         st.session_state["url_scrape_key"] += 1
@@ -80,20 +80,20 @@ def main() -> None:
         restart_agent()
 
     # Get the Agent
-    example_agent: Agent
+    generic_leader: Agent
     if (
-        "example_agent" not in st.session_state
-        or st.session_state["example_agent"] is None
+        "generic_leader" not in st.session_state
+        or st.session_state["generic_leader"] is None
     ):
         logger.info(f"---*--- Creating {model_id} Agent ---*---")
-        example_agent = get_example_agent(model_id=model_id, debug_mode=True)
-        st.session_state["example_agent"] = example_agent
+        generic_leader = get_generic_leader()
+        st.session_state["generic_leader"] = generic_leader
     else:
-        example_agent = st.session_state["example_agent"]
+        generic_leader = st.session_state["generic_leader"]
 
     # Create Agent session (i.e. log to database) and save session_id in session state
     try:
-        st.session_state["example_agent_session_id"] = example_agent.create_session()
+        st.session_state["generic_leader_session_id"] = generic_leader.create_session()
     except Exception:
         st.warning("Could not create Agent session, is the database running?")
         return
@@ -104,7 +104,7 @@ def main() -> None:
         uploaded_image = st.session_state["uploaded_image"]
 
     # Load existing messages
-    agent_chat_history = example_agent.memory.get_messages()
+    agent_chat_history = generic_leader.memory.get_messages()
     if len(agent_chat_history) > 0:
         logger.debug("Loading chat history")
         st.session_state["messages"] = agent_chat_history
@@ -177,7 +177,7 @@ def main() -> None:
             with st.spinner("Thinking..."):
                 resp_container = st.empty()
                 response = ""
-                for delta in example_agent.run(
+                for delta in generic_leader.run(
                     message=question,
                     images=[uploaded_image] if uploaded_image else [],
                     stream=True,
@@ -189,7 +189,7 @@ def main() -> None:
             )
 
     # Load knowledge base
-    if example_agent.knowledge:
+    if generic_leader.knowledge:
         # -*- Add websites to knowledge base
         if "url_scrape_key" not in st.session_state:
             st.session_state["url_scrape_key"] = 0
@@ -206,7 +206,7 @@ def main() -> None:
                     scraper = WebsiteReader(max_links=2, max_depth=1)
                     web_documents: List[Document] = scraper.read(input_url)
                     if web_documents:
-                        example_agent.knowledge.load_documents(
+                        generic_leader.knowledge.load_documents(
                             web_documents, upsert=True
                         )
                     else:
@@ -238,7 +238,7 @@ def main() -> None:
                     reader = DocxReader()
                 auto_rag_documents: List[Document] = reader.read(uploaded_file)
                 if auto_rag_documents:
-                    example_agent.knowledge.load_documents(
+                    generic_leader.knowledge.load_documents(
                         auto_rag_documents, upsert=True
                     )
                 else:
@@ -246,28 +246,33 @@ def main() -> None:
                 st.session_state[f"{document_name}_uploaded"] = True
             alert.empty()
 
-        if example_agent.knowledge.vector_db:
+        if generic_leader.knowledge.vector_db:
             if st.sidebar.button("Delete Knowledge Base"):
-                example_agent.knowledge.vector_db.delete()
+                generic_leader.knowledge.vector_db.delete()
                 st.sidebar.success("Knowledge base deleted")
 
-    if example_agent.storage:
-        example_agent_session_ids: List[str] = (
-            example_agent.storage.get_all_session_ids()
+    if generic_leader.storage:
+        generic_leader_session_ids: List[str] = (
+            generic_leader.storage.get_all_session_ids()
         )
-        new_example_agent_session_id = st.sidebar.selectbox(
-            "Session ID", options=example_agent_session_ids
+        new_generic_leader_session_id = st.sidebar.selectbox(
+            "Session ID", options=generic_leader_session_ids
         )
-        if st.session_state["example_agent_session_id"] != new_example_agent_session_id:
+        if (
+            st.session_state["generic_leader_session_id"]
+            != new_generic_leader_session_id
+        ):
             logger.info(
-                f"---*--- Loading {model_id} session: {new_example_agent_session_id} ---*---"
+                f"---*--- Loading {model_id} session: {new_generic_leader_session_id} ---*---"
             )
-            st.session_state["example_agent"] = get_example_agent(
+            st.session_state["generic_leader"] = get_generic_leader(
                 model_id=model_id,
-                session_id=new_example_agent_session_id,
+                session_id=new_generic_leader_session_id,
                 debug_mode=True,
             )
-            st.session_state["example_agent_session_id"] = new_example_agent_session_id
+            st.session_state["generic_leader_session_id"] = (
+                new_generic_leader_session_id
+            )
             st.session_state["uploaded_image"] = None
             st.rerun()
 
