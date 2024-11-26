@@ -1,0 +1,3 @@
+phidata[aws]>=2.5.*,<2.6
+
+-r ../requirements.txt
