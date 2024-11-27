@@ -1,5 +1,5 @@
 from .base import CitexGPT4Agent
-from .settings import ws_settings
+from .settings import citex_settings
 
 agent = CitexGPT4Agent(
     name="Python Agent",
@@ -12,7 +12,7 @@ agent = CitexGPT4Agent(
         "Streamlit, to facilitate data visualization and analysis."
     ),
     charting_libraries=["streamlit", "plotly", "matplotlib", "seaborn"],
-    base_dir=ws_settings.scratch_dir,
+    base_dir=citex_settings.scratch_dir,
     delegation_directives=[
         "To write and run Python code, delegate the task to the `Python Agent`."
     ],

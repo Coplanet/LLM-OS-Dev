@@ -24,7 +24,7 @@ class CitexOllamaAgen(CitexAgent):
 
 
 class CitextAgentTeam(list, Generic[TypeVar("T", bound=CitexAgent)]):
-    def __init__(self, agents: List[CitexAgent]):
+    def __init__(self, agents: List[CitexAgent] = []):
         # validate all agents during initialization
         self.__check_types(*agents)
         super().__init__(agents)
@@ -49,9 +49,15 @@ class CitextAgentTeam(list, Generic[TypeVar("T", bound=CitexAgent)]):
                 )
 
     @property
-    def delegation_directives(self):
+    def delegation_directives(self) -> str:
         return dedent(
-            "\n".join([getattr(agent, "delegation_directives", "") for agent in self])
+            "\n".join(
+                [
+                    dir
+                    for agent in self
+                    for dir in getattr(agent, "delegation_directives", "")
+                ]
+            )
         ).strip()
 
 

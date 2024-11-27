@@ -2,7 +2,7 @@ from textwrap import dedent
 
 from phi.tools.exa import ExaTools
 
-from workspace.settings import ws_settings
+from workspace.settings import citex_settings
 
 from .base import CitexGPT4Agent
 
@@ -10,7 +10,7 @@ agent = CitexGPT4Agent(
     name="Report Writer Agent",
     role="Write a research report on a given topic",
     tools=[ExaTools(num_results=5, text_length_limit=1000)],
-    save_output_to_file=ws_settings.scratch_dir / "{run_id}.md",
+    save_output_to_file=citex_settings.scratch_dir / "{run_id}.md",
     description="You are a Senior Report Writer tasked with writing a cover story research report.",
     instructions=[
         "For a given topic, use the `search_exa` to get the top 10 search results.",

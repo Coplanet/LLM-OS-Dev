@@ -2,7 +2,7 @@ from os import getenv
 
 from phi.playground import Playground
 
-from leaders.generic import get_leader as get_generic_leader
+from ai.leaders.generic import get_leader as get_generic_leader
 
 ######################################################
 # Router for the agent playground

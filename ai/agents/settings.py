@@ -8,7 +8,7 @@ from phi.model.ollama import Ollama
 from phi.model.openai import OpenAIChat
 from pydantic_settings import BaseSettings
 
-from workspace.settings import ws_settings
+from workspace.settings import citex_settings
 
 
 @unique
@@ -62,11 +62,12 @@ class AgentSettings(BaseSettings):
         return self._getenv(key, "true" if default else "false").lower() == "true"
 
     class Models:
-        ollama3_2 = Ollama(id="llama3.2", host=ws_settings.ollama_host)
+        ollama3_2 = Ollama(id="llama3.2", host=citex_settings.ollama_host)
         gpt4 = OpenAIChat(
             id=GPTModels.GPT4.value,
             max_tokens=Defaults.MAX_COMPLETION_TOKENS.value,
             temperature=Defaults.TEMPERATURE.value,
+            api_key=citex_settings.gpt_api_key,
         )
 
 

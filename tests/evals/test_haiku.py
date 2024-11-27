@@ -2,7 +2,7 @@ from typing import Optional
 
 from phi.eval import Eval, EvalResult
 
-from leaders.generic import get_leader
+from ai.leaders.generic import get_leader
 
 
 def test_haiku():

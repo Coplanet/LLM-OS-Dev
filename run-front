@@ -1,3 +1,4 @@
 #!/bin/bash
 
-python -m uvicorn api.main:app --reload --port 8100
+export $(grep -v '^#' .env | xargs)
+python -m streamlit run app/Home.py

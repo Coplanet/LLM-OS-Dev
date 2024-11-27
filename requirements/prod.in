@@ -1,5 +1,16 @@
 phidata[aws]>=2.5.*,<2.6
-composio-phidata
+
+groq
+arxiv
 ollama
+resend
+exa-py
+yfinance
+wikipedia
+composio_core
+composio_openai
+composio-phidata
+duckduckgo-search
+youtube-transcript-api
 
 -r ./phidata.txt

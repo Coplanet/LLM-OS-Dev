@@ -6,6 +6,11 @@ agent = CitexGPT4Agent(
         actions=[
             ComposioAction.GOOGLECALENDAR_FIND_FREE_SLOTS,
             ComposioAction.GOOGLECALENDAR_CREATE_EVENT,
+            ComposioAction.GOOGLECALENDAR_FIND_EVENT,
+            ComposioAction.GOOGLECALENDAR_GET_CALENDAR,
+            ComposioAction.GOOGLECALENDAR_LIST_CALENDARS,
+            ComposioAction.GOOGLECALENDAR_UPDATE_EVENT,
+            ComposioAction.GOOGLECALENDAR_DELETE_EVENT,
             ComposioAction.GMAIL_FETCH_EMAILS,
             ComposioAction.GMAIL_CREATE_EMAIL_DRAFT,
             ComposioAction.GMAIL_REPLY_TO_THREAD,

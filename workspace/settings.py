@@ -4,30 +4,18 @@ from typing import Optional
 
 from phi.workspace.settings import WorkspaceSettings
 
-
 #
 # -*- Define workspace settings using a WorkspaceSettings object
 # these values can also be set using environment variables or a .env file
 #
-class CitexSettings(WorkspaceSettings):
+
+ROOT_DIR = Path(__file__).parent.parent.resolve()
+
+ws_settings = WorkspaceSettings(
     # Path to the workspace root
-    ws_root: Path = Path(__file__).parent.parent.resolve()
-    ollama_host: Optional[str] = os.getenv("OLLAMA_HOST", "localhost")
-    gpt_api_key: Optional[str] = os.getenv("OPENAI_API_KEY", None)
-    resend_api_key: Optional[str] = os.getenv("RESEND_API_KEY", None)
-
-    @property
-    def scratch_dir(self):
-        return self.ws_root.joinpath("scratch")
-
-    @property
-    def knowledgebase_dir(self):
-        return self.ws_root.joinpath("knowledgebase")
-
-
-ws_settings = CitexSettings(
+    ws_root=ROOT_DIR,
     # Workspace name: used for naming cloud resources
-    ws_name="citex-llm-os",
+    ws_name="citex-agent",
     # -*- Development env settings
     dev_env="dev",
     # -*- Development Apps
@@ -52,7 +40,27 @@ ws_settings = CitexSettings(
     # Name of the image
     image_name="agent-app",
     # Repository for the image
+    image_repo="127.0.0.1:5000",
     # image_repo="phidata",
     # Build images locally
-    # build_images=True,
+    build_images=True,
 )
+
+
+class CitexSettings:
+    # Path to the workspace root
+    ws_root: Path = ROOT_DIR
+    ollama_host: Optional[str] = os.getenv("OLLAMA_HOST", "localhost")
+    gpt_api_key: Optional[str] = os.getenv("OPENAI_API_KEY", None)
+    resend_api_key: Optional[str] = os.getenv("RESEND_API_KEY", None)
+
+    @property
+    def scratch_dir(self):
+        return self.ws_root.joinpath("scratch")
+
+    @property
+    def knowledgebase_dir(self):
+        return self.ws_root.joinpath("knowledgebase")
+
+
+citex_settings = CitexSettings()

@@ -2,14 +2,14 @@ from textwrap import dedent
 
 from phi.tools.exa import ExaTools
 
-from workspace.settings import ws_settings
+from workspace.settings import citex_settings
 
 from .base import CitexGPT4Agent
 
 agent = CitexGPT4Agent(
     name="Patent Writer Agent",
     tools=[ExaTools(num_results=5, text_length_limit=1000)],
-    save_output_to_file=ws_settings.scratch_dir / "{run_id}.md",
+    save_output_to_file=citex_settings.scratch_dir / "{run_id}.md",
     role="Draft a patent document for a specified invention",
     description=(
         "An AI system designed to assist in drafting patent applications, "

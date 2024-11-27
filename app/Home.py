@@ -21,7 +21,7 @@ from phi.tools.streamlit.components import (
 from phi.utils.log import logger
 from PIL import Image
 
-from leaders.generic import get_leader as get_generic_leader
+from ai.leaders.generic import get_leader as get_generic_leader
 
 nest_asyncio.apply()
 st.set_page_config(
@@ -266,9 +266,7 @@ def main() -> None:
                 f"---*--- Loading {model_id} session: {new_generic_leader_session_id} ---*---"
             )
             st.session_state["generic_leader"] = get_generic_leader(
-                model_id=model_id,
                 session_id=new_generic_leader_session_id,
-                debug_mode=True,
             )
             st.session_state["generic_leader_session_id"] = (
                 new_generic_leader_session_id

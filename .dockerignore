@@ -23,5 +23,9 @@ docs
 .venv
 venv*
 aienv*
+env
 
 .ipynb_checkpoints
+
+requirements/*
+!requirements/prod.txt

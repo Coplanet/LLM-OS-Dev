@@ -4,6 +4,7 @@ from typing import List, Optional
 from phi.embedder.openai import OpenAIEmbedder
 from phi.knowledge.combined import CombinedKnowledgeBase
 from phi.knowledge.pdf import PDFKnowledgeBase, PDFReader
+from phi.storage.agent.postgres import PgAgentStorage
 from phi.tools import Toolkit
 from phi.tools.calculator import Calculator
 from phi.tools.duckduckgo import DuckDuckGo
@@ -12,7 +13,7 @@ from phi.tools.resend_tools import ResendTools
 from phi.tools.yfinance import YFinanceTools
 from phi.vectordb.pgvector import PgVector2
 
-from agents import (
+from ai.agents import (
     arxiv,
     github,
     google_calender,
@@ -22,9 +23,10 @@ from agents import (
     wikipedia,
     youtube,
 )
-from agents.base import CitextAgentTeam, agent_settings
+from ai.agents.base import CitextAgentTeam, agent_settings
 from db.session import db_url
-from workspace.settings import ws_settings
+from db.settings import db_settings
+from workspace.settings import citex_settings
 
 from .base import CitexGPT4Leader
 
@@ -45,6 +47,7 @@ def get_leader(
     patent_writer_assistant: bool = True,
     run_id: Optional[str] = None,
     user_id: Optional[str] = None,
+    session_id: Optional[str] = None,
 ):
     tools: List[Toolkit] = []
     extra_instructions: List[str] = []
@@ -96,7 +99,7 @@ def get_leader(
         )
 
     if file_tools:
-        tools.append(FileTools(base_dir=ws_settings.scratch_dir))
+        tools.append(FileTools(base_dir=citex_settings.scratch_dir))
         extra_instructions.append(
             "You can use the `read_file` tool to read a file, `save_file` to save a file, "
             "and `list_files` to list files in the working directory."
@@ -105,7 +108,8 @@ def get_leader(
     if resend_tools:
         tools.append(
             ResendTools(
-                api_key=ws_settings.resend_api_key, from_email="onboarding@resend.dev"
+                api_key=citex_settings.resend_api_key,
+                from_email="onboarding@resend.dev",
             )
         )
         extra_instructions.append(
@@ -116,7 +120,7 @@ def get_leader(
     knowledge_base = CombinedKnowledgeBase(
         sources=[
             PDFKnowledgeBase(
-                path=ws_settings.knowledgebase_dir, reader=PDFReader(chunk=True)
+                path=citex_settings.knowledgebase_dir, reader=PDFReader(chunk=True)
             )
         ],
         # Store assistant knowledge base in ai.sql_assistant_knowledge table
@@ -162,7 +166,7 @@ def get_leader(
                     - You need to delegate the task to a team member
                     - You need to ask a clarifying question\
                 """
-            ).strip,
+            ).strip(),
             (
                 "IMPORTANT: If the user asks about a topic, first ALWAYS search your knowledge "
                 "base using the `search_knowledge_base` tool."
@@ -202,4 +206,8 @@ def get_leader(
         # Inject some app related items
         run_id=run_id,
         user_id=user_id,
+        session_id=session_id,
+        storage=PgAgentStorage(
+            table_name="agent_sessions", db_url=db_settings.get_db_url()
+        ),
     )

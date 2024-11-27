@@ -1,4 +1,4 @@
-from agents.base import CitexGPT4Agent, CitextAgentTeam
+from ai.agents.base import CitexGPT4Agent, CitextAgentTeam
 
 
 class CitexGPT4Leader(CitexGPT4Agent):
