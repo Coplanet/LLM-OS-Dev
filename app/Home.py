@@ -21,17 +21,48 @@ from phi.tools.streamlit.components import (
 from phi.utils.log import logger
 from PIL import Image
 
-from ai.leaders.generic import get_leader as get_generic_leader
+from ai.coordinators.generic import get_leader as get_generic_leader
+
+STATIC_DIR = "app/static"
+LOGO = f"{STATIC_DIR}/images/llm-os.png"
 
 nest_asyncio.apply()
-st.set_page_config(
-    page_title="AI Agent",
-    page_icon=":orange_heart:",
-)
+st.set_page_config(page_title="LLM OS", page_icon=LOGO)
 st.title("AI Agent")
 st.markdown(
-    "##### :orange_heart: built using [phidata](https://github.com/phidatahq/phidata)"
+    f"""##### <img src="{LOGO}" alt="Logo" style="width: 30px; margin-right: 10px;"> LLM OS""",
+    unsafe_allow_html=True,
 )
+st.markdown(
+    """<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.0/css/all.min.css">""",
+    unsafe_allow_html=True,
+)
+st.markdown(
+    """
+    <style>
+        /* Target the sidebar container */
+        [data-testid="stSidebarContent"] {
+            overflow-x: hidden;
+        }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+with st.expander(":point_down: How to use"):
+    st.markdown(
+        "- Add blog post to knowledge: https://blog.samaltman.com/what-i-wish-someone-had-told-me and ask: "
+        "what did sam altman wish he knew?"
+    )
+    st.markdown("- Ask what are your agents?")
+    st.markdown("- Test Web search: Whats happening in france?")
+    st.markdown("- Test Calculator: What is 10!")
+    st.markdown("- Test Finance: What is the price of AAPL?")
+    st.markdown(
+        "- Test Finance: Write a comparison between nvidia and amd, use all finance tools available "
+        "and summarize the key points"
+    )
+    st.markdown("- Test Research: Write a report on Hashicorp IBM acquisition")
 
 
 def restart_agent():
@@ -54,6 +85,66 @@ def encode_image(image_file):
     image.save(buffer, format="JPEG")
     encoding = base64.b64encode(buffer.getvalue()).decode("utf-8")
     return f"data:image/jpeg;base64,{encoding}"
+
+
+ICONS = {
+    "calculator_enabled": "fa-solid fa-calculator",
+    "file_tools_enabled": "fa-solid fa-file",
+    "resend_tools_enabled": "fa-solid fa-paper-plane",
+    "ddg_search_enabled": "fa-solid fa-search",
+    "finance_tools_enabled": "fa-solid fa-chart-line",
+    "journal_assistant_enabled": "fa-solid fa-book",
+    "python_assistant_enabled": "fab fa-python",
+    "arxiv_assistant_enabled": "fa-solid fa-book-open",
+    "youtube_assistant_enabled": "fab fa-youtube",
+    "google_calender_assistant_enabled": "fa-solid fa-calendar-alt",
+    "github_assistant_enabled": "fab fa-github",
+    "wikipedia_assistant_enabled": "fab fa-wikipedia-w",
+    "patent_writer_assistant_enabled": "fa-solid fa-lightbulb",
+}
+
+
+def enable_feature(feature_name: str, checkbox_text: str, help: str) -> bool:
+    # Enable Calculator
+    if feature_name not in st.session_state:
+        st.session_state[feature_name] = True
+    # fetch the icon for the feature
+    ICON = ICONS.get(feature_name, "")
+    # Get calculator_enabled from session state if set
+    pre_value = st.session_state[feature_name]
+    # Inline layout for checkbox with icon and label
+    with st.sidebar:
+        col1, col2 = st.columns([1, 11])
+        with col1:
+            # Create the checkbox with a unique key
+            new_value = st.checkbox(
+                "label",
+                value=pre_value,
+                key=f"checkbox_{feature_name}",
+                label_visibility="collapsed" if ICON else "visible",
+            )
+
+        if ICON:
+            with col2:
+                # Create an HTML label tied to the checkbox
+                st.markdown(
+                    f"""
+                    <span style="position: relative">
+                        <span style="top: 27px; position: absolute; width: 100vw;">
+                            <i class="{ICON}" style="margin-right: 10px;"></i> {checkbox_text}
+                        </span>
+                    </span>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
+    if pre_value != new_value:
+        print(st.session_state[feature_name], new_value)
+        st.session_state[feature_name] = new_value
+        pre_value = new_value
+        restart_agent()
+
+    return new_value
 
 
 def main() -> None:
@@ -79,6 +170,47 @@ def main() -> None:
         st.session_state["model_id"] = model_id
         restart_agent()
 
+    # Sidebar checkboxes for selecting team members
+    st.sidebar.markdown("### Select Team Members")
+    journal_assistant_enabled = enable_feature(
+        "journal_assistant_enabled",
+        "Journal Assistant",
+        "Enable the journal assistant (uses Exa).",
+    )
+    python_assistant_enabled = enable_feature(
+        "python_assistant_enabled",
+        "Python Assistant",
+        "Enable the Python Assistant for writing and running python code.",
+    )
+    arxiv_assistant_enabled = enable_feature(
+        "arxiv_assistant_enabled",
+        "Arxiv Assistant",
+        "Enable the Arxiv Assistant for searching papers in arxiv.",
+    )
+    youtube_assistant_enabled = enable_feature(
+        "youtube_assistant_enabled",
+        "Youtube Assistant",
+        "Enable the Youtube Assistant for youtube related URLs and Queries.",
+    )
+    google_calender_assistant_enabled = enable_feature(
+        "google_calender_assistant_enabled",
+        "Google Calendar Assistant",
+        "Enable the Google Assistant",
+    )
+    github_assistant_enabled = enable_feature(
+        "github_assistant_enabled", "GitHub Assistant", "Enable the Google Assistant"
+    )
+    wikipedia_assistant_enabled = enable_feature(
+        "wikipedia_assistant_enabled",
+        "Wikipedia Assistant",
+        "Enable the Wikipedia Assistant for youtube related URLs and Queries.",
+    )
+    patent_writer_assistant_enabled = enable_feature(
+        "patent_writer_assistant_enabled",
+        "Patent Writer Assistant",
+        "Enable the Patent Assistant for writing patents",
+    )
+
     # Get the Agent
     generic_leader: Agent
     if (
@@ -86,7 +218,17 @@ def main() -> None:
         or st.session_state["generic_leader"] is None
     ):
         logger.info(f"---*--- Creating {model_id} Agent ---*---")
-        generic_leader = get_generic_leader()
+        generic_leader = get_generic_leader(
+            python_assistant=python_assistant_enabled,
+            youtube_assistant=youtube_assistant_enabled,
+            arxiv_assistant=arxiv_assistant_enabled,
+            journal_assistant=journal_assistant_enabled,
+            wikipedia_assistant=wikipedia_assistant_enabled,
+            github_assistant=github_assistant_enabled,
+            google_calender_assistant=google_calender_assistant_enabled,
+            patent_writer_assistant=patent_writer_assistant_enabled,
+            model_id=model_id,
+        )
         st.session_state["generic_leader"] = generic_leader
     else:
         generic_leader = st.session_state["generic_leader"]
@@ -266,6 +408,15 @@ def main() -> None:
                 f"---*--- Loading {model_id} session: {new_generic_leader_session_id} ---*---"
             )
             st.session_state["generic_leader"] = get_generic_leader(
+                python_assistant=python_assistant_enabled,
+                youtube_assistant=youtube_assistant_enabled,
+                arxiv_assistant=arxiv_assistant_enabled,
+                journal_assistant=journal_assistant_enabled,
+                wikipedia_assistant=wikipedia_assistant_enabled,
+                github_assistant=github_assistant_enabled,
+                google_calender_assistant=google_calender_assistant_enabled,
+                patent_writer_assistant=patent_writer_assistant_enabled,
+                model_id=model_id,
                 session_id=new_generic_leader_session_id,
             )
             st.session_state["generic_leader_session_id"] = (

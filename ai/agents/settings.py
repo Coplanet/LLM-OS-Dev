@@ -14,6 +14,7 @@ from workspace.settings import citex_settings
 @unique
 class GPTModels(Enum):
     GPT4 = "gpt-4o"
+    GPT4_MINI = "gpt-4o-mini"
 
 
 @unique
@@ -69,6 +70,15 @@ class AgentSettings(BaseSettings):
             temperature=Defaults.TEMPERATURE.value,
             api_key=citex_settings.gpt_api_key,
         )
+
+        @classmethod
+        def get_gpt_model(cls, model_id: str):
+            return OpenAIChat(
+                id=model_id,
+                max_tokens=Defaults.MAX_COMPLETION_TOKENS.value,
+                temperature=Defaults.TEMPERATURE.value,
+                api_key=citex_settings.gpt_api_key,
+            )
 
 
 # Create an AgentSettings object
