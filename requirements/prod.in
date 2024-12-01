@@ -8,6 +8,7 @@ exa-py
 yfinance
 wikipedia
 composio_core
+beautifulsoup4
 composio_openai
 composio-phidata
 duckduckgo-search

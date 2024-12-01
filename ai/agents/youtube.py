@@ -1,8 +1,8 @@
 from phi.tools.youtube_tools import YouTubeTools
 
-from .base import CitexGPT4Agent
+from .base import GPT4Agent
 
-agent = CitexGPT4Agent(
+agent = GPT4Agent(
     name="Youtube Agent",
     tools=[YouTubeTools()],
     description=(

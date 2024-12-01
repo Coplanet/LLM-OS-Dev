@@ -1,11 +1,11 @@
-from ai.agents.base import CitexGPT4Agent, CitextAgentTeam
+from ai.agents.base import AgentTeam, GPT4Agent
 
 
-class CitexGPT4Leader(CitexGPT4Agent):
+class GPT4Leader(GPT4Agent):
     @classmethod
     def build(
         cls,
-        team: CitextAgentTeam,
+        team: AgentTeam,
         *args,
         **kwargs,
     ):

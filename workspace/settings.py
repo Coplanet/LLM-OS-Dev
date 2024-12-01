@@ -47,7 +47,7 @@ ws_settings = WorkspaceSettings(
 )
 
 
-class CitexSettings:
+class Settings:
     # Path to the workspace root
     ws_root: Path = ROOT_DIR
     ollama_host: Optional[str] = os.getenv("OLLAMA_HOST", "localhost")
@@ -63,4 +63,4 @@ class CitexSettings:
         return self.ws_root.joinpath("knowledgebase")
 
 
-citex_settings = CitexSettings()
+citex_settings = Settings()

@@ -2,9 +2,9 @@ from textwrap import dedent
 
 from phi.tools.arxiv_toolkit import ArxivToolkit
 
-from .base import CitexGPT4Agent
+from .base import GPT4Agent
 
-agent = CitexGPT4Agent(
+agent = GPT4Agent(
     name="Arxiv Search Agent",
     tools=[ArxivToolkit()],
     description=dedent(

@@ -1,7 +1,7 @@
-from .base import CitexGPT4Agent
+from .base import GPT4Agent
 from .settings import citex_settings
 
-agent = CitexGPT4Agent(
+agent = GPT4Agent(
     name="Python Agent",
     role="Advanced Python Code Writer and Executor",
     pip_install=True,

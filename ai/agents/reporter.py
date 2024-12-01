@@ -4,9 +4,9 @@ from phi.tools.exa import ExaTools
 
 from workspace.settings import citex_settings
 
-from .base import CitexGPT4Agent
+from .base import GPT4Agent
 
-agent = CitexGPT4Agent(
+agent = GPT4Agent(
     name="Report Writer Agent",
     role="Write a research report on a given topic",
     tools=[ExaTools(num_results=5, text_length_limit=1000)],

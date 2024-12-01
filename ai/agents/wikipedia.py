@@ -2,9 +2,9 @@ from textwrap import dedent
 
 from phi.tools.wikipedia import WikipediaTools
 
-from .base import CitexGPT4Agent
+from .base import GPT4Agent
 
-agent = CitexGPT4Agent(
+agent = GPT4Agent(
     name="Wikipedia Search Agent",
     tools=[WikipediaTools()],
     description=dedent(

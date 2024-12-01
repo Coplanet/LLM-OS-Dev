@@ -1,6 +1,6 @@
-from .base import CitexGPT4Agent, ComposioAction, agent_settings
+from .base import ComposioAction, GPT4Agent, agent_settings
 
-agent = CitexGPT4Agent(
+agent = GPT4Agent(
     name="Google Calender Agent",
     tools=agent_settings.composio_tools.get_tools(
         actions=[

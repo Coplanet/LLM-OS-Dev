@@ -12,7 +12,10 @@ RUN groupadd -g ${DOCKER_UID} ${USER} \
 WORKDIR ${APP_DIR}
 
 # Copy requirements.txt
-COPY requirements/prod.txt ./requirements.txt
+COPY requirements/prod.in ./requirements.in
+
+# rebuild the requirements.txt
+RUN pip-compile requirements.in > requirements.txt
 
 # Install requirements
 RUN --mount=type=cache,target=/root/.cache/uv \

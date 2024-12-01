@@ -1,6 +1,6 @@
-from .base import CitexGPT4Agent, ComposioAction, agent_settings
+from .base import ComposioAction, GPT4Agent, agent_settings
 
-agent = CitexGPT4Agent(
+agent = GPT4Agent(
     name="GitHub Agent",
     tools=agent_settings.composio_tools.get_tools(
         actions=[
@@ -8,13 +8,15 @@ agent = CitexGPT4Agent(
         ]
     ),
     description=(
-        "You are a Github assistant capable of performing tasks on Github, "
-        "like make stars, create repositories etc"
+        """\
+        You are a GitHub assistant capable of starring repositories on behalf of the authenticated user.
+        """
     ),
     delegation_directives=[
+        "Delegate the task to the `GitHub Agent` for starring repositories on GitHub.",
         (
-            "For performing any actions in Github, "
-            "delegate the task to the `GitHub Agent`."
+            "For reading or analyzing a repository, use other enabled tools to crawl the repository and "
+            "do not delegate to the `GitHub Agent`."
         ),
     ],
 )

@@ -2,6 +2,7 @@ import base64
 from io import BytesIO
 from os import getenv
 from typing import List
+from urllib.parse import quote
 
 import nest_asyncio
 import streamlit as st
@@ -24,13 +25,19 @@ from PIL import Image
 from ai.coordinators.generic import get_leader as get_generic_leader
 
 STATIC_DIR = "app/static"
-LOGO = f"{STATIC_DIR}/images/llm-os.png"
+IMAGE_DIR = f"{STATIC_DIR}/images"
+
+SESSION_KEY = "sid"
 
 nest_asyncio.apply()
-st.set_page_config(page_title="LLM OS", page_icon=LOGO)
-st.title("AI Agent")
+st.set_page_config(page_title="CoPlanet AI", page_icon=f"{IMAGE_DIR}/favicon.png")
+
+st.title("CoPlanet AI")
 st.markdown(
-    f"""##### <img src="{LOGO}" alt="Logo" style="width: 30px; margin-right: 10px;"> LLM OS""",
+    f"""\
+    ##### <img src="{IMAGE_DIR}/coplanet.png" alt="Logo" style="width: 30px; margin-right: 10px;"> \
+    Unleashing Infinite Possibilities: Where Technology Meets Community\
+    """,
     unsafe_allow_html=True,
 )
 st.markdown(
@@ -44,29 +51,55 @@ st.markdown(
         [data-testid="stSidebarContent"] {
             overflow-x: hidden;
         }
+        .st-key-delete_knowledge_base button,
+        .st-key-delete_all_session_button button {
+            color: #fff;
+            background-color: #dc3545;
+            border-color: #dc3545;
+        }
+        .st-key-delete_knowledge_base button:hover,
+        .st-key-delete_all_session_button button:hover {
+            color: #fff;
+            background-color: #c82333;
+            border-color: #bd2130;
+        }
     </style>
     """,
     unsafe_allow_html=True,
 )
 
-with st.expander(":point_down: How to use"):
-    st.markdown(
-        "- Add blog post to knowledge: https://blog.samaltman.com/what-i-wish-someone-had-told-me and ask: "
-        "what did sam altman wish he knew?"
+with st.expander(":point_down: How to Utilize This Platform"):
+    examples = [
+        (
+            "Enrich your knowledge base by adding insightful blog posts. For example, explore insights \
+                from [Sam Altman's blog](https://blog.samaltman.com/what-i-wish-someone-had-told-me) and inquire: "
+            "What are the key lessons Sam Altman wished he had known?"
+        ),
+        "Discover the capabilities of your AI agents by asking: What functions can my agents perform?",
+        "Explore global events with our Web Search feature: What's the latest news from France?",
+        "Leverage our Calculator for complex computations: How do you calculate 10 factorial?",
+        "Stay informed on financial markets: What's the current stock price of AAPL?",
+        "Conduct in-depth financial analyses: Compare NVIDIA and AMD using all available financial tools, \
+            and distill the essential insights.",
+        "Dive into research: Generate a comprehensive report on the HashiCorp and IBM acquisition.",
+    ]
+    SID = (
+        "{}={}".format(SESSION_KEY, st.query_params[SESSION_KEY])
+        if SESSION_KEY in st.query_params and st.query_params[SESSION_KEY]
+        else ""
     )
-    st.markdown("- Ask what are your agents?")
-    st.markdown("- Test Web search: Whats happening in france?")
-    st.markdown("- Test Calculator: What is 10!")
-    st.markdown("- Test Finance: What is the price of AAPL?")
+    for example in examples:
+        st.markdown(
+            f"- {example} <a href='?{SID}&q={quote(example)}' target='_self'>[Try it!]</a>",
+            unsafe_allow_html=True,
+        )
     st.markdown(
-        "- Test Finance: Write a comparison between nvidia and amd, use all finance tools available "
-        "and summarize the key points"
+        "Feel free to unleash your creativity and explore the full potential of this platform."
     )
-    st.markdown("- Test Research: Write a report on Hashicorp IBM acquisition")
 
 
 def restart_agent():
-    logger.debug("---*--- Restarting Agent ---*---")
+    logger.debug(">>> Restarting Agent")
     st.session_state["generic_leader"] = None
     st.session_state["generic_leader_session_id"] = None
     st.session_state["uploaded_image"] = None
@@ -152,7 +185,7 @@ def main() -> None:
     get_openai_key_sidebar()
 
     # Get username
-    username = "streamlit" if getenv("RUNTIME_ENV") == "dev" else get_username_sidebar()
+    username = "CoPlanet" if getenv("RUNTIME_ENV") == "dev" else get_username_sidebar()
     if username:
         st.sidebar.info(f":technologist: User: {username}")
     else:
@@ -213,11 +246,19 @@ def main() -> None:
 
     # Get the Agent
     generic_leader: Agent
+    SID = (
+        st.query_params[SESSION_KEY]
+        if (SESSION_KEY in st.query_params and st.query_params[SESSION_KEY])
+        else None
+    )
+    if SID:
+        logger.info(f">>> Using Session ID: {SID}")
     if (
         "generic_leader" not in st.session_state
         or st.session_state["generic_leader"] is None
+        or (SID and st.session_state["generic_leader"].session_id != SID)
     ):
-        logger.info(f"---*--- Creating {model_id} Agent ---*---")
+        logger.info(f">>> Creating {model_id} Agent")
         generic_leader = get_generic_leader(
             python_assistant=python_assistant_enabled,
             youtube_assistant=youtube_assistant_enabled,
@@ -228,15 +269,25 @@ def main() -> None:
             google_calender_assistant=google_calender_assistant_enabled,
             patent_writer_assistant=patent_writer_assistant_enabled,
             model_id=model_id,
+            session_id=SID,
         )
         st.session_state["generic_leader"] = generic_leader
     else:
         generic_leader = st.session_state["generic_leader"]
 
+    NEW_SESSION = not bool(SID)
     # Create Agent session (i.e. log to database) and save session_id in session state
     try:
-        st.session_state["generic_leader_session_id"] = generic_leader.create_session()
-    except Exception:
+        if SID:
+            st.session_state["generic_leader_session_id"] = st.query_params[SESSION_KEY]
+            logger.info(">>> Identified Session ID: %s", st.query_params[SESSION_KEY])
+        else:
+            st.query_params[SESSION_KEY] = generic_leader.create_session()
+            st.rerun()
+            return
+
+    except Exception as e:
+        logger.error(e)
         st.warning("Could not create Agent session, is the database running?")
         return
 
@@ -247,48 +298,83 @@ def main() -> None:
 
     # Load existing messages
     agent_chat_history = generic_leader.memory.get_messages()
-    if len(agent_chat_history) > 0:
+    if not agent_chat_history:
+        history = generic_leader.read_from_storage()
+        if (
+            history
+            and history.memory
+            and "chats" in history.memory
+            and isinstance(history.memory["chats"], list)
+        ):
+            for chat in history.memory["chats"]:
+                if "messages" in chat:
+                    if "role" in chat["message"] and chat["message"]["role"] == "user":
+                        agent_chat_history.append(
+                            {"role": "user", "content": chat["messages"]["content"]}
+                        )
+                        if "response" in chat:
+                            agent_chat_history.append(
+                                {
+                                    "role": "assistant",
+                                    "content": chat["response"]["content"],
+                                }
+                            )
+    if agent_chat_history:
         logger.debug("Loading chat history")
+        null_content = []
+        for i in range(len(agent_chat_history)):
+            if agent_chat_history[i].get("content") is None:
+                null_content.append(i)
+        # remove null content using the indices:
+        for i in reversed(null_content):
+            agent_chat_history.pop(i)
         st.session_state["messages"] = agent_chat_history
         # Search for uploaded image
-        if uploaded_image is None:
-            for message in agent_chat_history:
-                if message.get("role") == "user":
-                    content = message.get("content")
-                    if isinstance(content, list):
-                        for item in content:
-                            if item["type"] == "image_url":
-                                uploaded_image = item["image_url"]["url"]
-                                st.session_state["uploaded_image"] = uploaded_image
-                                break
+        if False:
+            if uploaded_image is None:
+                for message in agent_chat_history:
+                    if message.get("role") == "user":
+                        content = message.get("content")
+                        if isinstance(content, list):
+                            for item in content:
+                                if item["type"] == "image_url":
+                                    uploaded_image = item["image_url"]["url"]
+                                    st.session_state["uploaded_image"] = uploaded_image
+                                    break
     else:
-        logger.debug("No chat history found")
-        st.session_state["messages"] = [
-            {"role": "assistant", "content": "Ask me anything..."}
-        ]
+        if "q" in st.query_params:
+            st.session_state["messages"] = [
+                {"role": "user", "content": st.query_params["q"]}
+            ]
+        else:
+            logger.debug("No chat history found")
+            st.session_state["messages"] = [
+                {"role": "assistant", "content": "Ask me anything..."}
+            ]
 
-    # Upload Image
-    if uploaded_image is None:
-        if "image_uploader_key" not in st.session_state:
-            st.session_state["image_uploader_key"] = 200
-        uploaded_file = st.sidebar.file_uploader(
-            "Upload Image",
-            key=st.session_state["image_uploader_key"],
-        )
-        if uploaded_file is not None:
-            alert = st.sidebar.info("Processing Image...", icon="ℹ️")
-            image_file_name = uploaded_file.name.split(".")[0]
-            if f"{image_file_name}_uploaded" not in st.session_state:
-                logger.info(f"Encoding {image_file_name}")
-                uploaded_image = encode_image(uploaded_file)
-                st.session_state["uploaded_image"] = uploaded_image
-                st.session_state[f"{image_file_name}_uploaded"] = True
-            alert.empty()
+    if False:
+        # Upload Image
+        if uploaded_image is None:
+            if "image_uploader_key" not in st.session_state:
+                st.session_state["image_uploader_key"] = 200
+            uploaded_file = st.sidebar.file_uploader(
+                "Upload Image",
+                key=st.session_state["image_uploader_key"],
+            )
+            if uploaded_file is not None:
+                alert = st.sidebar.info("Processing Image...", icon="ℹ️")
+                image_file_name = uploaded_file.name.split(".")[0]
+                if f"{image_file_name}_uploaded" not in st.session_state:
+                    logger.info(f"Encoding {image_file_name}")
+                    uploaded_image = encode_image(uploaded_file)
+                    st.session_state["uploaded_image"] = uploaded_image
+                    st.session_state[f"{image_file_name}_uploaded"] = True
+                alert.empty()
 
-    # Prompt for user input
-    if uploaded_image:
-        with st.expander("Uploaded Image", expanded=False):
-            st.image(uploaded_image, use_column_width=True)
+        # Prompt for user input
+        if uploaded_image:
+            with st.expander("Uploaded Image", expanded=False):
+                st.image(uploaded_image, use_column_width=True)
     if prompt := st.chat_input():
         st.session_state["messages"].append({"role": "user", "content": prompt})
 
@@ -335,6 +421,8 @@ def main() -> None:
         # -*- Add websites to knowledge base
         if "url_scrape_key" not in st.session_state:
             st.session_state["url_scrape_key"] = 0
+            st.session_state["input_url"] = ""
+
         input_url = st.sidebar.text_input(
             "Add URL to Knowledge Base",
             type="default",
@@ -345,7 +433,7 @@ def main() -> None:
             if input_url is not None:
                 alert = st.sidebar.info("Processing URLs...", icon="ℹ️")
                 if f"{input_url}_scraped" not in st.session_state:
-                    scraper = WebsiteReader(max_links=2, max_depth=1)
+                    scraper = WebsiteReader(max_links=10, max_depth=3)
                     web_documents: List[Document] = scraper.read(input_url)
                     if web_documents:
                         generic_leader.knowledge.load_documents(
@@ -360,7 +448,8 @@ def main() -> None:
         if "file_uploader_key" not in st.session_state:
             st.session_state["file_uploader_key"] = 100
         uploaded_file = st.sidebar.file_uploader(
-            "Add a Document (.pdf, .csv, .txt, or .docx)",
+            "Add a Document (.pdf)",
+            type=["pdf"],
             key=st.session_state["file_uploader_key"],
         )
         if uploaded_file is not None:
@@ -372,11 +461,11 @@ def main() -> None:
                 reader: Reader
                 if file_type == "pdf":
                     reader = PDFReader()
-                elif file_type == "csv":
+                elif False and file_type == "csv":
                     reader = CSVReader()
-                elif file_type == "txt":
+                elif False and file_type == "txt":
                     reader = TextReader()
-                elif file_type == "docx":
+                elif False and file_type == "docx":
                     reader = DocxReader()
                 auto_rag_documents: List[Document] = reader.read(uploaded_file)
                 if auto_rag_documents:
@@ -389,43 +478,48 @@ def main() -> None:
             alert.empty()
 
         if generic_leader.knowledge.vector_db:
-            if st.sidebar.button("Delete Knowledge Base"):
+            if st.sidebar.button("Delete Knowledge Base", key="delete_knowledge_base"):
                 generic_leader.knowledge.vector_db.delete()
                 st.sidebar.success("Knowledge base deleted")
 
     if generic_leader.storage:
+        selectbox_index = 0
         generic_leader_session_ids: List[str] = (
             generic_leader.storage.get_all_session_ids()
         )
-        new_generic_leader_session_id = st.sidebar.selectbox(
-            "Session ID", options=generic_leader_session_ids
-        )
-        if (
-            st.session_state["generic_leader_session_id"]
-            != new_generic_leader_session_id
-        ):
-            logger.info(
-                f"---*--- Loading {model_id} session: {new_generic_leader_session_id} ---*---"
-            )
-            st.session_state["generic_leader"] = get_generic_leader(
-                python_assistant=python_assistant_enabled,
-                youtube_assistant=youtube_assistant_enabled,
-                arxiv_assistant=arxiv_assistant_enabled,
-                journal_assistant=journal_assistant_enabled,
-                wikipedia_assistant=wikipedia_assistant_enabled,
-                github_assistant=github_assistant_enabled,
-                google_calender_assistant=google_calender_assistant_enabled,
-                patent_writer_assistant=patent_writer_assistant_enabled,
-                model_id=model_id,
-                session_id=new_generic_leader_session_id,
-            )
-            st.session_state["generic_leader_session_id"] = (
-                new_generic_leader_session_id
-            )
-            st.session_state["uploaded_image"] = None
-            st.rerun()
+        for index, id in enumerate(generic_leader_session_ids):
+            if id == SID:
+                selectbox_index = index
+                break
 
-    if st.sidebar.button("New Session"):
+        new_generic_leader_session_id = st.sidebar.selectbox(
+            "Session ID", options=generic_leader_session_ids, index=selectbox_index
+        )
+        if SID != new_generic_leader_session_id:
+            logger.info(
+                f">>> Loading {model_id} session: {new_generic_leader_session_id}"
+            )
+            st.query_params[SESSION_KEY] = new_generic_leader_session_id
+            st.rerun()
+            return
+        else:
+            logger.info(
+                f">>> Continuing {model_id} session: {new_generic_leader_session_id}"
+            )
+
+    NEW_SESSION = st.sidebar.button("New Session")
+
+    if generic_leader.storage:
+        if st.sidebar.button("Delete All Session", key="delete_all_session_button"):
+            for id in generic_leader.storage.get_all_session_ids():
+                generic_leader.storage.delete_session(id)
+            NEW_SESSION = True
+
+    if NEW_SESSION:
+        logger.info(">>> Creating new session...")
+        KEYS = list(st.query_params.keys())
+        for key in KEYS:
+            del st.query_params[key]
         restart_agent()
 
 
