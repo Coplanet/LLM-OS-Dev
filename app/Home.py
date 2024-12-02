@@ -11,6 +11,7 @@ from phi.document import Document
 from phi.document.reader import Reader
 from phi.document.reader.csv_reader import CSVReader
 from phi.document.reader.docx import DocxReader
+from phi.document.reader.json import JSONReader
 from phi.document.reader.pdf import PDFReader
 from phi.document.reader.text import TextReader
 from phi.document.reader.website import WebsiteReader
@@ -23,6 +24,10 @@ from phi.utils.log import logger
 from PIL import Image
 
 from ai.coordinators.generic import get_leader as get_generic_leader
+from ai.document.reader.excel import ExcelReader
+from ai.document.reader.general import GenericReader
+from ai.document.reader.image import ImageReader
+from ai.document.reader.pptx import PPTXReader
 
 STATIC_DIR = "app/static"
 IMAGE_DIR = f"{STATIC_DIR}/images"
@@ -68,29 +73,17 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-with st.expander(":point_down: How to Utilize This Platform"):
+with st.expander(":point_down: Examples:"):
     examples = [
-        (
-            "Enrich your knowledge base by adding insightful blog posts. For example, explore insights \
-                from [Sam Altman's blog](https://blog.samaltman.com/what-i-wish-someone-had-told-me) and inquire: "
-            "What are the key lessons Sam Altman wished he had known?"
-        ),
-        "Discover the capabilities of your AI agents by asking: What functions can my agents perform?",
-        "Explore global events with our Web Search feature: What's the latest news from France?",
-        "Leverage our Calculator for complex computations: How do you calculate 10 factorial?",
-        "Stay informed on financial markets: What's the current stock price of AAPL?",
-        "Conduct in-depth financial analyses: Compare NVIDIA and AMD using all available financial tools, \
-            and distill the essential insights.",
-        "Dive into research: Generate a comprehensive report on the HashiCorp and IBM acquisition.",
+        "Write a polite email requesting a meeting with a client.",
+        "How does machine learning work?",
+        "Generate 5 catchy taglines for a tech startup.",
+        "Translate 'Good evening, how are you?' into Spanish.",
+        "Explain how an API works in simple terms.",
     ]
-    SID = (
-        "{}={}".format(SESSION_KEY, st.query_params[SESSION_KEY])
-        if SESSION_KEY in st.query_params and st.query_params[SESSION_KEY]
-        else ""
-    )
     for example in examples:
         st.markdown(
-            f"- {example} <a href='?{SID}&q={quote(example)}' target='_self'>[Try it!]</a>",
+            f"- {example} <a href='?q={quote(example)}' target='_self'>[Try it!]</a>",
             unsafe_allow_html=True,
         )
     st.markdown(
@@ -292,9 +285,13 @@ def main() -> None:
         return
 
     # Store uploaded image in session state
-    uploaded_image = None
-    if "uploaded_image" in st.session_state:
-        uploaded_image = st.session_state["uploaded_image"]
+    if "uploaded_images" not in st.session_state:
+        st.session_state["uploaded_images"] = []
+
+    uploaded_images = st.session_state["uploaded_images"]
+
+    if "uploaded_files" not in st.session_state:
+        st.session_state["uploaded_files"] = []
 
     # Load existing messages
     agent_chat_history = generic_leader.memory.get_messages()
@@ -329,18 +326,7 @@ def main() -> None:
         for i in reversed(null_content):
             agent_chat_history.pop(i)
         st.session_state["messages"] = agent_chat_history
-        # Search for uploaded image
-        if False:
-            if uploaded_image is None:
-                for message in agent_chat_history:
-                    if message.get("role") == "user":
-                        content = message.get("content")
-                        if isinstance(content, list):
-                            for item in content:
-                                if item["type"] == "image_url":
-                                    uploaded_image = item["image_url"]["url"]
-                                    st.session_state["uploaded_image"] = uploaded_image
-                                    break
+
     else:
         if "q" in st.query_params:
             st.session_state["messages"] = [
@@ -352,29 +338,6 @@ def main() -> None:
                 {"role": "assistant", "content": "Ask me anything..."}
             ]
 
-    if False:
-        # Upload Image
-        if uploaded_image is None:
-            if "image_uploader_key" not in st.session_state:
-                st.session_state["image_uploader_key"] = 200
-            uploaded_file = st.sidebar.file_uploader(
-                "Upload Image",
-                key=st.session_state["image_uploader_key"],
-            )
-            if uploaded_file is not None:
-                alert = st.sidebar.info("Processing Image...", icon="ℹ️")
-                image_file_name = uploaded_file.name.split(".")[0]
-                if f"{image_file_name}_uploaded" not in st.session_state:
-                    logger.info(f"Encoding {image_file_name}")
-                    uploaded_image = encode_image(uploaded_file)
-                    st.session_state["uploaded_image"] = uploaded_image
-                    st.session_state[f"{image_file_name}_uploaded"] = True
-                alert.empty()
-
-        # Prompt for user input
-        if uploaded_image:
-            with st.expander("Uploaded Image", expanded=False):
-                st.image(uploaded_image, use_column_width=True)
     if prompt := st.chat_input():
         st.session_state["messages"].append({"role": "user", "content": prompt})
 
@@ -407,7 +370,7 @@ def main() -> None:
                 response = ""
                 for delta in generic_leader.run(
                     message=question,
-                    images=[uploaded_image] if uploaded_image else [],
+                    images=uploaded_images,
                     stream=True,
                 ):
                     response += delta.content  # type: ignore
@@ -447,34 +410,82 @@ def main() -> None:
         # -*- Add documents to knowledge base
         if "file_uploader_key" not in st.session_state:
             st.session_state["file_uploader_key"] = 100
-        uploaded_file = st.sidebar.file_uploader(
-            "Add a Document (.pdf)",
-            type=["pdf"],
+        uploaded_files_ = st.sidebar.file_uploader(
+            "Add a Document (image files, .pdf, .csv, .pptx, .txt, .md, .docx, .json, .xlsx, .xls and etc)",
             key=st.session_state["file_uploader_key"],
+            accept_multiple_files=True,
         )
-        if uploaded_file is not None:
-            alert = st.sidebar.info("Processing document...", icon="🧠")
-            document_name = uploaded_file.name.split(".")[0]
-            if f"{document_name}_uploaded" not in st.session_state:
-                file_type = uploaded_file.name.split(".")[-1].lower()
+        if uploaded_files_:
+            alert = st.sidebar.info(
+                "Processing {} document{}...".format(
+                    len(uploaded_files_), "s" if len(uploaded_files_) > 1 else ""
+                ),
+                icon="🧠",
+            )
+            for uploaded_file in uploaded_files_:
+                document_name = uploaded_file.name
+                if f"{document_name}_uploaded" not in st.session_state:
+                    file_type = uploaded_file.name.split(".")[-1].lower()
 
-                reader: Reader
-                if file_type == "pdf":
-                    reader = PDFReader()
-                elif False and file_type == "csv":
-                    reader = CSVReader()
-                elif False and file_type == "txt":
-                    reader = TextReader()
-                elif False and file_type == "docx":
-                    reader = DocxReader()
-                auto_rag_documents: List[Document] = reader.read(uploaded_file)
-                if auto_rag_documents:
-                    generic_leader.knowledge.load_documents(
-                        auto_rag_documents, upsert=True
-                    )
-                else:
-                    st.sidebar.error("Could not read document")
-                st.session_state[f"{document_name}_uploaded"] = True
+                    reader: Reader
+                    if file_type == "pdf":
+                        reader = PDFReader()
+                    elif file_type == "csv":
+                        reader = CSVReader()
+                    elif file_type == "pptx":
+                        reader = PPTXReader()
+                    elif file_type in ["txt", "md"]:
+                        reader = TextReader()
+                    elif file_type == "docx":
+                        reader = DocxReader()
+                    elif file_type == "json":
+                        reader = JSONReader()
+                    elif file_type in ["xlsx", "xls"]:
+                        reader = ExcelReader()
+                    elif file_type in [
+                        "png",
+                        "jpg",
+                        "jpeg",
+                        "gif",
+                        "bmp",
+                        "tiff",
+                        "webp",
+                    ]:
+                        reader = ImageReader()
+                    else:
+                        reader = GenericReader()
+
+                    try:
+                        auto_rag_documents: List[Document] = reader.read(uploaded_file)
+
+                        if auto_rag_documents:
+                            if not isinstance(reader, ImageReader):
+                                generic_leader.knowledge.load_documents(
+                                    auto_rag_documents, upsert=True
+                                )
+                                st.session_state["uploaded_files"].append(document_name)
+                            else:
+                                st.session_state["uploaded_images"].append(
+                                    auto_rag_documents
+                                )
+                        else:
+                            st.sidebar.error(
+                                "Could not read document: {}".format(document_name)
+                            )
+                        st.session_state[f"{document_name}_uploaded"] = True
+                        st.sidebar.success(
+                            "Document: `{}` successfully added to knowledge base.".format(
+                                document_name
+                            )
+                        )
+
+                    except Exception as e:
+                        logger.error(e)
+                        st.sidebar.error(
+                            "Could not read document: {}".format(document_name)
+                        )
+                        continue
+            st.session_state["file_uploader_key"] += 1
             alert.empty()
 
         if generic_leader.knowledge.vector_db:

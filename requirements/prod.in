@@ -1,12 +1,18 @@
+ipython
 phidata[aws]>=2.5.*,<2.6
 
 groq
+xlrd
 arxiv
 ollama
 resend
 exa-py
+pandas
+openpyxl
 yfinance
 wikipedia
+sentry-sdk
+python-pptx
 composio_core
 beautifulsoup4
 composio_openai
@@ -15,3 +21,4 @@ duckduckgo-search
 youtube-transcript-api
 
 -r ./phidata.txt
+-r ./django.txt

@@ -61,8 +61,11 @@ def main():
             )
         except Exception as e:
             logger.error(f"Error processing {file}: {e}")
+    logger.info("Bulk upload: {}".format(len(bulk)))
 
-    ckb.load_documents(bulk, upsert=True)
+    for i in range(0, len(bulk), 40):
+        ckb.load_documents(bulk[i : i + 40], upsert=True)
+        logger.info("{:.2f}% Upserted documents".format((i + 40) * 100 / len(bulk)))
 
     end = time()
 
