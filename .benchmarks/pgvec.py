@@ -14,14 +14,14 @@ from phi.vectordb.pgvector import PgVector2
 
 from ai.agents.base import agent_settings
 from db.session import db_url
-from workspace.settings import citex_settings
+from workspace.settings import extra_settings
 
 
 def main():
     ckb = CombinedKnowledgeBase(
         sources=[
             PDFKnowledgeBase(
-                path=citex_settings.knowledgebase_dir, reader=PDFReader(chunk=True)
+                path=extra_settings.knowledgebase_dir, reader=PDFReader(chunk=True)
             )
         ],
         vector_db=PgVector2(

@@ -1,7 +1,7 @@
-from ai.agents.base import AgentTeam, GPT4Agent
+from ai.agents.base import Agent, AgentTeam
 
 
-class GPT4Leader(GPT4Agent):
+class Coordinator(Agent):
     @classmethod
     def build(
         cls,

@@ -2,12 +2,12 @@ from typing import Optional
 
 from phi.eval import Eval, EvalResult
 
-from ai.coordinators.generic import get_leader
+from ai.coordinators.generic import get_coordinator
 
 
 def test_haiku():
     evaluation = Eval(
-        agent=get_leader(),
+        agent=get_coordinator(),
         question="Share a haiku",
         expected_answer="Any haiku",
     )

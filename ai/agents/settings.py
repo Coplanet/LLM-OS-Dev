@@ -4,22 +4,10 @@ from typing import Optional
 
 from composio_phidata import Action as ComposioAction
 from composio_phidata import ComposioToolSet
-from phi.model.ollama import Ollama
 from phi.model.openai import OpenAIChat
 from pydantic_settings import BaseSettings
 
-from workspace.settings import citex_settings
-
-
-@unique
-class GPTModels(Enum):
-    GPT4 = "gpt-4o"
-    GPT4_MINI = "gpt-4o-mini"
-
-
-@unique
-class OllamaModels(Enum):
-    LLAMA3_2 = "llama3.2"
+from workspace.settings import extra_settings
 
 
 @unique
@@ -34,7 +22,7 @@ class AgentSettings(BaseSettings):
     Reference: https://pydantic-docs.helpmanual.io/usage/settings/
     """
 
-    gpt_4: str = GPTModels.GPT4.value
+    gpt_4: str = "gpt-4o"
     embedding_model: str = "text-embedding-3-small"
     default_max_completion_tokens: int = Defaults.MAX_COMPLETION_TOKENS.value
     default_temperature: float = Defaults.TEMPERATURE.value
@@ -63,25 +51,17 @@ class AgentSettings(BaseSettings):
         return self._getenv(key, "true" if default else "false").lower() == "true"
 
     class Models:
-        ollama3_2 = Ollama(id="llama3.2", host=citex_settings.ollama_host)
-        gpt4 = OpenAIChat(
-            id=GPTModels.GPT4.value,
-            max_tokens=Defaults.MAX_COMPLETION_TOKENS.value,
-            temperature=Defaults.TEMPERATURE.value,
-            api_key=citex_settings.gpt_api_key,
-        )
-
         @classmethod
         def get_gpt_model(cls, model_id: str):
             return OpenAIChat(
                 id=model_id,
                 max_tokens=Defaults.MAX_COMPLETION_TOKENS.value,
                 temperature=Defaults.TEMPERATURE.value,
-                api_key=citex_settings.gpt_api_key,
+                api_key=extra_settings.gpt_api_key,
             )
 
 
 # Create an AgentSettings object
 agent_settings = AgentSettings()
 
-__all__ = ["agent_settings", "ComposioAction", "Defaults", "OllamaModels", "GPTModels"]
+__all__ = ["agent_settings", "ComposioAction", "Defaults"]

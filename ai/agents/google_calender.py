@@ -1,6 +1,8 @@
-from .base import ComposioAction, GPT4Agent, agent_settings
+from textwrap import dedent
 
-agent = GPT4Agent(
+from .base import Agent, ComposioAction, agent_settings
+
+agent = Agent(
     name="Google Calender Agent",
     tools=agent_settings.composio_tools.get_tools(
         actions=[
@@ -17,20 +19,24 @@ agent = GPT4Agent(
             ComposioAction.GMAIL_CREATE_EMAIL_DRAFT,
         ]
     ),
-    description=(
-        "Analyze google calender, email, fetch emails, and create event on calendar depending on the email content. "
-        "You should also draft an email in response to the sender of the previous email. "
-        "IMPORTANT: You cannot **send** any email. You can only draft the email. "
-        "IMPORTANT: You cannot **reply** to the email on behalf of the sender. You can only draft the email. "
-    ),
-    delegation_directives=[
-        (
-            "To analyze google calender, email, fetch emails, and create event on calendar "
-            "depending on the email content and write the email as draft, "
-            "delegate the task to the `Google Calender Agent`."
+).register_or_load(
+    default_agent_config={
+        "description": dedent(
+            """\
+            Analyze google calender, email, fetch emails, and create event on calendar depending on the email content.
+            You should also draft an email in response to the sender of the previous email.
+            IMPORTANT: You cannot **send** any email. You can only draft the email.
+            IMPORTANT: You cannot **reply** to the email on behalf of the sender. You can only draft the email.\
+            """
         ),
-    ],
+        "delegation_directives": [
+            (
+                "To analyze google calender, email, fetch emails, and create event on calendar "
+                "depending on the email content and write the email as draft, "
+                "delegate the task to the `Google Calender Agent`."
+            ),
+        ],
+    },
 )
-
 
 __all__ = ["agent"]

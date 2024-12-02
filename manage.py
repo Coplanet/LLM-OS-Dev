@@ -3,10 +3,17 @@
 import os
 import sys
 
+from llmdj.externalize import DJANGO_ACTIVATED  # noqa
+
 
 def main():
     """Run administrative tasks."""
-    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "llmos.settings")
+    global DJANGO_ACTIVATED
+
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "llmdj.settings")
+
+    DJANGO_ACTIVATED = True
+
     try:
         from django.core.management import execute_from_command_line
     except ImportError as exc:

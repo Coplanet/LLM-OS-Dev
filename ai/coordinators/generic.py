@@ -29,13 +29,12 @@ from ai.agents import (
 from ai.agents.base import AgentTeam, agent_settings
 from db.session import db_url
 from db.settings import db_settings
-from workspace.settings import citex_settings
+from workspace.settings import extra_settings
 
-from ..agents.settings import GPTModels
-from .base import GPT4Leader
+from .base import Coordinator
 
 
-def get_leader(
+def get_coordinator(
     calculator: bool = True,
     ddg_search: bool = True,
     file_tools: bool = True,
@@ -50,7 +49,7 @@ def get_leader(
     github_assistant: bool = True,
     google_calender_assistant: bool = True,
     patent_writer_assistant: bool = True,
-    model_id: Optional[str] = GPTModels.GPT4.value,
+    model_id: Optional[str] = "gpt-4o",
     run_id: Optional[str] = None,
     user_id: Optional[str] = None,
     session_id: Optional[str] = None,
@@ -62,6 +61,13 @@ def get_leader(
 
     def enable_agent_if(flag: bool, agent: base.Agent):
         if flag:
+            if not agent.enabled:
+                logger.warning(
+                    "Agent %s is required to be enabled but is currently disabled by the administrator.",
+                    agent.name,
+                )
+                return
+
             logger.info("Activating %s", agent.name)
             team_members.activate(agent)
         else:
@@ -153,13 +159,13 @@ def get_leader(
 
     if not file_tools:
         logger.info(
-            "Removing File Tools with base directory: %s", citex_settings.scratch_dir
+            "Removing File Tools with base directory: %s", extra_settings.scratch_dir
         )
     else:
         logger.info(
-            "Adding File Tools with base directory: %s", citex_settings.scratch_dir
+            "Adding File Tools with base directory: %s", extra_settings.scratch_dir
         )
-        tools.append(FileTools(base_dir=citex_settings.scratch_dir))
+        tools.append(FileTools(base_dir=extra_settings.scratch_dir))
         extra_instructions.append(
             """\
             Use the File Tools for managing files in the working directory. Specific use cases include:
@@ -185,7 +191,7 @@ def get_leader(
         )
         tools.append(
             ResendTools(
-                api_key=citex_settings.resend_api_key,
+                api_key=extra_settings.resend_api_key,
                 from_email="onboarding@resend.dev",
             )
         )
@@ -225,7 +231,7 @@ def get_leader(
     knowledge_base = CombinedKnowledgeBase(
         sources=[
             PDFKnowledgeBase(
-                path=citex_settings.knowledgebase_dir, reader=PDFReader(chunk=True)
+                path=extra_settings.knowledgebase_dir, reader=PDFReader(chunk=True)
             )
         ],
         vector_db=PgVector2(
@@ -239,86 +245,16 @@ def get_leader(
     )
 
     logger.info("Loading the knowledge base (recreate=False).")
-    agent = GPT4Leader.build(
+
+    agent = Coordinator.build(
         team_members,
         id=agent_settings.Models.get_gpt_model(model_id),
-        name="leader",
+        name="Generic Coordinator",
         role="Lead the team to complete the task",
-        introduction=dedent(
-            """\
-            Hi, I'm your LLM OS.
-            I have access to a set of tools and AI Assistants to assist you.
-            Lets get started!\
-            """
-        ),
-        description=dedent(
-            """\
-            You are the most advanced AI system in the world called ` LLM OS`.
-            You have access to a set of tools and a team of AI Assistants at your disposal.
-            Your goal is to assist the user in the best way possible.\
-            """
-        ),
-        instructions=[
-            dedent(
-                """\
-                WORKFLOW: When the user sends a message, first **think** and determine if:
-                    - You can answer using the tools available to you.
-                    - You need to search the knowledge base (limited to 3 attempts with specific refinements).
-                    - You need to search the internet if the knowledge base does not yield results.
-                    - You need to delegate the task to a team member.
-                    - You need to ask a clarifying question.\
-                """
-            ).strip(),
-            (
-                "IMPORTANT: **Prioritize** using **your available tools** before considering delegation. "
-                "If no suitable tool is found, delegate the task to the appropriate team member."
-            ),
-            (
-                "IMPORTANT: If the user asks about a topic, attempt to search your knowledge "
-                "base using the `search_knowledge_base` tool **up to 3 times**. Each attempt "
-                "should refine the query for better results. If no relevant results are found "
-                "after 3 attempts, proceed to follow your WORKFLOW and skip the knowledge base."
-            ),
-            (
-                "IMPORTANT: If you do not find relevant information in the knowledge base after "
-                "3 attempts, use the `duckduckgo_search` tool to search the internet."
-            ),
-            (
-                "IMPORTANT: If the user provides a YouTube link or URL, delegate the task to the "
-                "YouTube Assistant team member to fetch and process the full captions of the video."
-            ),
-            (
-                "IMPORTANT: If the user provides a Wikipedia link or URL or asks about Wikipedia, "
-                "delegate the task to the Wikipedia Assistant team member."
-            ),
-            (
-                "If the user asks to summarize the conversation, use the `get_chat_history` "
-                "tool with None as the argument."
-            ),
-            "If the user's message is unclear, ask clarifying questions to get more information.",
-            (
-                "When gathering information, limit redundant searches and avoid repeated attempts "
-                "on the same query or slight variations. Focus on concise, accurate queries."
-            ),
-            "Carefully read the information you have gathered and provide a clear and concise answer to the user.",
-            "Do not use phrases like 'based on my knowledge' or 'depending on the information'.",
-        ],
         # Add tools to the Assistant
         tools=tools,
         # Introduce knowledge base to the leader
         knowledge_base=knowledge_base,
-        # This setting adds a tool to search the knowledge base for information
-        search_knowledge=True,
-        # This setting adds a tool to get chat history
-        read_chat_history=True,
-        # This setting adds chat history to the messages
-        add_chat_history_to_messages=True,
-        # Add the previous chat history to the messages sent to the Model.
-        add_history_to_messages=True,
-        # This setting adds 6 previous messages from chat history to the messages sent to the LLM
-        num_history_messages=6,
-        # Set addication context to the system's prompt
-        additional_context=extra_instructions,
         # Inject some app related items
         run_id=run_id,
         user_id=user_id,
@@ -326,6 +262,78 @@ def get_leader(
         storage=PgAgentStorage(
             table_name="agent_sessions", db_url=db_settings.get_db_url()
         ),
+    ).register_or_load(
+        default_agent_config={
+            "introduction": dedent(
+                """\
+                Hi, I'm your LLM OS.
+                I have access to a set of tools and AI Assistants to assist you.
+                Lets get started!\
+                """
+            ),
+            "description": dedent(
+                """\
+                You are the most advanced AI system in the world called ` LLM OS`.
+                You have access to a set of tools and a team of AI Assistants at your disposal.
+                Your goal is to assist the user in the best way possible.\
+                """
+            ),
+            "instructions": [
+                dedent(
+                    """\
+                    WORKFLOW: When the user sends a message, first **think** and determine if:
+                        - You can answer using the tools available to you.
+                        - You need to search the knowledge base (limited to 3 attempts with specific refinements).
+                        - You need to search the internet if the knowledge base does not yield results.
+                        - You need to delegate the task to a team member.
+                        - You need to ask a clarifying question.\
+                    """
+                ).strip(),
+                (
+                    "IMPORTANT: **Prioritize** using **your available tools** before considering delegation. "
+                    "If no suitable tool is found, delegate the task to the appropriate team member."
+                ),
+                (
+                    "IMPORTANT: If the user asks about a topic, attempt to search your knowledge "
+                    "base using the `search_knowledge_base` tool **up to 3 times**. Each attempt "
+                    "should refine the query for better results. If no relevant results are found "
+                    "after 3 attempts, proceed to follow your WORKFLOW and skip the knowledge base."
+                ),
+                (
+                    "IMPORTANT: If you do not find relevant information in the knowledge base after "
+                    "3 attempts, use the `duckduckgo_search` tool to search the internet."
+                ),
+                (
+                    "IMPORTANT: If the user provides a YouTube link or URL, delegate the task to the "
+                    "YouTube Assistant team member to fetch and process the full captions of the video."
+                ),
+                (
+                    "IMPORTANT: If the user provides a Wikipedia link or URL or asks about Wikipedia, "
+                    "delegate the task to the Wikipedia Assistant team member."
+                ),
+                (
+                    "If the user asks to summarize the conversation, use the `get_chat_history` "
+                    "tool with None as the argument."
+                ),
+                "If the user's message is unclear, ask clarifying questions to get more information.",
+                (
+                    "When gathering information, limit redundant searches and avoid repeated attempts "
+                    "on the same query or slight variations. Focus on concise, accurate queries."
+                ),
+                "Carefully read the information you have gathered and provide a clear and concise answer to the user.",
+                "Do not use phrases like 'based on my knowledge' or 'depending on the information'.",
+            ],
+            # This setting adds a tool to search the knowledge base for information
+            "search_knowledge": True,
+            # This setting adds a tool to get chat history
+            "read_chat_history": True,
+            # Add the previous chat history to the messages sent to the Model.
+            "add_history_to_messages": True,
+            # This setting adds 6 previous messages from chat history to the messages sent to the LLM
+            "num_history_responses": 6,
+            # Set addication context to the system's prompt
+            "additional_context": extra_instructions,
+        },
     )
     agent.read_from_storage()
     return agent

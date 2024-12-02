@@ -15,7 +15,7 @@ ws_settings = WorkspaceSettings(
     # Path to the workspace root
     ws_root=ROOT_DIR,
     # Workspace name: used for naming cloud resources
-    ws_name="citex-agent",
+    ws_name="llmos-plus",
     # -*- Development env settings
     dev_env="dev",
     # -*- Development Apps
@@ -63,4 +63,4 @@ class Settings:
         return self.ws_root.joinpath("knowledgebase")
 
 
-citex_settings = Settings()
+extra_settings = Settings()
