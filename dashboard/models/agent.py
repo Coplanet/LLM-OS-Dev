@@ -2,6 +2,7 @@ from typing import Optional
 
 from django.db import models
 from phi.model.base import Model as PhiBaseModel
+from phi.model.groq import Groq
 from phi.model.ollama import Ollama
 from phi.model.openai import OpenAIChat
 from phi.utils.log import logger
@@ -12,8 +13,9 @@ from .base import BaseModel
 
 
 class AIModels(models.TextChoices):
-    GPT = ("gpt",)
-    LLaMA = ("llama",)
+    GPT = "gpt"
+    LLaMA = "llama"
+    Groq = "groq"
 
     @property
     def model(self) -> PhiBaseModel:
@@ -22,6 +24,8 @@ class AIModels(models.TextChoices):
                 return OpenAIChat
             case AIModels.LLaMA:
                 return Ollama
+            case AIModels.Groq:
+                return Groq
             case _:
                 raise ValueError(f"Unknown model: {self}")
 
@@ -31,6 +35,8 @@ class AIModels(models.TextChoices):
             return AIModels.GPT
         elif isinstance(agent.model, Ollama):
             return AIModels.LLaMA
+        elif isinstance(agent.model, Groq):
+            return AIModels.Groq
         else:
             raise ValueError(f"Unknown model: {agent.model}")
 

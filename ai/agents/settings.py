@@ -23,13 +23,18 @@ class AgentSettings(BaseSettings):
     """
 
     gpt_4: str = "gpt-4o"
-    embedding_model: str = "text-embedding-3-small"
     default_max_completion_tokens: int = Defaults.MAX_COMPLETION_TOKENS.value
     default_temperature: float = Defaults.TEMPERATURE.value
 
     debug_mode: bool = False
     show_tool_calls: bool = True
     composio_tools: Optional[ComposioToolSet] = None
+
+    @property
+    def embedding_model(self):
+        from dashboard.models import Config
+
+        return Config.get("OPENAPI_EMBEDDING_MODEL", "text-embedding-3-small")
 
     def __init__(self, *args, **kwargs):
         # pass arguments to the parent constructor
