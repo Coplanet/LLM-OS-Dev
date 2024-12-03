@@ -3,12 +3,13 @@ from typing import Callable, Dict
 import streamlit as st
 
 from ai.agents.base import Agent
+from dashboard.models import UserConfig
 from dashboard.models.agent import AgentConfig
 
 from .icons import ICONS
 
 
-def create_sidebar(agents: Dict[str, Callable[[], Agent]]) -> None:
+def create_sidebar(session_id, agents: Dict[str, Callable[[], Agent]]) -> None:
     """Create the sidebar with assistant toggles and gear buttons."""
     with st.sidebar:
         for assistant in agents:
@@ -75,35 +76,12 @@ def create_sidebar(agents: Dict[str, Callable[[], Agent]]) -> None:
                 if gear_button:
                     st.session_state.selected_assistant = assistant
                     st.session_state.show_popup = True
-                # # Gear button styling and click handler
-                # st.markdown(
-                #     f"""
-                #     <div style="display: flex; justify-content: center; padding-top: 5px;">
-                #         <button
-                #             onclick="document.dispatchEvent(new CustomEvent('gear-click', {{ detail: '{label}' }}))"
-                #             style="background: none; border: none; cursor: pointer; padding: 0 5px; font-size: 18px;"
-                #         >
-                #             ⚙️
-                #         </button>
-                #     </div>
-                #     <script>
-                #         document.addEventListener('gear-click', (event) => {{
-                #             fetch('/_stcore/{label}', {{ method: 'POST' }});
-                #         }});
-                #     </script>
-                #     """,
-                #     unsafe_allow_html=True,
-                # )
-
-                # # Hidden Streamlit handler for the gear click
-                # if f"gear_{label}" not in st.session_state:
-                #     st.session_state[f"gear_{label}"] = False
-
-                # if st.session_state[f"gear_{label}"]:
-                #     st.session_state.selected_assistant = assistant
-                #     st.session_state.show_popup = True
-                #     st.session_state[f"gear_{label}"] = False
 
             if pre_value != new_value:
                 st.session_state[feature_name] = new_value
+                uc, _ = UserConfig.objects.get_or_create(
+                    session_id=session_id, key=feature_name
+                )
+                uc.value = str(int(new_value))
+                uc.save()
                 st.rerun()

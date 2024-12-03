@@ -46,6 +46,7 @@ from ai.document.reader.image import ImageReader
 from ai.document.reader.pptx import PPTXReader
 from app.components.popup import show_popup
 from app.components.sidebar import create_sidebar
+from dashboard.models import UserConfig
 
 STATIC_DIR = "app/static"
 IMAGE_DIR = f"{STATIC_DIR}/images"
@@ -131,19 +132,33 @@ def encode_image(image_file):
     return f"data:image/jpeg;base64,{encoding}"
 
 
-def get_selected_assistant_config(assistant_name):
+def get_selected_assistant_config(session_id, assistant_name):
     label = assistant_name.lower().replace(" ", "_")
-    model = st.session_state.get(f"{label}_model_type", "GPT")
-    model_id = st.session_state.get(f"{label}_model_id", "gpt-4o")
-    temperature = st.session_state.get(f"{label}_temperature", 0)
-    agent_enabled = st.session_state.get(f"{label}_agent_enabled", True)
+    try:
+        configs = {
+            f"{label}_model_type": "GPT",
+            f"{label}_model_id": "gpt-4o",
+            f"{label}_temperature": "0",
+            f"{label}_agent_enabled": "1",
+        }
+        ucs = UserConfig.objects.filter(session_id=session_id, key__in=configs.keys())
 
-    return CoordiantorTeamConfig(
-        model,
-        model_id,
-        temperature,
-        agent_enabled,
-    )
+        for config in ucs:
+            configs[config.key] = config.value
+            if config.key == f"{label}_agent_enabled":
+                configs[config.key] = bool(int(config.value))
+            if config.key == f"{label}_temperature":
+                configs[config.key] = float(config.value)
+
+        return CoordiantorTeamConfig(
+            model=configs[f"{label}_model_type"],
+            model_id=configs[f"{label}_model_id"],
+            temperature=configs[f"{label}_temperature"],
+            enabled=configs[f"{label}_agent_enabled"],
+        )
+    except ExcelReader as e:
+        logger.error("Error reading get_selected_assistant_config(): %s", e)
+        return None
 
 
 def main() -> None:
@@ -189,14 +204,6 @@ def main() -> None:
         patent_writer.agent_name: patent_writer.get_agent,
     }
 
-    AGENTS_CONFIG: Dict[str, CoordiantorTeamConfig] = {
-        agent: get_selected_assistant_config(agent) for agent in AGENTS
-    }
-
-    logger.debug("Agents Config: ")
-    for agent, config in AGENTS_CONFIG.items():
-        logger.debug(f"'{agent}' configed to: {config}")
-
     # Get the Agent
     generic_leader: Agent
     SID = (
@@ -204,8 +211,21 @@ def main() -> None:
         if (SESSION_KEY in st.query_params and st.query_params[SESSION_KEY])
         else None
     )
+
+    AGENTS_CONFIG: Dict[str, CoordiantorTeamConfig] = {}
+
     if SID:
         logger.debug(f">>> Using Session ID: {SID}")
+
+        for agent in AGENTS:
+            config = get_selected_assistant_config(SID, agent)
+            if config:
+                AGENTS_CONFIG[agent] = config
+
+        logger.debug("Agents Config: ")
+        for agent, config in AGENTS_CONFIG.items():
+            logger.debug(f"'{agent}' configed to: {config}")
+
     if (
         "generic_leader" not in st.session_state
         or st.session_state["generic_leader"] is None
@@ -221,27 +241,12 @@ def main() -> None:
     else:
         generic_leader = st.session_state["generic_leader"]
 
-    for agent in generic_leader.team:
-        agent: base.Agent
-        st.session_state[f"{agent.label}_model_id"] = agent.model.id
-        st.session_state[f"{agent.label}_model_type"] = agent.model_type
-        st.session_state[f"{agent.label}_temperature"] = getattr(
-            agent.model, "temperature", 0
-        )
-
-    # Create sidebar
-    create_sidebar(AGENTS)
-
-    # Show popup if triggered
-    if st.session_state.show_popup and st.session_state.selected_assistant:
-        show_popup(st.session_state.selected_assistant)
-
     NEW_SESSION = not bool(SID)
     # Create Agent session (i.e. log to database) and save session_id in session state
     try:
         if SID:
             st.session_state["generic_leader_session_id"] = st.query_params[SESSION_KEY]
-            logger.debug(">>> Identified Session ID: %s", st.query_params[SESSION_KEY])
+            logger.debug(">>> Identified Session ID: %s", SID)
         else:
             st.query_params[SESSION_KEY] = generic_leader.create_session()
             st.rerun()
@@ -251,6 +256,24 @@ def main() -> None:
         logger.error(e)
         st.warning("Could not create Agent session, is the database running?")
         return
+
+    for agent in generic_leader.team:
+        agent: base.Agent
+
+        st.session_state[f"{agent.label}_model_id"] = agent.model.id
+        st.session_state[f"{agent.label}_model_type"] = agent.model_type
+        st.session_state[f"{agent.label}_temperature"] = getattr(
+            agent.model, "temperature", 0
+        )
+
+    # Create sidebar
+    create_sidebar(SID, AGENTS)
+
+    # Show popup if triggered
+    if st.session_state.show_popup and st.session_state.selected_assistant:
+        show_popup(SID, st.session_state.selected_assistant)
+        st.session_state.show_popup = False
+        st.session_state.selected_assistant = None
 
     # Store uploaded image in session state
     if "uploaded_images" not in st.session_state:
@@ -490,8 +513,10 @@ def main() -> None:
 
     if generic_leader.storage:
         if st.sidebar.button("Delete All Session", key="delete_all_session_button"):
-            for id in generic_leader.storage.get_all_session_ids():
+            ids = generic_leader.storage.get_all_session_ids()
+            for id in ids:
                 generic_leader.storage.delete_session(id)
+            UserConfig.objects.filter(session_id__in=ids).delete()
             NEW_SESSION = True
 
     if NEW_SESSION:

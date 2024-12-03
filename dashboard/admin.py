@@ -8,10 +8,12 @@ from .models import (
     APIKey,
     Config,
     LlmOsDocuments,
+    UserConfig,
 )
 
 admin.site.register(Config)
 admin.site.register(APIKey)
+admin.site.register(UserConfig)
 admin.site.register(AgentConfig)
 admin.site.register(AgentSessions)
 admin.site.register(AlembicVersion)

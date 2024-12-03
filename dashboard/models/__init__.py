@@ -1,6 +1,6 @@
 from .agent import AgentConfig, AIModels, APIKey
 from .base import BaseModel
-from .config import Config
+from .config import Config, UserConfig
 from .phidata import AgentSessions, AlembicVersion, LlmOsDocuments
 
 __all__ = [
@@ -8,6 +8,7 @@ __all__ = [
     "APIKey",
     "AIModels",
     "BaseModel",
+    "UserConfig",
     "AgentConfig",
     "AgentSessions",
     "AlembicVersion",
