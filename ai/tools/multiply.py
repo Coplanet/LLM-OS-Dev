@@ -16,7 +16,7 @@ class MyCustomMultipluTool(Toolkit):
         """
 
         # args = [a, b]
-        logger.info("Running Custom Multiply: {}".format("x".join(args)))
+        logger.debug("Running Custom Multiply: {}".format("x".join(args)))
         result = 1
         for num in args:
             try:

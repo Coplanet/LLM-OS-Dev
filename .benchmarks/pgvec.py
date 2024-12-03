@@ -35,17 +35,17 @@ def main():
     )
 
     if len(sys.argv) != 2:
-        logger.info("Usage: python pgvec.py <target_folder>")
+        logger.debug("Usage: python pgvec.py <target_folder>")
         sys.exit(1)
 
     TARGET_FOLDER = Path(sys.argv[1])
     PDFs = list(TARGET_FOLDER.glob("*.pdf"))
 
     if not PDFs:
-        logger.info(f"No PDFs found in '{TARGET_FOLDER}'")
+        logger.debug(f"No PDFs found in '{TARGET_FOLDER}'")
         sys.exit(1)
 
-    logger.info("Found `{}` pdf documents...".format(len(PDFs)))
+    logger.debug("Found `{}` pdf documents...".format(len(PDFs)))
 
     reader = PDFReader()
 
@@ -54,26 +54,26 @@ def main():
     for index, file in enumerate(PDFs):
         try:
             bulk.extend(reader.read(file))
-            logger.info(
+            logger.debug(
                 "[Bulk upload][{:.2f}%][Avg. Time: {:.2f} seconds] Processing...".format(
                     ((index + 1) * 100) / len(PDFs), ((time() - start) / (index + 1))
                 )
             )
         except Exception as e:
             logger.error(f"Error processing {file}: {e}")
-    logger.info("Bulk upload: {}".format(len(bulk)))
+    logger.debug("Bulk upload: {}".format(len(bulk)))
 
     for i in range(0, len(bulk), 40):
         ckb.load_documents(bulk[i : i + 40], upsert=True)
-        logger.info("{:.2f}% Upserted documents".format((i + 40) * 100 / len(bulk)))
+        logger.debug("{:.2f}% Upserted documents".format((i + 40) * 100 / len(bulk)))
 
     end = time()
 
-    logger.info("[Bulk upload][DONE]")
+    logger.debug("[Bulk upload][DONE]")
 
     dur = end - start
 
-    logger.info(
+    logger.debug(
         "[Bulk upload] Time taken: {} seconds / avg time: {:.2f} seconds.".format(
             dur, dur / len(PDFs)
         )
@@ -84,7 +84,7 @@ def main():
     for index, file in enumerate(PDFs):
         try:
             ckb.load_documents(reader.read(file), upsert=True)
-            logger.info(
+            logger.debug(
                 "[Single upload][{:.2f}%][Avg. Time: {:.2f} seconds] Processing...".format(
                     ((index + 1) * 100) / len(PDFs), ((time() - start) / (index + 1))
                 )
@@ -94,11 +94,11 @@ def main():
 
     end = time()
 
-    logger.info("[Single upload][DONE]")
+    logger.debug("[Single upload][DONE]")
 
     dur = end - start
 
-    logger.info(
+    logger.debug(
         "[Single upload] Time taken: {} seconds / avg time: {:.2f} seconds.".format(
             dur, dur / len(PDFs)
         )

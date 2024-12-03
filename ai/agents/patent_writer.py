@@ -1,15 +1,27 @@
 from textwrap import dedent
 
+from phi.model.base import Model
 from phi.tools.exa import ExaTools
+from phi.utils.log import logger
 
 from workspace.settings import extra_settings
 
 from .base import Agent
 
+agent_name = "Patent Writer Agent"
 
-def get_agent():
+
+def get_agent(model: Model = None):
+    if model is not None:
+        logger.debug(
+            "Agent '%s' uses model: '%s' with temperature: '%s'",
+            agent_name,
+            model.id,
+            str(getattr(model, "temperature", "n/a")),
+        )
+
     return Agent(
-        name="Patent Writer Agent",
+        name=agent_name,
         tools=[ExaTools(num_results=5, text_length_limit=1000)],
         save_output_to_file=extra_settings.scratch_dir / "{run_id}.md",
         role="Draft a patent document for a specified invention",
@@ -67,7 +79,8 @@ def get_agent():
                 ),
             ],
         },
+        force_model=model,
     )
 
 
-__all__ = ["get_agent"]
+__all__ = ["get_agent", "agent_name"]

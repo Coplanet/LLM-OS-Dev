@@ -13,9 +13,9 @@ from .base import BaseModel
 
 
 class AIModels(models.TextChoices):
-    GPT = "gpt"
-    LLaMA = "llama"
-    Groq = "groq"
+    GPT = ("gpt", "GPT")
+    LLaMA = ("llama", "LLaMA")
+    Groq = ("groq", "Groq")
 
     @property
     def model(self) -> PhiBaseModel:
@@ -72,7 +72,11 @@ class AgentConfig(BaseModel):
 
     @classmethod
     def register_or_load(
-        cls, agent: Agent, model_config: dict, agent_config: dict
+        cls,
+        agent: Agent,
+        model_config: dict,
+        agent_config: dict,
+        force_model: PhiBaseModel = None,
     ) -> Optional[Agent]:
         obj, created = cls.objects.get_or_create(
             name=agent_config.pop("name", None) or agent.name,
@@ -105,9 +109,13 @@ class AgentConfig(BaseModel):
             "description": obj.description,
             "instructions": obj.instructions,
             "delegation_directives": obj.delegation_directives,
-            "model": obj.model_type.model(**obj.model_config),
             "enabled": obj.enabled,
         }
+
+        if force_model:
+            kwargs["model"] = force_model
+        else:
+            kwargs["model"] = obj.model_type.model(**obj.model_config)
 
         # Remove keys from agent_config that are already in kwargs
         for key in kwargs:
@@ -124,19 +132,19 @@ class AgentConfig(BaseModel):
 
         agent_ = agent.__class__(**kwargs)
 
-        logger.info(
+        logger.debug(
             "Agent `%s` loaded with `%s` model with id `%s`",
             agent_.name,
             type(agent_.model).__name__,
             agent_.model.id,
         )
-        logger.info(
+        logger.debug(
             'Agent `%s` loaded with descrption: "%s"', agent_.name, agent_.description
         )
-        logger.info(
+        logger.debug(
             "Agent `%s` loaded with instructions: %s", agent_.name, agent_.instructions
         )
-        logger.info(
+        logger.debug(
             "Agent `%s` loaded with delegation directives: %s",
             agent_.name,
             agent_.delegation_directives,

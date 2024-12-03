@@ -3,7 +3,10 @@ from typing import Any, Dict, Generic, List, Optional, TypeVar
 
 from phi.agent import Agent as PhiAgent
 from phi.model import Model
+from phi.model.groq import Groq
+from phi.model.ollama import Ollama
 from phi.model.openai import OpenAIChat
+from phi.utils.log import logger
 
 from .settings import ComposioAction, Defaults, agent_settings, extra_settings
 
@@ -28,6 +31,7 @@ class Agent(PhiAgent):
         self,
         default_model_config: Dict[str, Any] = DEFAULT_GPT_MODEL_CONFIG,
         default_agent_config: Dict[str, Any] = {},
+        force_model: Model = None,
     ):
         from dashboard.models import AgentConfig
 
@@ -38,7 +42,61 @@ class Agent(PhiAgent):
             setattr(self, field, config)
 
         return AgentConfig.register_or_load(
-            self, default_model_config, default_agent_config
+            self, default_model_config, default_agent_config, force_model
+        )
+
+    @property
+    def model_type(self):
+        if isinstance(self.model, OpenAIChat):
+            return "GPT"
+        if isinstance(self.model, Groq):
+            return "Groq"
+        if isinstance(self.model, Ollama):
+            return "LLaMA"
+        logger.warning(f"Model type '{self.model}' is not defined!")
+        return None
+
+    @property
+    def label(self):
+        return self.name.lower().replace(" ", "_")
+
+    @staticmethod
+    def get_model(model: str = None, model_id: str = None, templature: float = 0):
+        models = {"GPT", "Groq", "LLaMA"}
+        if model is None:
+            return None
+
+        if model not in models:
+            logger.warning(f"Model '{model}' is not defined!")
+            return None
+
+        configs = {}
+        model_class = None
+
+        match model:
+            case "GPT":
+                model_class = OpenAIChat
+                model_id = model_id or "gpt-4o"
+                configs["api_key"] = extra_settings.gpt_api_key
+
+            case "Groq":
+                model_class = Groq
+                model_id = model_id or "llama3-groq-70b-8192-tool-use-preview"
+                configs["api_key"] = extra_settings.groq_api_key
+            case "LLaMA":
+                model_class = Ollama
+                model_id = model_id or "llama3.2"
+                configs["host"] = extra_settings.ollama_host
+
+            case _:
+                logger.warning(f"Model '{model}' didn't match!")
+                return None
+
+        return model_class(
+            id=model_id,
+            temperature=templature,
+            max_tokens=agent_settings.default_max_completion_tokens,
+            **configs,
         )
 
 

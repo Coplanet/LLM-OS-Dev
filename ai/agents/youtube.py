@@ -1,11 +1,23 @@
+from phi.model.base import Model
 from phi.tools.youtube_tools import YouTubeTools
+from phi.utils.log import logger
 
 from .base import Agent
 
+agent_name = "Youtube Agent"
 
-def get_agent():
+
+def get_agent(model: Model = None):
+    if model is not None:
+        logger.debug(
+            "Agent '%s' uses model: '%s' with temperature: '%s'",
+            agent_name,
+            model.id,
+            str(getattr(model, "temperature", "n/a")),
+        )
+
     return Agent(
-        name="Youtube Agent",
+        name=agent_name,
         tools=[YouTubeTools()],
     ).register_or_load(
         default_agent_config={
@@ -20,7 +32,8 @@ def get_agent():
                 ),
             ],
         },
+        force_model=model,
     )
 
 
-__all__ = ["get_agent"]
+__all__ = ["get_agent", "agent_name"]

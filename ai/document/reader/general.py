@@ -16,7 +16,7 @@ class GenericReader(Reader):
             raise ValueError("No path provided")
 
         try:
-            logger.info(f"Reading: {path}")
+            logger.debug(f"Reading: {path}")
             file_name = path.name.split(".")[0]
             file_content = path.read()
 

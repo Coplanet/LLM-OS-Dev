@@ -1,11 +1,24 @@
 from textwrap import dedent
 
+from phi.model.base import Model
+from phi.utils.log import logger
+
 from .base import Agent, ComposioAction, agent_settings
 
+agent_name = "Google Calender Agent"
 
-def get_agent():
+
+def get_agent(model: Model = None):
+    if model is not None:
+        logger.debug(
+            "Agent '%s' uses model: '%s' with temperature: '%s'",
+            agent_name,
+            model.id,
+            str(getattr(model, "temperature", "n/a")),
+        )
+
     return Agent(
-        name="Google Calender Agent",
+        name=agent_name,
         tools=agent_settings.composio_tools.get_tools(
             actions=[
                 ComposioAction.GOOGLECALENDAR_FIND_FREE_SLOTS,
@@ -40,7 +53,8 @@ def get_agent():
                 ),
             ],
         },
+        force_model=model,
     )
 
 
-__all__ = ["get_agent"]
+__all__ = ["get_agent", "agent_name"]

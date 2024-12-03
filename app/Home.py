@@ -1,7 +1,7 @@
 import base64
 from io import BytesIO
 from os import getenv
-from typing import List
+from typing import Dict, List
 from urllib.parse import quote
 
 import nest_asyncio
@@ -38,11 +38,14 @@ from ai.agents import (
     wikipedia,
     youtube,
 )
+from ai.coordinators.generic import CoordiantorTeamConfig
 from ai.coordinators.generic import get_coordinator as get_generic_leader
 from ai.document.reader.excel import ExcelReader
 from ai.document.reader.general import GenericReader
 from ai.document.reader.image import ImageReader
 from ai.document.reader.pptx import PPTXReader
+from app.components.popup import show_popup
+from app.components.sidebar import create_sidebar
 
 STATIC_DIR = "app/static"
 IMAGE_DIR = f"{STATIC_DIR}/images"
@@ -128,84 +131,23 @@ def encode_image(image_file):
     return f"data:image/jpeg;base64,{encoding}"
 
 
-ICONS = {
-    "calculator_enabled": "fa-solid fa-calculator",
-    "file_tools_enabled": "fa-solid fa-file",
-    "resend_tools_enabled": "fa-solid fa-paper-plane",
-    "ddg_search_enabled": "fa-solid fa-search",
-    "finance_tools_enabled": "fa-solid fa-chart-line",
-    "journal_assistant_enabled": "fa-solid fa-book",
-    "python_assistant_enabled": "fab fa-python",
-    "arxiv_assistant_enabled": "fa-solid fa-book-open",
-    "youtube_assistant_enabled": "fab fa-youtube",
-    "google_calender_assistant_enabled": "fa-solid fa-calendar-alt",
-    "github_assistant_enabled": "fab fa-github",
-    "wikipedia_assistant_enabled": "fab fa-wikipedia-w",
-    "patent_writer_assistant_enabled": "fa-solid fa-lightbulb",
-}
+def get_selected_assistant_config(assistant_name):
+    label = assistant_name.lower().replace(" ", "_")
+    model = st.session_state.get(f"{label}_model_type", "GPT")
+    model_id = st.session_state.get(f"{label}_model_id", "gpt-4o")
+    temperature = st.session_state.get(f"{label}_temperature", 0)
+    agent_enabled = st.session_state.get(f"{label}_agent_enabled", True)
 
-
-def enable_feature(feature_name: str, checkbox_text: str, help: str) -> bool:
-    AGENTS = {
-        "journal_assistant_enabled": journal.get_agent,
-        "python_assistant_enabled": python.get_agent,
-        "arxiv_assistant_enabled": arxiv.get_agent,
-        "youtube_assistant_enabled": youtube.get_agent,
-        "google_calender_assistant_enabled": google_calender.get_agent,
-        "github_assistant_enabled": github.get_agent,
-        "wikipedia_assistant_enabled": wikipedia.get_agent,
-        "patent_writer_assistant_enabled": patent_writer.get_agent,
-    }
-    # Enable Calculator
-    if feature_name not in st.session_state:
-        st.session_state[feature_name] = True
-    # fetch the icon for the feature
-    ICON = ICONS.get(feature_name, "")
-    # fetch the agent
-    agent: base.Agent = None
-    if feature_name in AGENTS:
-        agent = AGENTS.get(feature_name)()
-    # Get calculator_enabled from session state if set
-    pre_value = st.session_state[feature_name]
-    if agent and not agent.enabled:
-        pre_value = False
-    # Inline layout for checkbox with icon and label
-    with st.sidebar:
-        col1, col2 = st.columns([1, 11])
-        with col1:
-            # Create the checkbox with a unique key
-            new_value = st.checkbox(
-                "label",
-                value=pre_value,
-                key=f"checkbox_{feature_name}",
-                label_visibility="collapsed" if ICON else "visible",
-                disabled=bool(agent and not agent.enabled),
-            )
-
-        if ICON:
-            with col2:
-                # Create an HTML label tied to the checkbox
-                st.markdown(
-                    f"""
-                    <span style="position: relative">
-                        <span style="top: 27px; position: absolute; width: 100vw;">
-                            <i class="{ICON}" style="margin-right: 10px;"></i> {checkbox_text}
-                        </span>
-                    </span>
-                    """,
-                    unsafe_allow_html=True,
-                )
-
-    if pre_value != new_value:
-        st.session_state[feature_name] = new_value
-        pre_value = new_value
-        restart_agent()
-
-    return new_value
+    return CoordiantorTeamConfig(
+        model,
+        model_id,
+        temperature,
+        agent_enabled,
+    )
 
 
 def main() -> None:
-    # Get OpenAI key from environment variable or user input
+    # Get OpenAI key
     get_openai_key_sidebar()
 
     # Get username
@@ -229,44 +171,31 @@ def main() -> None:
 
     # Sidebar checkboxes for selecting team members
     st.sidebar.markdown("### Select Team Members")
-    journal_assistant_enabled = enable_feature(
-        "journal_assistant_enabled",
-        "Journal Assistant",
-        "Enable the journal assistant (uses Exa).",
-    )
-    python_assistant_enabled = enable_feature(
-        "python_assistant_enabled",
-        "Python Assistant",
-        "Enable the Python Assistant for writing and running python code.",
-    )
-    arxiv_assistant_enabled = enable_feature(
-        "arxiv_assistant_enabled",
-        "Arxiv Assistant",
-        "Enable the Arxiv Assistant for searching papers in arxiv.",
-    )
-    youtube_assistant_enabled = enable_feature(
-        "youtube_assistant_enabled",
-        "Youtube Assistant",
-        "Enable the Youtube Assistant for youtube related URLs and Queries.",
-    )
-    google_calender_assistant_enabled = enable_feature(
-        "google_calender_assistant_enabled",
-        "Google Calendar Assistant",
-        "Enable the Google Assistant",
-    )
-    github_assistant_enabled = enable_feature(
-        "github_assistant_enabled", "GitHub Assistant", "Enable the Google Assistant"
-    )
-    wikipedia_assistant_enabled = enable_feature(
-        "wikipedia_assistant_enabled",
-        "Wikipedia Assistant",
-        "Enable the Wikipedia Assistant for youtube related URLs and Queries.",
-    )
-    patent_writer_assistant_enabled = enable_feature(
-        "patent_writer_assistant_enabled",
-        "Patent Writer Assistant",
-        "Enable the Patent Assistant for writing patents",
-    )
+
+    # Initialize session state for popup control
+    if "show_popup" not in st.session_state:
+        st.session_state.show_popup = False
+        st.session_state.selected_assistant = None
+
+    # Define agents dictionary
+    AGENTS = {
+        journal.agent_name: journal.get_agent,
+        python.agent_name: python.get_agent,
+        arxiv.agent_name: arxiv.get_agent,
+        youtube.agent_name: youtube.get_agent,
+        google_calender.agent_name: google_calender.get_agent,
+        github.agent_name: github.get_agent,
+        wikipedia.agent_name: wikipedia.get_agent,
+        patent_writer.agent_name: patent_writer.get_agent,
+    }
+
+    AGENTS_CONFIG: Dict[str, CoordiantorTeamConfig] = {
+        agent: get_selected_assistant_config(agent) for agent in AGENTS
+    }
+
+    logger.debug("Agents Config: ")
+    for agent, config in AGENTS_CONFIG.items():
+        logger.debug(f"'{agent}' configed to: {config}")
 
     # Get the Agent
     generic_leader: Agent
@@ -276,22 +205,15 @@ def main() -> None:
         else None
     )
     if SID:
-        logger.info(f">>> Using Session ID: {SID}")
+        logger.debug(f">>> Using Session ID: {SID}")
     if (
         "generic_leader" not in st.session_state
         or st.session_state["generic_leader"] is None
         or (SID and st.session_state["generic_leader"].session_id != SID)
     ):
-        logger.info(f">>> Creating {model_id} Agent")
+        logger.debug(f">>> Creating {model_id} Agent")
         generic_leader = get_generic_leader(
-            python_assistant=python_assistant_enabled,
-            youtube_assistant=youtube_assistant_enabled,
-            arxiv_assistant=arxiv_assistant_enabled,
-            journal_assistant=journal_assistant_enabled,
-            wikipedia_assistant=wikipedia_assistant_enabled,
-            github_assistant=github_assistant_enabled,
-            google_calender_assistant=google_calender_assistant_enabled,
-            patent_writer_assistant=patent_writer_assistant_enabled,
+            team_config=AGENTS_CONFIG,
             model_id=model_id,
             session_id=SID,
         )
@@ -299,12 +221,27 @@ def main() -> None:
     else:
         generic_leader = st.session_state["generic_leader"]
 
+    for agent in generic_leader.team:
+        agent: base.Agent
+        st.session_state[f"{agent.label}_model_id"] = agent.model.id
+        st.session_state[f"{agent.label}_model_type"] = agent.model_type
+        st.session_state[f"{agent.label}_temperature"] = getattr(
+            agent.model, "temperature", 0
+        )
+
+    # Create sidebar
+    create_sidebar(AGENTS)
+
+    # Show popup if triggered
+    if st.session_state.show_popup and st.session_state.selected_assistant:
+        show_popup(st.session_state.selected_assistant)
+
     NEW_SESSION = not bool(SID)
     # Create Agent session (i.e. log to database) and save session_id in session state
     try:
         if SID:
             st.session_state["generic_leader_session_id"] = st.query_params[SESSION_KEY]
-            logger.info(">>> Identified Session ID: %s", st.query_params[SESSION_KEY])
+            logger.debug(">>> Identified Session ID: %s", st.query_params[SESSION_KEY])
         else:
             st.query_params[SESSION_KEY] = generic_leader.create_session()
             st.rerun()
@@ -538,14 +475,14 @@ def main() -> None:
             "Session ID", options=generic_leader_session_ids, index=selectbox_index
         )
         if SID != new_generic_leader_session_id:
-            logger.info(
+            logger.debug(
                 f">>> Loading {model_id} session: {new_generic_leader_session_id}"
             )
             st.query_params[SESSION_KEY] = new_generic_leader_session_id
             st.rerun()
             return
         else:
-            logger.info(
+            logger.debug(
                 f">>> Continuing {model_id} session: {new_generic_leader_session_id}"
             )
 
@@ -558,7 +495,7 @@ def main() -> None:
             NEW_SESSION = True
 
     if NEW_SESSION:
-        logger.info(">>> Creating new session...")
+        logger.debug(">>> Creating new session...")
         KEYS = list(st.query_params.keys())
         for key in KEYS:
             del st.query_params[key]

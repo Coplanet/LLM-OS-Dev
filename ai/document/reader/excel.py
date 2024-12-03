@@ -17,7 +17,7 @@ class ExcelReader(Reader):
             raise ValueError("No path provided")
 
         try:
-            logger.info(f"Reading: {path}")
+            logger.debug(f"Reading: {path}")
             splits = path.name.split(".")
             file_name = splits[0]
             file_extension = splits[-1]

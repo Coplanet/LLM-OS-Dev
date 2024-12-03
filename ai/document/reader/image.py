@@ -19,7 +19,7 @@ class ImageReader(Reader):
             raise ValueError("No path provided")
 
         try:
-            logger.info(f"Reading: {path}")
+            logger.debug(f"Reading: {path}")
             img_name = path.name.split(".")[0]
 
             image = Image.open(path)

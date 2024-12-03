@@ -15,7 +15,7 @@ class PPTXReader(Reader):
             raise ValueError("No path provided")
 
         try:
-            logger.info(f"Reading: {path}")
+            logger.debug(f"Reading: {path}")
             ppt_name = path.name.split(".")[0]
             ppt_contents = Presentation(path)
             text_content = []

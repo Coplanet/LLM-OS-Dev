@@ -1,4 +1,6 @@
 from phi.agent.python import PythonAgent
+from phi.model.base import Model
+from phi.utils.log import logger
 
 from .base import Agent
 from .settings import extra_settings
@@ -7,9 +9,20 @@ from .settings import extra_settings
 class IPythonAgent(Agent, PythonAgent): ...
 
 
-def get_agent():
+agent_name = "Python Agent"
+
+
+def get_agent(model: Model = None):
+    if model is not None:
+        logger.debug(
+            "Agent '%s' uses model: '%s' with temperature: '%s'",
+            agent_name,
+            model.id,
+            str(getattr(model, "temperature", "n/a")),
+        )
+
     return IPythonAgent(
-        name="Python Agent",
+        name=agent_name,
         role="Advanced Python Code Writer and Executor",
         pip_install=True,
         base_dir=extra_settings.scratch_dir,
@@ -26,7 +39,8 @@ def get_agent():
                 "To write and run Python code, delegate the task to the `Python Agent`."
             ],
         },
+        force_model=model,
     )
 
 
-__all__ = ["get_agent"]
+__all__ = ["get_agent", "agent_name"]

@@ -1,5 +1,5 @@
 from textwrap import dedent
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from phi.embedder.openai import OpenAIEmbedder
 from phi.knowledge.combined import CombinedKnowledgeBase
@@ -34,6 +34,32 @@ from workspace.settings import extra_settings
 from .base import Coordinator
 
 
+class CoordiantorTeamConfig:
+    model: str
+    model_id: str
+    temperature: float
+    enabled: bool
+
+    def __init__(self, model: str, model_id: str, temperature: float, enabled: bool):
+        self.model = model
+        self.model_id = model_id
+        self.temperature = temperature
+        self.enabled = enabled
+
+    def __str__(self):
+        return str(
+            {
+                "model": self.model,
+                "model_id": self.model_id,
+                "temperature": self.temperature,
+                "enabled": self.enabled,
+            }
+        )
+
+    def __repr__(self):
+        return str(self)
+
+
 def get_coordinator(
     calculator: bool = True,
     ddg_search: bool = True,
@@ -41,14 +67,7 @@ def get_coordinator(
     finance_tools: bool = True,
     resend_tools: bool = True,
     website_tools: bool = True,
-    python_assistant: bool = True,
-    youtube_assistant: bool = True,
-    arxiv_assistant: bool = True,
-    journal_assistant: bool = True,
-    wikipedia_assistant: bool = True,
-    github_assistant: bool = True,
-    google_calender_assistant: bool = True,
-    patent_writer_assistant: bool = True,
+    team_config: Dict[str, CoordiantorTeamConfig] = {},
     model_id: Optional[str] = "gpt-4o",
     run_id: Optional[str] = None,
     user_id: Optional[str] = None,
@@ -59,32 +78,39 @@ def get_coordinator(
 
     team_members = AgentTeam()
 
-    def enable_agent_if(flag: bool, agent: base.Agent):
-        if not agent.enabled:
-            logger.warning(
-                "Agent `%s` is currently disabled by the administrator.",
-                agent.name,
+    def conditional_agent_enable(pkg):
+        config: CoordiantorTeamConfig = team_config.get(pkg.agent_name)
+        if not config:
+            logger.debug("Activating %s", pkg.agent_name)
+            team_members.activate(pkg.get_agent())
+            return
+
+        if not config.enabled:
+            logger.debug("DEACTICATING %s", pkg.agent_name)
+            return
+
+        logger.debug("Activating %s", pkg.agent_name)
+        team_members.activate(
+            pkg.get_agent(
+                model=base.Agent.get_model(
+                    config.model, config.model_id, config.temperature
+                )
             )
+        )
 
-        if flag and agent.enabled:
-            logger.info("Activating %s", agent.name)
-            team_members.activate(agent)
-        else:
-            logger.info("DEACTICATING %s", agent.name)
-
-    enable_agent_if(python_assistant, python.get_agent())
-    enable_agent_if(youtube_assistant, youtube.get_agent())
-    enable_agent_if(arxiv_assistant, arxiv.get_agent())
-    enable_agent_if(journal_assistant, journal.get_agent())
-    enable_agent_if(wikipedia_assistant, wikipedia.get_agent())
-    enable_agent_if(github_assistant, github.get_agent())
-    enable_agent_if(google_calender_assistant, google_calender.get_agent())
-    enable_agent_if(patent_writer_assistant, patent_writer.get_agent())
+    conditional_agent_enable(python)
+    conditional_agent_enable(youtube)
+    conditional_agent_enable(arxiv)
+    conditional_agent_enable(journal)
+    conditional_agent_enable(wikipedia)
+    conditional_agent_enable(github)
+    conditional_agent_enable(google_calender)
+    conditional_agent_enable(patent_writer)
 
     if not calculator:
-        logger.info("Removing Calculator tool with full functionality.")
+        logger.debug("Removing Calculator tool with full functionality.")
     else:
-        logger.info("Adding Calculator tool with full functionality.")
+        logger.debug("Adding Calculator tool with full functionality.")
         tools.append(
             Calculator(
                 add=True,
@@ -109,9 +135,9 @@ def get_coordinator(
         )
 
     if not ddg_search:
-        logger.info("Removing DuckDuckGo search tool.")
+        logger.debug("Removing DuckDuckGo search tool.")
     else:
-        logger.info("Adding DuckDuckGo search tool with fixed max results: 3.")
+        logger.debug("Adding DuckDuckGo search tool with fixed max results: 3.")
         tools.append(DuckDuckGo(fixed_max_results=3))
         extra_instructions.append(
             dedent(
@@ -126,11 +152,11 @@ def get_coordinator(
         )
 
     if not finance_tools:
-        logger.info(
+        logger.debug(
             "Removing YFinance Tools for stock price, company info, analyst recommendations, and company news."
         )
     else:
-        logger.info(
+        logger.debug(
             "Adding YFinance Tools for stock price, company info, analyst recommendations, and company news."
         )
         tools.append(
@@ -157,11 +183,11 @@ def get_coordinator(
         )
 
     if not file_tools:
-        logger.info(
+        logger.debug(
             "Removing File Tools with base directory: %s", extra_settings.scratch_dir
         )
     else:
-        logger.info(
+        logger.debug(
             "Adding File Tools with base directory: %s", extra_settings.scratch_dir
         )
         tools.append(FileTools(base_dir=extra_settings.scratch_dir))
@@ -179,12 +205,12 @@ def get_coordinator(
         )
 
     if not resend_tools:
-        logger.info(
+        logger.debug(
             "Removing Resend Tools with API key and from_email: %s",
             "onboarding@resend.dev",
         )
     else:
-        logger.info(
+        logger.debug(
             "Adding Resend Tools with API key and from_email: %s",
             "onboarding@resend.dev",
         )
@@ -206,11 +232,11 @@ def get_coordinator(
             """
         )
     if not website_tools:
-        logger.info(
+        logger.debug(
             "Removing Website Tools to parse a website and add its contents to the knowledge base."
         )
     else:
-        logger.info(
+        logger.debug(
             "Adding Website Tools to parse a website and add its contents to the knowledge base."
         )
         tools.append(WebsiteTools())
@@ -224,7 +250,7 @@ def get_coordinator(
             """
         )
 
-    logger.info(
+    logger.debug(
         "Initializing combined knowledge base with sources and vector database."
     )
     knowledge_base = CombinedKnowledgeBase(
@@ -243,7 +269,7 @@ def get_coordinator(
         num_documents=5,
     )
 
-    logger.info("Loading the knowledge base (recreate=False).")
+    logger.debug("Loading the knowledge base (recreate=False).")
 
     agent = Coordinator.build(
         team_members,
