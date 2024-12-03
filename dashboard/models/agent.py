@@ -4,6 +4,7 @@ from django.db import models
 from phi.model.base import Model as PhiBaseModel
 from phi.model.ollama import Ollama
 from phi.model.openai import OpenAIChat
+from phi.utils.log import logger
 
 from ai.agents.base import Agent
 
@@ -51,6 +52,7 @@ class APIKey(BaseModel):
 class AgentConfig(BaseModel):
     name = models.CharField(max_length=255, unique=True)
     description = models.TextField(blank=True, null=True)
+    instructions = models.JSONField(blank=True, null=True, default=list)
     delegation_directives = models.JSONField(blank=True, null=True)
     model_type = models.CharField(
         max_length=255, choices=AIModels.choices, default=AIModels.GPT
@@ -69,12 +71,15 @@ class AgentConfig(BaseModel):
         obj, created = cls.objects.get_or_create(
             name=agent_config.pop("name", None) or agent.name,
         )
+        description = agent_config.pop("description", None)
+        instructions = agent_config.pop("instructions", None)
+        delegation_directives = agent_config.pop("delegation_directives", None)
 
         if created:
-            obj.description = agent_config.pop("description", None) or agent.description
+            obj.description = description or agent.description
+            obj.instructions = instructions or agent.instructions
             obj.delegation_directives = (
-                agent_config.pop("delegation_directives", None)
-                or agent.delegation_directives
+                delegation_directives or agent.delegation_directives
             )
             obj.model_type = AIModels.detect(agent)
             obj.model_id = agent.model.id
@@ -86,20 +91,52 @@ class AgentConfig(BaseModel):
         if isinstance(obj.model_type, str):
             obj.model_type = AIModels(obj.model_type)
 
-        obj.model_config["api_key"] = (
-            obj.api_key.key if obj.api_key is not None else None
+        if obj.api_key is not None:
+            obj.model_config["api_key"] = obj.api_key.key
+
+        kwargs = {
+            "name": obj.name,
+            "description": obj.description,
+            "instructions": obj.instructions,
+            "delegation_directives": obj.delegation_directives,
+            "model": obj.model_type.model(**obj.model_config),
+            "enabled": obj.enabled,
+        }
+
+        # Remove keys from agent_config that are already in kwargs
+        for key in kwargs:
+            if key in obj.agent_config:
+                del obj.agent_config[key]
+
+        # Update kwargs with remaining agent_config
+        kwargs.update(obj.agent_config)
+
+        # Add fields from agent that are not in kwargs
+        for key, value in vars(agent).items():
+            if key not in kwargs:
+                kwargs[key] = value
+
+        agent_ = agent.__class__(**kwargs)
+
+        logger.info(
+            "Agent `%s` loaded with `%s` model with id `%s`",
+            agent_.name,
+            type(agent_.model).__name__,
+            agent_.model.id,
+        )
+        logger.info(
+            'Agent `%s` loaded with descrption: "%s"', agent_.name, agent_.description
+        )
+        logger.info(
+            "Agent `%s` loaded with instructions: %s", agent_.name, agent_.instructions
+        )
+        logger.info(
+            "Agent `%s` loaded with delegation directives: %s",
+            agent_.name,
+            agent_.delegation_directives,
         )
 
-        agent.name = obj.name
-        agent.description = obj.description
-        agent.delegation_directives = obj.delegation_directives
-        agent.model = obj.model_type.model(**obj.model_config)
-        agent.enabled = obj.enabled
-
-        for field, value in obj.agent_config.items():
-            setattr(agent, field, value)
-
-        return agent
+        return agent_
 
     def save(self, *args, **kwargs):
         if self.agent_config is None:

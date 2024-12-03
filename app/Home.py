@@ -23,14 +23,18 @@ from phi.tools.streamlit.components import (
 from phi.utils.log import logger
 from PIL import Image
 
+from llmdj.externalize import activate_django
+
+activate_django()
+
 from ai.agents import (
     arxiv,
     base,
     github,
     google_calender,
+    journal,
     patent_writer,
     python,
-    reporter,
     wikipedia,
     youtube,
 )
@@ -39,9 +43,6 @@ from ai.document.reader.excel import ExcelReader
 from ai.document.reader.general import GenericReader
 from ai.document.reader.image import ImageReader
 from ai.document.reader.pptx import PPTXReader
-from llmdj.externalize import activate_django
-
-activate_django()
 
 STATIC_DIR = "app/static"
 IMAGE_DIR = f"{STATIC_DIR}/images"
@@ -143,27 +144,31 @@ ICONS = {
     "patent_writer_assistant_enabled": "fa-solid fa-lightbulb",
 }
 
-AGENTS = {
-    "journal_assistant_enabled": reporter.agent,
-    "python_assistant_enabled": python.agent,
-    "arxiv_assistant_enabled": arxiv.agent,
-    "youtube_assistant_enabled": youtube.agent,
-    "google_calender_assistant_enabled": google_calender.agent,
-    "github_assistant_enabled": github.agent,
-    "wikipedia_assistant_enabled": wikipedia.agent,
-    "patent_writer_assistant_enabled": patent_writer.agent,
-}
-
 
 def enable_feature(feature_name: str, checkbox_text: str, help: str) -> bool:
+    AGENTS = {
+        "journal_assistant_enabled": journal.get_agent,
+        "python_assistant_enabled": python.get_agent,
+        "arxiv_assistant_enabled": arxiv.get_agent,
+        "youtube_assistant_enabled": youtube.get_agent,
+        "google_calender_assistant_enabled": google_calender.get_agent,
+        "github_assistant_enabled": github.get_agent,
+        "wikipedia_assistant_enabled": wikipedia.get_agent,
+        "patent_writer_assistant_enabled": patent_writer.get_agent,
+    }
     # Enable Calculator
     if feature_name not in st.session_state:
         st.session_state[feature_name] = True
     # fetch the icon for the feature
     ICON = ICONS.get(feature_name, "")
-    agent: base.Agent = AGENTS.get(feature_name)
+    # fetch the agent
+    agent: base.Agent = None
+    if feature_name in AGENTS:
+        agent = AGENTS.get(feature_name)()
     # Get calculator_enabled from session state if set
     pre_value = st.session_state[feature_name]
+    if agent and not agent.enabled:
+        pre_value = False
     # Inline layout for checkbox with icon and label
     with st.sidebar:
         col1, col2 = st.columns([1, 11])
@@ -171,10 +176,10 @@ def enable_feature(feature_name: str, checkbox_text: str, help: str) -> bool:
             # Create the checkbox with a unique key
             new_value = st.checkbox(
                 "label",
-                value=pre_value if agent and agent.enabled else False,
+                value=pre_value,
                 key=f"checkbox_{feature_name}",
                 label_visibility="collapsed" if ICON else "visible",
-                disabled=agent and not agent.enabled,
+                disabled=bool(agent and not agent.enabled),
             )
 
         if ICON:

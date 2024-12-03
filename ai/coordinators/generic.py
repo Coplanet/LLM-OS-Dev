@@ -20,9 +20,9 @@ from ai.agents import (
     base,
     github,
     google_calender,
+    journal,
     patent_writer,
     python,
-    reporter,
     wikipedia,
     youtube,
 )
@@ -60,27 +60,26 @@ def get_coordinator(
     team_members = AgentTeam()
 
     def enable_agent_if(flag: bool, agent: base.Agent):
-        if flag:
-            if not agent.enabled:
-                logger.warning(
-                    "Agent %s is required to be enabled but is currently disabled by the administrator.",
-                    agent.name,
-                )
-                return
+        if not agent.enabled:
+            logger.warning(
+                "Agent `%s` is currently disabled by the administrator.",
+                agent.name,
+            )
 
+        if flag and agent.enabled:
             logger.info("Activating %s", agent.name)
             team_members.activate(agent)
         else:
             logger.info("DEACTICATING %s", agent.name)
 
-    enable_agent_if(python_assistant, python.agent)
-    enable_agent_if(youtube_assistant, youtube.agent)
-    enable_agent_if(arxiv_assistant, arxiv.agent)
-    enable_agent_if(journal_assistant, reporter.agent)
-    enable_agent_if(wikipedia_assistant, wikipedia.agent)
-    enable_agent_if(github_assistant, github.agent)
-    enable_agent_if(google_calender_assistant, google_calender.agent)
-    enable_agent_if(patent_writer_assistant, patent_writer.agent)
+    enable_agent_if(python_assistant, python.get_agent())
+    enable_agent_if(youtube_assistant, youtube.get_agent())
+    enable_agent_if(arxiv_assistant, arxiv.get_agent())
+    enable_agent_if(journal_assistant, journal.get_agent())
+    enable_agent_if(wikipedia_assistant, wikipedia.get_agent())
+    enable_agent_if(github_assistant, github.get_agent())
+    enable_agent_if(google_calender_assistant, google_calender.get_agent())
+    enable_agent_if(patent_writer_assistant, patent_writer.get_agent())
 
     if not calculator:
         logger.info("Removing Calculator tool with full functionality.")
@@ -248,13 +247,15 @@ def get_coordinator(
 
     agent = Coordinator.build(
         team_members,
-        id=agent_settings.Models.get_gpt_model(model_id),
+        model=agent_settings.Models.get_gpt_model(model_id),
         name="Generic Coordinator",
         role="Lead the team to complete the task",
         # Add tools to the Assistant
         tools=tools,
         # Introduce knowledge base to the leader
         knowledge_base=knowledge_base,
+        # Set addication context to the system's prompt
+        additional_context=extra_instructions,
         # Inject some app related items
         run_id=run_id,
         user_id=user_id,
@@ -331,8 +332,6 @@ def get_coordinator(
             "add_history_to_messages": True,
             # This setting adds 6 previous messages from chat history to the messages sent to the LLM
             "num_history_responses": 6,
-            # Set addication context to the system's prompt
-            "additional_context": extra_instructions,
         },
     )
     agent.read_from_storage()
