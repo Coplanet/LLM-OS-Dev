@@ -27,6 +27,8 @@ from llmdj.externalize import activate_django
 
 activate_django()
 
+from dashboard.models import UserConfig
+
 from ai.agents import (
     arxiv,
     base,
@@ -46,7 +48,6 @@ from ai.document.reader.image import ImageReader
 from ai.document.reader.pptx import PPTXReader
 from app.components.popup import show_popup
 from app.components.sidebar import create_sidebar
-from dashboard.models import UserConfig
 
 STATIC_DIR = "app/static"
 IMAGE_DIR = f"{STATIC_DIR}/images"
@@ -175,7 +176,10 @@ def main() -> None:
         return
 
     # Get Model Id
-    model_id = st.sidebar.selectbox("Model", options=["gpt-4o", "gpt-4o-mini"])
+    model_id = st.sidebar.selectbox("Coordinator", options=["gpt-4o", "gpt-4o-mini"])
+    # TODO: add tempature
+    # ADD ICON + POPUP
+    # EXAMPLES using multi agent 3 times
     # Set model_id in session state
     if "model_id" not in st.session_state:
         st.session_state["model_id"] = model_id

@@ -21,4 +21,3 @@ duckduckgo-search
 youtube-transcript-api
 
 -r ./phidata.txt
--r ./django.in
