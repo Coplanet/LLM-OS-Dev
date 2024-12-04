@@ -1,4 +1,2 @@
 [flake8]
 ignore = E701,W503,E203
-per-file-ignores =
-    app/Home.py:E402

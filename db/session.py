@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 from typing import Generator
 
 from sqlalchemy.engine import Engine, create_engine
@@ -24,6 +25,21 @@ def get_db() -> Generator[Session, None, None]:
         Session: An SQLAlchemy database session.
     """
     db: Session = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+@contextmanager
+def get_db_context() -> Generator[Session, None, None]:
+    """
+    Context manager to get a database session.
+
+    Yields:
+        Session: An SQLAlchemy database session.
+    """
+    db = next(get_db())  # Get the database session
     try:
         yield db
     finally:

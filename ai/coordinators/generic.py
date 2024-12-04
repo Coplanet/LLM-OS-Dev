@@ -17,7 +17,6 @@ from phi.vectordb.pgvector import PgVector2
 
 from ai.agents import (
     arxiv,
-    base,
     github,
     google_calender,
     journal,
@@ -26,38 +25,15 @@ from ai.agents import (
     wikipedia,
     youtube,
 )
-from ai.agents.base import AgentTeam, agent_settings
+from ai.agents.base import AgentTeam
+from ai.agents.settings import AgentConfig, agent_settings
 from db.session import db_url
 from db.settings import db_settings
 from workspace.settings import extra_settings
 
 from .base import Coordinator
 
-
-class CoordiantorTeamConfig:
-    model: str
-    model_id: str
-    temperature: float
-    enabled: bool
-
-    def __init__(self, model: str, model_id: str, temperature: float, enabled: bool):
-        self.model = model
-        self.model_id = model_id
-        self.temperature = temperature
-        self.enabled = enabled
-
-    def __str__(self):
-        return str(
-            {
-                "model": self.model,
-                "model_id": self.model_id,
-                "temperature": self.temperature,
-                "enabled": self.enabled,
-            }
-        )
-
-    def __repr__(self):
-        return str(self)
+agent_name = "Coordinator"
 
 
 def get_coordinator(
@@ -67,8 +43,8 @@ def get_coordinator(
     finance_tools: bool = True,
     resend_tools: bool = True,
     website_tools: bool = True,
-    team_config: Dict[str, CoordiantorTeamConfig] = {},
-    model_id: Optional[str] = "gpt-4o",
+    team_config: Dict[str, AgentConfig] = {},
+    config: AgentConfig = None,
     run_id: Optional[str] = None,
     user_id: Optional[str] = None,
     session_id: Optional[str] = None,
@@ -76,11 +52,21 @@ def get_coordinator(
     tools: List[Toolkit] = []
     extra_instructions: List[str] = []
 
+    if config is None:
+        config = AgentConfig.empty()
+
+    if config.is_empty:
+        config.model = "GPT"
+        config.model_id = "gpt-4o"
+        config.enabled = True
+        config.temperature = 0
+        config.max_tokens = agent_settings.default_max_completion_tokens
+
     team_members = AgentTeam()
 
     def conditional_agent_enable(pkg):
-        config: CoordiantorTeamConfig = team_config.get(pkg.agent_name)
-        if not config:
+        config: AgentConfig = team_config.get(pkg.agent_name)
+        if not config or config.is_empty:
             logger.debug("Activating %s", pkg.agent_name)
             team_members.activate(pkg.get_agent())
             return
@@ -90,13 +76,7 @@ def get_coordinator(
             return
 
         logger.debug("Activating %s", pkg.agent_name)
-        team_members.activate(
-            pkg.get_agent(
-                model=base.Agent.get_model(
-                    config.model, config.model_id, config.temperature
-                )
-            )
-        )
+        team_members.activate(pkg.get_agent(config))
 
     conditional_agent_enable(python)
     conditional_agent_enable(youtube)
@@ -273,8 +253,8 @@ def get_coordinator(
 
     agent = Coordinator.build(
         team_members,
-        model=agent_settings.Models.get_gpt_model(model_id),
-        name="Generic Coordinator",
+        model=config.get_model,
+        name=agent_name,
         role="Lead the team to complete the task",
         # Add tools to the Assistant
         tools=tools,
@@ -289,25 +269,23 @@ def get_coordinator(
         storage=PgAgentStorage(
             table_name="agent_sessions", db_url=db_settings.get_db_url()
         ),
-    ).register_or_load(
-        default_agent_config={
-            "introduction": dedent(
-                """\
+        introduction=dedent(
+            """\
                 Hi, I'm your LLM OS.
                 I have access to a set of tools and AI Assistants to assist you.
                 Lets get started!\
                 """
-            ),
-            "description": dedent(
-                """\
+        ),
+        description=dedent(
+            """\
                 You are the most advanced AI system in the world called ` LLM OS`.
                 You have access to a set of tools and a team of AI Assistants at your disposal.
                 Your goal is to assist the user in the best way possible.\
                 """
-            ),
-            "instructions": [
-                dedent(
-                    """\
+        ),
+        instructions=[
+            dedent(
+                """\
                     WORKFLOW: When the user sends a message, first **think** and determine if:
                         - You can answer using the tools available to you.
                         - You need to search the knowledge base (limited to 3 attempts with specific refinements).
@@ -315,50 +293,52 @@ def get_coordinator(
                         - You need to delegate the task to a team member.
                         - You need to ask a clarifying question.\
                     """
-                ).strip(),
-                (
-                    "IMPORTANT: **Prioritize** using **your available tools** before considering delegation. "
-                    "If no suitable tool is found, delegate the task to the appropriate team member."
-                ),
-                (
-                    "IMPORTANT: If the user asks about a topic, attempt to search your knowledge "
-                    "base using the `search_knowledge_base` tool **up to 3 times**. Each attempt "
-                    "should refine the query for better results. If no relevant results are found "
-                    "after 3 attempts, proceed to follow your WORKFLOW and skip the knowledge base."
-                ),
-                (
-                    "IMPORTANT: If you do not find relevant information in the knowledge base after "
-                    "3 attempts, use the `duckduckgo_search` tool to search the internet."
-                ),
-                (
-                    "IMPORTANT: If the user provides a YouTube link or URL, delegate the task to the "
-                    "YouTube Assistant team member to fetch and process the full captions of the video."
-                ),
-                (
-                    "IMPORTANT: If the user provides a Wikipedia link or URL or asks about Wikipedia, "
-                    "delegate the task to the Wikipedia Assistant team member."
-                ),
-                (
-                    "If the user asks to summarize the conversation, use the `get_chat_history` "
-                    "tool with None as the argument."
-                ),
-                "If the user's message is unclear, ask clarifying questions to get more information.",
-                (
-                    "When gathering information, limit redundant searches and avoid repeated attempts "
-                    "on the same query or slight variations. Focus on concise, accurate queries."
-                ),
-                "Carefully read the information you have gathered and provide a clear and concise answer to the user.",
-                "Do not use phrases like 'based on my knowledge' or 'depending on the information'.",
-            ],
-            # This setting adds a tool to search the knowledge base for information
-            "search_knowledge": True,
-            # This setting adds a tool to get chat history
-            "read_chat_history": True,
-            # Add the previous chat history to the messages sent to the Model.
-            "add_history_to_messages": True,
-            # This setting adds 6 previous messages from chat history to the messages sent to the LLM
-            "num_history_responses": 6,
-        },
+            ).strip(),
+            (
+                "IMPORTANT: **Prioritize** using **your available tools** before considering delegation. "
+                "If no suitable tool is found, delegate the task to the appropriate team member."
+            ),
+            (
+                "IMPORTANT: If the user asks about a topic, attempt to search your knowledge "
+                "base using the `search_knowledge_base` tool **up to 3 times**. Each attempt "
+                "should refine the query for better results. If no relevant results are found "
+                "after 3 attempts, proceed to follow your WORKFLOW and skip the knowledge base."
+            ),
+            (
+                "IMPORTANT: If you do not find relevant information in the knowledge base after "
+                "3 attempts, use the `duckduckgo_search` tool to search the internet."
+            ),
+            (
+                "IMPORTANT: If the user provides a YouTube link or URL, delegate the task to the "
+                "YouTube Assistant team member to fetch and process the full captions of the video."
+            ),
+            (
+                "IMPORTANT: If the user provides a Wikipedia link or URL or asks about Wikipedia, "
+                "delegate the task to the Wikipedia Assistant team member."
+            ),
+            (
+                "If the user asks to summarize the conversation, use the `get_chat_history` "
+                "tool with None as the argument."
+            ),
+            "If the user's message is unclear, ask clarifying questions to get more information.",
+            (
+                "When gathering information, limit redundant searches and avoid repeated attempts "
+                "on the same query or slight variations. Focus on concise, accurate queries."
+            ),
+            "Carefully read the information you have gathered and provide a clear and concise answer to the user.",
+            "Do not use phrases like 'based on my knowledge' or 'depending on the information'.",
+        ],
+        # This setting adds a tool to search the knowledge base for information
+        search_knowledge=True,
+        # This setting adds a tool to get chat history
+        read_chat_history=True,
+        # Add the previous chat history to the messages sent to the Model.
+        add_history_to_messages=True,
+        # This setting adds 6 previous messages from chat history to the messages sent to the LLM
+        num_history_responses=6,
     )
     agent.read_from_storage()
     return agent
+
+
+__all__ = ["get_coordinator", "agent_name", "AgentConfig"]

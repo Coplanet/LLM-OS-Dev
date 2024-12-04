@@ -5,6 +5,7 @@ from typing import Dict, List
 from urllib.parse import quote
 
 import nest_asyncio
+import sqlalchemy as sql
 import streamlit as st
 from phi.agent import Agent
 from phi.document import Document
@@ -23,12 +24,6 @@ from phi.tools.streamlit.components import (
 from phi.utils.log import logger
 from PIL import Image
 
-from llmdj.externalize import activate_django
-
-activate_django()
-
-from dashboard.models import UserConfig
-
 from ai.agents import (
     arxiv,
     base,
@@ -37,17 +32,21 @@ from ai.agents import (
     journal,
     patent_writer,
     python,
+    settings,
     wikipedia,
     youtube,
 )
-from ai.coordinators.generic import CoordiantorTeamConfig
-from ai.coordinators.generic import get_coordinator as get_generic_leader
+from ai.agents.settings import agent_settings
+from ai.coordinators import generic as coordinator
 from ai.document.reader.excel import ExcelReader
 from ai.document.reader.general import GenericReader
 from ai.document.reader.image import ImageReader
 from ai.document.reader.pptx import PPTXReader
 from app.components.popup import show_popup
 from app.components.sidebar import create_sidebar
+from app.utils import to_label
+from db.session import get_db_context
+from db.tables import UserConfig
 
 STATIC_DIR = "app/static"
 IMAGE_DIR = f"{STATIC_DIR}/images"
@@ -95,11 +94,9 @@ st.markdown(
 
 with st.expander(":point_down: Examples:"):
     examples = [
-        "Write a polite email requesting a meeting with a client.",
-        "How does machine learning work?",
-        "Generate 5 catchy taglines for a tech startup.",
-        "Translate 'Good evening, how are you?' into Spanish.",
-        "Explain how an API works in simple terms.",
+        "Report on the latest AI technology updates at your choice from YouTube channels.",
+        "Identify the best AI framework on GitHub and star it upon confirmation.",
+        "Summarize a Wikipedia page and YouTube video on quantum computers.",
     ]
     for example in examples:
         st.markdown(
@@ -133,31 +130,35 @@ def encode_image(image_file):
     return f"data:image/jpeg;base64,{encoding}"
 
 
-def get_selected_assistant_config(session_id, assistant_name):
-    label = assistant_name.lower().replace(" ", "_")
+def get_selected_assistant_config(session_id, label):
     try:
-        configs = {
-            f"{label}_model_type": "GPT",
-            f"{label}_model_id": "gpt-4o",
-            f"{label}_temperature": "0",
-            f"{label}_agent_enabled": "1",
+        default_configs = {
+            "model_type": "GPT",
+            "model_id": "gpt-4o",
+            "temperature": 0,
+            "enabled": True,
+            "max_tokens": agent_settings.default_max_completion_tokens,
         }
-        ucs = UserConfig.objects.filter(session_id=session_id, key__in=configs.keys())
 
-        for config in ucs:
-            configs[config.key] = config.value
-            if config.key == f"{label}_agent_enabled":
-                configs[config.key] = bool(int(config.value))
-            if config.key == f"{label}_temperature":
-                configs[config.key] = float(config.value)
+        with get_db_context() as db:
+            config: UserConfig = UserConfig.get_models_config(
+                db, session_id, auto_create=False
+            )
 
-        return CoordiantorTeamConfig(
-            model=configs[f"{label}_model_type"],
-            model_id=configs[f"{label}_model_id"],
-            temperature=configs[f"{label}_temperature"],
-            enabled=configs[f"{label}_agent_enabled"],
+        if config:
+            if isinstance(config.value_json, dict) and label in config.value_json:
+                for key in default_configs:
+                    if key in config.value_json[label]:
+                        default_configs[key] = config.value_json[label][key]
+
+        return settings.AgentConfig(
+            model=default_configs["model_type"],
+            model_id=default_configs["model_id"],
+            temperature=default_configs["temperature"],
+            enabled=default_configs["enabled"],
+            max_tokens=default_configs["max_tokens"],
         )
-    except ExcelReader as e:
+    except Exception as e:
         logger.error("Error reading get_selected_assistant_config(): %s", e)
         return None
 
@@ -175,22 +176,6 @@ def main() -> None:
         st.markdown("#### :technologist: Please enter a username")
         return
 
-    # Get Model Id
-    model_id = st.sidebar.selectbox("Coordinator", options=["gpt-4o", "gpt-4o-mini"])
-    # TODO: add tempature
-    # ADD ICON + POPUP
-    # EXAMPLES using multi agent 3 times
-    # Set model_id in session state
-    if "model_id" not in st.session_state:
-        st.session_state["model_id"] = model_id
-    # Restart the agent if model_id has changed
-    elif st.session_state["model_id"] != model_id:
-        st.session_state["model_id"] = model_id
-        restart_agent()
-
-    # Sidebar checkboxes for selecting team members
-    st.sidebar.markdown("### Select Team Members")
-
     # Initialize session state for popup control
     if "show_popup" not in st.session_state:
         st.session_state.show_popup = False
@@ -198,14 +183,45 @@ def main() -> None:
 
     # Define agents dictionary
     AGENTS = {
-        journal.agent_name: journal.get_agent,
-        python.agent_name: python.get_agent,
-        arxiv.agent_name: arxiv.get_agent,
-        youtube.agent_name: youtube.get_agent,
-        google_calender.agent_name: google_calender.get_agent,
-        github.agent_name: github.get_agent,
-        wikipedia.agent_name: wikipedia.get_agent,
-        patent_writer.agent_name: patent_writer.get_agent,
+        coordinator.agent_name: {
+            "icon": "fa-solid fa-sitemap",
+            "selectable": False,
+            "is_leader": True,
+            "label": to_label(coordinator.agent_name),
+            "get_agent": coordinator.get_coordinator,
+        },
+        journal.agent_name: {
+            "label": to_label(journal.agent_name),
+            "get_agent": journal.get_agent,
+        },
+        python.agent_name: {
+            "label": to_label(python.agent_name),
+            "get_agent": python.get_agent,
+        },
+        arxiv.agent_name: {
+            "label": to_label(arxiv.agent_name),
+            "get_agent": arxiv.get_agent,
+        },
+        youtube.agent_name: {
+            "label": to_label(youtube.agent_name),
+            "get_agent": youtube.get_agent,
+        },
+        google_calender.agent_name: {
+            "label": google_calender.agent_name.lower().replace(" ", "_"),
+            "get_agent": google_calender.get_agent,
+        },
+        github.agent_name: {
+            "label": github.agent_name.lower().replace(" ", "_"),
+            "get_agent": github.get_agent,
+        },
+        wikipedia.agent_name: {
+            "label": to_label(wikipedia.agent_name),
+            "get_agent": wikipedia.get_agent,
+        },
+        patent_writer.agent_name: {
+            "label": to_label(patent_writer.agent_name),
+            "get_agent": patent_writer.get_agent,
+        },
     }
 
     # Get the Agent
@@ -216,15 +232,21 @@ def main() -> None:
         else None
     )
 
-    AGENTS_CONFIG: Dict[str, CoordiantorTeamConfig] = {}
+    LEADER_CONFIG = settings.AgentConfig.empty()
+    AGENTS_CONFIG: Dict[str, settings.AgentConfig] = {}
 
     if SID:
         logger.debug(f">>> Using Session ID: {SID}")
 
-        for agent in AGENTS:
-            config = get_selected_assistant_config(SID, agent)
+        for agent, agent_config in AGENTS.items():
+            config = get_selected_assistant_config(
+                SID, agent_config.get("label", agent)
+            )
             if config:
-                AGENTS_CONFIG[agent] = config
+                if agent_config.get("is_leader", False):
+                    LEADER_CONFIG = config
+                else:
+                    AGENTS_CONFIG[agent] = config
 
         logger.debug("Agents Config: ")
         for agent, config in AGENTS_CONFIG.items():
@@ -235,10 +257,10 @@ def main() -> None:
         or st.session_state["generic_leader"] is None
         or (SID and st.session_state["generic_leader"].session_id != SID)
     ):
-        logger.debug(f">>> Creating {model_id} Agent")
-        generic_leader = get_generic_leader(
+        logger.debug(">>> Creating leader agent with config: %s", LEADER_CONFIG)
+        generic_leader = coordinator.get_coordinator(
             team_config=AGENTS_CONFIG,
-            model_id=model_id,
+            config=LEADER_CONFIG,
             session_id=SID,
         )
         st.session_state["generic_leader"] = generic_leader
@@ -261,17 +283,30 @@ def main() -> None:
         st.warning("Could not create Agent session, is the database running?")
         return
 
-    for agent in generic_leader.team:
+    for agent in [generic_leader] + generic_leader.team:
         agent: base.Agent
 
-        st.session_state[f"{agent.label}_model_id"] = agent.model.id
-        st.session_state[f"{agent.label}_model_type"] = agent.model_type
-        st.session_state[f"{agent.label}_temperature"] = getattr(
+        config: settings.AgentConfig = (
+            AGENTS_CONFIG.get(agent.name) or settings.AgentConfig.empty()
+        )
+
+        st.session_state[f"{agent.label}_model_id"] = config.model_id or agent.model.id
+        st.session_state[f"{agent.label}_model_type"] = config.model or agent.model_type
+        st.session_state[f"{agent.label}_temperature"] = config.temperature or getattr(
             agent.model, "temperature", 0
+        )
+        st.session_state[f"{agent.label}_max_tokens"] = config.max_tokens or getattr(
+            agent.model, "max_tokens", agent_settings.default_max_completion_tokens
         )
 
     # Create sidebar
-    create_sidebar(SID, AGENTS)
+    create_sidebar(SID, {generic_leader.name: AGENTS[generic_leader.name]})
+
+    # Sidebar checkboxes for selecting team members
+    st.sidebar.markdown("### Select Team Members")
+    create_sidebar(
+        SID, {k: v for k, v in AGENTS.items() if not v.get("is_leader", False)}
+    )
 
     # Show popup if triggered
     if st.session_state.show_popup and st.session_state.selected_assistant:
@@ -503,14 +538,14 @@ def main() -> None:
         )
         if SID != new_generic_leader_session_id:
             logger.debug(
-                f">>> Loading {model_id} session: {new_generic_leader_session_id}"
+                f">>> Loading {generic_leader.model.id} session: {new_generic_leader_session_id}"
             )
             st.query_params[SESSION_KEY] = new_generic_leader_session_id
             st.rerun()
             return
         else:
             logger.debug(
-                f">>> Continuing {model_id} session: {new_generic_leader_session_id}"
+                f">>> Continuing {generic_leader.model.id} session: {new_generic_leader_session_id}"
             )
 
     NEW_SESSION = st.sidebar.button("New Session")
@@ -520,7 +555,12 @@ def main() -> None:
             ids = generic_leader.storage.get_all_session_ids()
             for id in ids:
                 generic_leader.storage.delete_session(id)
-            UserConfig.objects.filter(session_id__in=ids).delete()
+            if ids:
+                with get_db_context() as db:
+                    db.execute(
+                        sql.delete(UserConfig).where(UserConfig.session_id.in_(ids))
+                    )
+                    db.commit()
             NEW_SESSION = True
 
     if NEW_SESSION:

@@ -4,7 +4,10 @@ from typing import Optional
 
 from composio_phidata import Action as ComposioAction
 from composio_phidata import ComposioToolSet
+from phi.model.groq import Groq
+from phi.model.ollama import Ollama
 from phi.model.openai import OpenAIChat
+from phi.utils.log import logger
 from pydantic_settings import BaseSettings
 
 from workspace.settings import extra_settings
@@ -22,19 +25,18 @@ class AgentSettings(BaseSettings):
     Reference: https://pydantic-docs.helpmanual.io/usage/settings/
     """
 
-    gpt_4: str = "gpt-4o"
-    default_max_completion_tokens: int = Defaults.MAX_COMPLETION_TOKENS.value
-    default_temperature: float = Defaults.TEMPERATURE.value
+    gpt_4: str = os.getenv("DEFAULT_GPT_MODEL", "gpt-4o")
+    default_temperature: float = int(os.getenv("DEFAULT_TEMPERATURE", "0"))
+    embedding_model: str = os.getenv(
+        "OPENAPI_EMBEDDING_MODEL", "text-embedding-3-small"
+    )
+    default_max_completion_tokens: int = int(
+        os.getenv("DEFAULT_MAX_COMPLETION_TOKENS", 16000)
+    )
 
     debug_mode: bool = False
     show_tool_calls: bool = True
     composio_tools: Optional[ComposioToolSet] = None
-
-    @property
-    def embedding_model(self):
-        from dashboard.models import Config
-
-        return Config.get("OPENAPI_EMBEDDING_MODEL", "text-embedding-3-small")
 
     def __init__(self, *args, **kwargs):
         # pass arguments to the parent constructor
@@ -55,18 +57,108 @@ class AgentSettings(BaseSettings):
     def _get_boolean_env(self, key, default: bool = False) -> bool:
         return self._getenv(key, "true" if default else "false").lower() == "true"
 
-    class Models:
-        @classmethod
-        def get_gpt_model(cls, model_id: str):
-            return OpenAIChat(
-                id=model_id,
-                max_tokens=Defaults.MAX_COMPLETION_TOKENS.value,
-                temperature=Defaults.TEMPERATURE.value,
-                api_key=extra_settings.gpt_api_key,
-            )
+
+class AgentConfig:
+    model: Optional[str] = None
+    model_id: Optional[str] = None
+    temperature: Optional[float] = None
+    enabled: Optional[bool] = None
+    max_tokens: Optional[int] = None
+
+    def __init__(
+        self,
+        model: str,
+        model_id: str,
+        temperature: float,
+        enabled: bool,
+        max_tokens: int,
+    ):
+        self.model = model
+        self.model_id = model_id
+        self.temperature = temperature
+        self.enabled = enabled
+        self.max_tokens = max_tokens
+
+    @property
+    def is_empty(self):
+        return (
+            self.model is None
+            and self.model_id is None
+            and self.temperature is None
+            and self.enabled is None
+            and self.max_tokens is None
+        )
+
+    @classmethod
+    def empty(cls):
+        return cls(None, None, None, None, None)
+
+    def __str__(self):
+        return str(
+            {
+                "model": self.model,
+                "model_id": self.model_id,
+                "temperature": self.temperature,
+                "enabled": self.enabled,
+                "max_tokens": self.max_tokens,
+            }
+        )
+
+    def __repr__(self):
+        return str(self)
+
+    @classmethod
+    def default_model(cls):
+        return OpenAIChat(
+            id="gpt-4o",
+            max_tokens=agent_settings.default_max_completion_tokens,
+            temperature=agent_settings.default_temperature,
+        )
+
+    @property
+    def get_model(self):
+        models = {"GPT", "Groq", "LLaMA"}
+        if self.is_empty or self.model is None:
+            return self.default_model()
+
+        if self.model not in models:
+            logger.warning("Model '%s' is not defined!", self.model)
+            return None
+
+        if not self.max_tokens:
+            self.max_tokens = agent_settings.default_max_completion_tokens
+
+        configs = {}
+        model_class = None
+
+        match self.model:
+            case "GPT":
+                model_class = OpenAIChat
+                model_id = self.model_id or "gpt-4o"
+                configs["api_key"] = extra_settings.gpt_api_key
+
+            case "Groq":
+                model_class = Groq
+                model_id = self.model_id or "llama3-groq-70b-8192-tool-use-preview"
+                configs["api_key"] = extra_settings.groq_api_key
+            case "LLaMA":
+                model_class = Ollama
+                model_id = self.model_id or "llama3.2"
+                configs["host"] = extra_settings.ollama_host
+
+            case _:
+                logger.warning("Model '%s' didn't match!", self.model)
+                return None
+
+        return model_class(
+            id=model_id,
+            temperature=self.temperature,
+            max_tokens=self.max_tokens,
+            **configs,
+        )
 
 
 # Create an AgentSettings object
 agent_settings = AgentSettings()
 
-__all__ = ["agent_settings", "ComposioAction", "Defaults"]
+__all__ = ["agent_settings", "ComposioAction", "AgentConfig"]

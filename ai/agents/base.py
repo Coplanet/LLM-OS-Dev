@@ -1,5 +1,5 @@
 from textwrap import dedent
-from typing import Any, Dict, Generic, List, Optional, TypeVar
+from typing import Generic, List, Optional, TypeVar
 
 from phi.agent import Agent as PhiAgent
 from phi.model import Model
@@ -8,11 +8,11 @@ from phi.model.ollama import Ollama
 from phi.model.openai import OpenAIChat
 from phi.utils.log import logger
 
-from .settings import ComposioAction, Defaults, agent_settings, extra_settings
+from .settings import AgentConfig, ComposioAction, agent_settings, extra_settings
 
 DEFAULT_GPT_MODEL_CONFIG = {
-    "max_tokens": Defaults.MAX_COMPLETION_TOKENS.value,
-    "temperature": Defaults.TEMPERATURE.value,
+    "max_tokens": agent_settings.default_max_completion_tokens,
+    "temperature": agent_settings.default_temperature,
     "api_key": extra_settings.gpt_api_key,
 }
 
@@ -27,22 +27,23 @@ class Agent(PhiAgent):
     markdown: bool = True
     add_datetime_to_instructions: bool = True
 
-    def register_or_load(
-        self,
-        default_model_config: Dict[str, Any] = DEFAULT_GPT_MODEL_CONFIG,
-        default_agent_config: Dict[str, Any] = {},
-        force_model: Model = None,
-    ):
-        from dashboard.models import AgentConfig
+    def __init__(self, *args, **kwargs):
+        agent_config: AgentConfig = kwargs.pop("agent_config", None)
+        if agent_config:
+            if not isinstance(agent_config, AgentConfig):
+                raise Exception("agent_config must be an instance of AgentConfig")
+            kwargs["model"] = agent_config.get_model
 
-        for field, config in default_model_config.items():
-            setattr(self.model, field, config)
+        if "model" not in kwargs or kwargs["model"] is None:
+            kwargs["model"] = AgentConfig.default_model()
 
-        for field, config in default_agent_config.items():
-            setattr(self, field, config)
+        super().__init__(*args, **kwargs)
 
-        return AgentConfig.register_or_load(
-            self, default_model_config, default_agent_config, force_model
+        logger.debug(
+            "Agent '%s' initialized using model: '%s' with temperature: '%s'",
+            self.name or "n/a",
+            self.model.id,
+            str(getattr(self.model, "temperature", "n/a")),
         )
 
     @property
@@ -58,46 +59,9 @@ class Agent(PhiAgent):
 
     @property
     def label(self):
-        return self.name.lower().replace(" ", "_")
+        from app.utils import to_label
 
-    @staticmethod
-    def get_model(model: str = None, model_id: str = None, templature: float = 0):
-        models = {"GPT", "Groq", "LLaMA"}
-        if model is None:
-            return None
-
-        if model not in models:
-            logger.warning(f"Model '{model}' is not defined!")
-            return None
-
-        configs = {}
-        model_class = None
-
-        match model:
-            case "GPT":
-                model_class = OpenAIChat
-                model_id = model_id or "gpt-4o"
-                configs["api_key"] = extra_settings.gpt_api_key
-
-            case "Groq":
-                model_class = Groq
-                model_id = model_id or "llama3-groq-70b-8192-tool-use-preview"
-                configs["api_key"] = extra_settings.groq_api_key
-            case "LLaMA":
-                model_class = Ollama
-                model_id = model_id or "llama3.2"
-                configs["host"] = extra_settings.ollama_host
-
-            case _:
-                logger.warning(f"Model '{model}' didn't match!")
-                return None
-
-        return model_class(
-            id=model_id,
-            temperature=templature,
-            max_tokens=agent_settings.default_max_completion_tokens,
-            **configs,
-        )
+        return to_label(self.name)
 
 
 class AgentTeam(list, Generic[TypeVar("T", bound=Agent)]):

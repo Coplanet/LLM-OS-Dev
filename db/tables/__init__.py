@@ -1,3 +1,5 @@
 from db.tables.base import Base
 
-__all__ = ["Base"]
+from .user_config import UserConfig
+
+__all__ = ["Base", "UserConfig"]

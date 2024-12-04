@@ -1,44 +1,33 @@
 from textwrap import dedent
 
-from phi.model.base import Model
 from phi.tools.exa import ExaTools
-from phi.utils.log import logger
 
 from workspace.settings import extra_settings
 
-from .base import Agent
+from .base import Agent, AgentConfig
 
 agent_name = "Patent Writer Agent"
 
 
-def get_agent(model: Model = None):
-    if model is not None:
-        logger.debug(
-            "Agent '%s' uses model: '%s' with temperature: '%s'",
-            agent_name,
-            model.id,
-            str(getattr(model, "temperature", "n/a")),
-        )
-
+def get_agent(config: AgentConfig = None):
     return Agent(
         name=agent_name,
+        agent_config=config,
         tools=[ExaTools(num_results=5, text_length_limit=1000)],
         save_output_to_file=extra_settings.scratch_dir / "{run_id}.md",
         role="Draft a patent document for a specified invention",
-    ).register_or_load(
-        default_agent_config={
-            "description": (
-                "An AI system designed to assist in drafting patent applications, "
-                "ensuring clarity and adherence to patent office standards."
-            ),
-            "instructions": [
-                "Use the `search_exa` tool to gather relevant prior art and technical information.",
-                "Analyze the collected data to draft a comprehensive patent document.",
-                "Ensure the document is clear, precise, and follows the standard patent format.",
-                "Focus on highlighting the novelty and inventive step of the invention.",
-            ],
-            "expected_output": dedent(
-                """\
+        description=(
+            "An AI system designed to assist in drafting patent applications, "
+            "ensuring clarity and adherence to patent office standards."
+        ),
+        instructions=[
+            "Use the `search_exa` tool to gather relevant prior art and technical information.",
+            "Analyze the collected data to draft a comprehensive patent document.",
+            "Ensure the document is clear, precise, and follows the standard patent format.",
+            "Focus on highlighting the novelty and inventive step of the invention.",
+        ],
+        expected_output=dedent(
+            """\
             A structured patent document comprising the following sections:
 
             ## Title
@@ -71,15 +60,13 @@ def get_agent(model: Model = None):
             - [Reference 1](Link to Source)
             - [Reference 2](Link to Source)\
             """
-            ).strip(),
-            "delegation_directives": [
-                (
-                    "Delegate the task of drafting a patent document to the `Patent Writer Agent`. "
-                    "Provide the document in the specified format directly to the user without additional commentary."
-                ),
-            ],
-        },
-        force_model=model,
+        ).strip(),
+        delegation_directives=[
+            (
+                "Delegate the task of drafting a patent document to the `Patent Writer Agent`. "
+                "Provide the document in the specified format directly to the user without additional commentary."
+            ),
+        ],
     )
 
 

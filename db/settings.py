@@ -1,9 +1,8 @@
 from os import getenv
 from typing import Optional
 
+from phi.utils.log import logger
 from pydantic_settings import BaseSettings
-
-from utils.log import logger
 
 
 class DbSettings(BaseSettings):
