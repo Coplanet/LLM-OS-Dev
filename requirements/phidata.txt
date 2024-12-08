@@ -47,7 +47,6 @@ openai==1.51.2
 packaging==24.1
 pandas==2.2.3
 pgvector==0.3.5
-phidata==2.5.3
 pillow==10.4.0
 pluggy==1.5.0
 primp==0.6.4
@@ -72,7 +71,7 @@ referencing==0.35.1
 regex==2024.9.11
 requests==2.32.3
 rich==13.9.2
-rpds-py==0.20.0
+rpds-py
 ruff==0.6.9
 s3transfer==0.10.3
 shellingham==1.5.4

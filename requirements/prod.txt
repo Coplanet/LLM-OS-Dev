@@ -314,7 +314,6 @@ pgvector==0.3.5
     # via -r requirements/./phidata.txt
 phidata[aws]==2.5.3
     # via
-    #   -r requirements/./phidata.txt
     #   -r requirements/prod.in
     #   composio-phidata
 pillow==10.4.0

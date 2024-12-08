@@ -1,7 +1,7 @@
 """UserConfig added
 
 Revision ID: 4499778c1f63
-Revises: 
+Revises:
 Create Date: 2024-12-04 12:20:42.815183
 
 """
