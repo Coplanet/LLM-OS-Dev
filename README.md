@@ -67,6 +67,14 @@ phi ws up
 phi ws down
 ```
 
+5. Local developments:
+
+```sh
+pip install -r requirements/dev.txt && \
+alembic -c db/alembic.ini upgrade head && \
+./run-front
+```
+
 ## Next Steps:
 
 - [Run the Agent App on AWS](https://docs.phidata.com/templates/agent-app/run-aws)
