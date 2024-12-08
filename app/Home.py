@@ -133,8 +133,8 @@ def encode_image(image_file):
 def get_selected_assistant_config(session_id, label):
     try:
         default_configs = {
-            "model_type": "GPT",
-            "model_id": "gpt-4o",
+            "model_type": "OpenAI",
+            "model_id": "GPT-4o",
             "temperature": 0,
             "enabled": True,
             "max_tokens": agent_settings.default_max_completion_tokens,
@@ -152,7 +152,7 @@ def get_selected_assistant_config(session_id, label):
                         default_configs[key] = config.value_json[label][key]
 
         return settings.AgentConfig(
-            model=default_configs["model_type"],
+            provider=default_configs["model_type"],
             model_id=default_configs["model_id"],
             temperature=default_configs["temperature"],
             enabled=default_configs["enabled"],
@@ -291,7 +291,9 @@ def main() -> None:
         )
 
         st.session_state[f"{agent.label}_model_id"] = config.model_id or agent.model.id
-        st.session_state[f"{agent.label}_model_type"] = config.model or agent.model_type
+        st.session_state[f"{agent.label}_model_type"] = (
+            config.provider or agent.model_type
+        )
         st.session_state[f"{agent.label}_temperature"] = config.temperature or getattr(
             agent.model, "temperature", 0
         )

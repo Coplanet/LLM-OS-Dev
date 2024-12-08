@@ -56,7 +56,7 @@ def get_coordinator(
         config = AgentConfig.empty()
 
     if config.is_empty:
-        config.model = "GPT"
+        config.model = "OpenAI"
         config.model_id = "gpt-4o"
         config.enabled = True
         config.temperature = 0

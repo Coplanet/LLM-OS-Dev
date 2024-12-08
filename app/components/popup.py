@@ -1,9 +1,48 @@
 import streamlit as st
 from phi.utils.log import logger
 
+from ai.agents.settings import agent_settings
 from app.utils import to_label
 from db.session import get_db_context
 from db.tables import UserConfig
+
+MODELS = {
+    "OpenAI": {
+        "gpt-4o": {
+            "max_temperature": 2,
+            "max_token_size": agent_settings.default_max_completion_tokens,
+        },
+        "gpt-4o-Mini": {
+            "max_temperature": 2,
+            "max_token_size": agent_settings.default_max_completion_tokens,
+        },
+        # "o1-preview": {
+        #     "max_temperature": 2,
+        #     "max_token_size": 128_000,
+        # },
+        # "o1-mini": {
+        #     "max_temperature": 2,
+        #     "max_token_size": 128_000,
+        # },
+    },
+    "Groq": {
+        "llama3-groq-70b-8192-tool-use-preview": {
+            "max_temperature": 2,
+            "max_token_size": 8_192,
+        },
+        "llama3-groq-8b-8192-tool-use-preview": {
+            "max_temperature": 2,
+            "max_token_size": 8_192,
+        },
+        "gemma-7b-it": {
+            "max_temperature": 2,
+            "max_token_size": 8_192,
+        },
+        "llama-3.3-70b-versatile": {"max_temperature": 2, "max_token_size": 128_000},
+    },
+}
+
+PROVIDERS_ORDER = ["OpenAI", "Groq"]
 
 
 @st.dialog("Configure Agent")
@@ -13,27 +52,29 @@ def show_popup(session_id, assistant_name):
     st.markdown(f"Agent: **{assistant_name}**")
 
     # Two dropdowns with string options
-    model_type = st.selectbox(
-        "Select Model Type", ["GPT", "Groq", "LLaMA"], key=f"{label}_model_type"
+    provider: str = st.selectbox(
+        "Foundation Model Provider", PROVIDERS_ORDER, key=f"{label}_model_type"
     )
-    model_id = st.text_input("Input Model ID", key=f"{label}_model_id")
+    PROVIDER_CONFIG: dict = MODELS[provider]
 
-    # Float input between 0 and 1
+    if st.session_state[f"{label}_model_id"] not in PROVIDER_CONFIG:
+        st.session_state[f"{label}_model_id"] = list(PROVIDER_CONFIG.keys())[0]
+
+    model_id: str = st.selectbox(
+        "Model ID", list(PROVIDER_CONFIG.keys()), key=f"{label}_model_id"
+    )
+
+    MODEL_CONFIG: dict = PROVIDER_CONFIG[model_id]
+
     temperature = st.slider(
         "Temperature",
         min_value=0.0,
-        max_value=10.0,
+        max_value=float(MODEL_CONFIG["max_temperature"]),
         step=0.1,
         key=f"{label}_temperature",
     )
 
-    max_tokens = st.number_input(
-        "Max Tokens",
-        min_value=1024,
-        max_value=1048576,
-        step=64,
-        key=f"{label}_max_tokens",
-    )
+    max_tokens = MODEL_CONFIG["max_token_size"]
 
     col1, col2 = st.columns(2)
     with col1:
@@ -47,7 +88,7 @@ def show_popup(session_id, assistant_name):
             st.session_state.show_popup = False
             st.session_state["generic_leader"] = None
             new_configs = {
-                "model_type": model_type,
+                "model_type": provider,
                 "model_id": model_id,
                 "temperature": temperature,
                 "max_tokens": max_tokens,

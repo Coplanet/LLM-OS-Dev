@@ -49,11 +49,11 @@ class Agent(PhiAgent):
     @property
     def model_type(self):
         if isinstance(self.model, OpenAIChat):
-            return "GPT"
+            return "OpenAI"
         if isinstance(self.model, Groq):
             return "Groq"
         if isinstance(self.model, Ollama):
-            return "LLaMA"
+            return "Ollama"
         logger.warning(f"Model type '{self.model}' is not defined!")
         return None
 

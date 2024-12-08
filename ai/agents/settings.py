@@ -25,7 +25,6 @@ class AgentSettings(BaseSettings):
     Reference: https://pydantic-docs.helpmanual.io/usage/settings/
     """
 
-    gpt_4: str = os.getenv("DEFAULT_GPT_MODEL", "gpt-4o")
     default_temperature: float = int(os.getenv("DEFAULT_TEMPERATURE", "0"))
     embedding_model: str = os.getenv(
         "OPENAPI_EMBEDDING_MODEL", "text-embedding-3-small"
@@ -59,7 +58,7 @@ class AgentSettings(BaseSettings):
 
 
 class AgentConfig:
-    model: Optional[str] = None
+    provider: Optional[str] = None
     model_id: Optional[str] = None
     temperature: Optional[float] = None
     enabled: Optional[bool] = None
@@ -67,13 +66,13 @@ class AgentConfig:
 
     def __init__(
         self,
-        model: str,
+        provider: str,
         model_id: str,
         temperature: float,
         enabled: bool,
         max_tokens: int,
     ):
-        self.model = model
+        self.provider = provider
         self.model_id = model_id
         self.temperature = temperature
         self.enabled = enabled
@@ -82,7 +81,7 @@ class AgentConfig:
     @property
     def is_empty(self):
         return (
-            self.model is None
+            self.provider is None
             and self.model_id is None
             and self.temperature is None
             and self.enabled is None
@@ -96,7 +95,7 @@ class AgentConfig:
     def __str__(self):
         return str(
             {
-                "model": self.model,
+                "model": self.provider,
                 "model_id": self.model_id,
                 "temperature": self.temperature,
                 "enabled": self.enabled,
@@ -117,12 +116,12 @@ class AgentConfig:
 
     @property
     def get_model(self):
-        models = {"GPT", "Groq", "LLaMA"}
-        if self.is_empty or self.model is None:
+        models = {"OpenAI", "Groq", "Ollama"}
+        if self.is_empty or self.provider is None:
             return self.default_model()
 
-        if self.model not in models:
-            logger.warning("Model '%s' is not defined!", self.model)
+        if self.provider not in models:
+            logger.warning("Model '%s' is not defined!", self.provider)
             return None
 
         if not self.max_tokens:
@@ -131,8 +130,8 @@ class AgentConfig:
         configs = {}
         model_class = None
 
-        match self.model:
-            case "GPT":
+        match self.provider:
+            case "OpenAI":
                 model_class = OpenAIChat
                 model_id = self.model_id or "gpt-4o"
                 configs["api_key"] = extra_settings.gpt_api_key
@@ -141,13 +140,13 @@ class AgentConfig:
                 model_class = Groq
                 model_id = self.model_id or "llama3-groq-70b-8192-tool-use-preview"
                 configs["api_key"] = extra_settings.groq_api_key
-            case "LLaMA":
+            case "Ollama":
                 model_class = Ollama
                 model_id = self.model_id or "llama3.2"
                 configs["host"] = extra_settings.ollama_host
 
             case _:
-                logger.warning("Model '%s' didn't match!", self.model)
+                logger.warning("Model '%s' didn't match!", self.provider)
                 return None
 
         return model_class(
