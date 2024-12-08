@@ -34,9 +34,9 @@ MODELS = {
             "max_temperature": 2,
             "max_token_size": 8_192,
         },
-        "gemma-7b-it": {
+        "mixtral-8x7b-32768": {
             "max_temperature": 2,
-            "max_token_size": 8_192,
+            "max_token_size": 32_768,
         },
         "llama-3.3-70b-versatile": {"max_temperature": 2, "max_token_size": 128_000},
     },
