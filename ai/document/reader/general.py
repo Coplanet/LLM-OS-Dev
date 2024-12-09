@@ -3,7 +3,8 @@ from typing import IO, Any, List
 
 from phi.document.base import Document
 from phi.document.reader.base import Reader
-from phi.utils.log import logger
+
+from helpers.log import logger
 
 
 class GenericReader(Reader):

@@ -21,7 +21,6 @@ from phi.tools.streamlit.components import (
     get_openai_key_sidebar,
     get_username_sidebar,
 )
-from phi.utils.log import logger
 from PIL import Image
 
 from ai.agents import (
@@ -49,6 +48,7 @@ from app.components.sidebar import create_sidebar
 from app.utils import to_label
 from db.session import get_db_context
 from db.tables import UserConfig
+from helpers.log import logger
 
 STATIC_DIR = "app/static"
 IMAGE_DIR = f"{STATIC_DIR}/images"

@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from utils.dttm import current_utc_str
+from helpers.dttm import current_utc_str
 
 ######################################################
 # Router for health checks

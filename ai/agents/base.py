@@ -6,7 +6,8 @@ from phi.model import Model
 from phi.model.groq import Groq
 from phi.model.ollama import Ollama
 from phi.model.openai import OpenAIChat
-from phi.utils.log import logger
+
+from helpers.log import logger
 
 from .settings import AgentConfig, ComposioAction, agent_settings, extra_settings
 

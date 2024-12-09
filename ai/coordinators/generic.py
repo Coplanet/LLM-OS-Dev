@@ -12,7 +12,6 @@ from phi.tools.file import FileTools
 from phi.tools.resend_tools import ResendTools
 from phi.tools.website import WebsiteTools
 from phi.tools.yfinance import YFinanceTools
-from phi.utils.log import logger
 from phi.vectordb.pgvector import PgVector2
 
 from ai.agents import (
@@ -31,6 +30,7 @@ from ai.agents.base import AgentTeam
 from ai.agents.settings import AgentConfig, agent_settings
 from db.session import db_url
 from db.settings import db_settings
+from helpers.log import logger
 from workspace.settings import extra_settings
 
 from .base import Coordinator
@@ -46,7 +46,7 @@ def get_coordinator(
     resend_tools: bool = True,
     website_tools: bool = True,
     team_config: Dict[str, AgentConfig] = {},
-    config: AgentConfig = None,
+    config: Optional[AgentConfig] = None,
     run_id: Optional[str] = None,
     user_id: Optional[str] = None,
     session_id: Optional[str] = None,

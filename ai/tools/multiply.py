@@ -1,7 +1,8 @@
 from typing import List
 
 from phi.tools import Toolkit
-from phi.utils.log import logger
+
+from helpers.log import logger
 
 
 class MyCustomMultipluTool(Toolkit):

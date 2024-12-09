@@ -1,10 +1,10 @@
 import streamlit as st
-from phi.utils.log import logger
 
 from ai.agents.settings import agent_settings
 from app.utils import to_label
 from db.session import get_db_context
 from db.tables import UserConfig
+from helpers.log import logger
 
 MODELS = {
     "OpenAI": {
@@ -75,6 +75,14 @@ def show_popup(session_id, assistant_name):
     )
 
     max_tokens = MODEL_CONFIG["max_token_size"]
+
+    logger.info(
+        "Provider: '%s', Model: '%s', Temperature: '%s', Max Tokens: '%s'",
+        provider,
+        model_id,
+        temperature,
+        max_tokens,
+    )
 
     col1, col2 = st.columns(2)
     with col1:

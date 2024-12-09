@@ -7,9 +7,9 @@ from composio_phidata import ComposioToolSet
 from phi.model.groq import Groq
 from phi.model.ollama import Ollama
 from phi.model.openai import OpenAIChat
-from phi.utils.log import logger
 from pydantic_settings import BaseSettings
 
+from helpers.log import logger
 from workspace.settings import extra_settings
 
 

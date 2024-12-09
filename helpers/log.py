@@ -1,9 +1,30 @@
 import logging
+import os
+from enum import Enum
+
+
+class LogLevel(Enum):
+    CRITICAL = 50
+    FATAL = 50
+    ERROR = 40
+    WARNING = 30
+    WARN = 30
+    INFO = 20
+    DEBUG = 10
+    NOTSET = 0
+
+    @classmethod
+    def from_string(cls, level: str) -> "LogLevel":
+        return cls[level.upper()]
+
+    @classmethod
+    def from_env(cls) -> "LogLevel":
+        return cls.from_string(os.getenv("LOG_LEVEL", "INFO"))
 
 
 def build_logger(
     logger_name: str,
-    log_level: int = logging.INFO,
+    log_level: int = LogLevel.from_env().value,
     show_time: bool = False,
     rich_tracebacks: bool = False,
     tracebacks_show_locals: bool = False,
@@ -30,4 +51,6 @@ def build_logger(
 
 
 # Default logger instance
-logger: logging.Logger = build_logger("agent-app")
+logger: logging.Logger = build_logger("llm-os")
+
+__all__ = ["logger"]

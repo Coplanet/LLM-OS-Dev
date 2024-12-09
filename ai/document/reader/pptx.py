@@ -3,8 +3,9 @@ from typing import IO, Any, List, Union
 
 from phi.document.base import Document
 from phi.document.reader.base import Reader
-from phi.utils.log import logger
 from pptx import Presentation
+
+from helpers.log import logger
 
 
 class PPTXReader(Reader):
