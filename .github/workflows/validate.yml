@@ -34,20 +34,11 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install black
-        run: uv pip install black
-
       - name: Install the project
         run: uv pip sync requirements/dev.txt
-
-      - name: Format with black
-        run: uv run -- black --exclude .venv .
 
       - name: Lint with ruff
         run: uv run ruff check .
 
-      - name: Type-check with mypy
-        run: uv run mypy .
-
-      # - name: Run tests
-      #   run: uv run pytest tests
+      - name: Run pre-commit
+        run: uv run pre-commit
