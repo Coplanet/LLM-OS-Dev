@@ -136,7 +136,7 @@ def get_selected_assistant_config(session_id, label):
     try:
         default_configs = {
             "model_type": "OpenAI",
-            "model_id": "GPT-4o",
+            "model_id": "gpt-4o",
             "temperature": 0,
             "enabled": True,
             "max_tokens": agent_settings.default_max_completion_tokens,
