@@ -92,15 +92,20 @@ class AgentTeam(list, Generic[TypeVar("T", bound=Agent)]):
 
     @property
     def delegation_directives(self) -> str:
-        return dedent(
-            "\n".join(
-                [
-                    dir
-                    for agent in self
-                    for dir in getattr(agent, "delegation_directives", "")
-                ]
-            )
-        ).strip()
+        DELIMITER = "\n---\n"
+
+        return (
+            DELIMITER
+            + dedent(
+                DELIMITER.join(
+                    [
+                        dir.strip()
+                        for agent in self
+                        for dir in getattr(agent, "delegation_directives", "")
+                    ]
+                )
+            ).strip()
+        )
 
 
 __all__ = [
