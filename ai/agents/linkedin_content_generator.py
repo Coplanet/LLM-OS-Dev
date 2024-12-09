@@ -6,7 +6,7 @@ from workspace.settings import extra_settings
 
 from .base import Agent, AgentConfig
 
-agent_name = "LinkedIn Content Generator Agent"
+agent_name = "LinkedIn Agent"
 
 
 def get_agent(config: AgentConfig = None):
