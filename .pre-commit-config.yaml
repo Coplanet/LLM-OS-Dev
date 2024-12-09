@@ -34,9 +34,3 @@ repos:
     hooks:
       - id: flake8
         args: ["--max-line-length=119"]
-
-  - repo: https://github.com/Riverside-Healthcare/djLint
-    rev: v1.34.1
-    hooks:
-      - id: djlint-reformat-django
-      - id: djlint-django
