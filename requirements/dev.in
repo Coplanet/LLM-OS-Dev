@@ -7,3 +7,4 @@ black
 djlint
 pylint-django
 pre-commit
+pip-tools
