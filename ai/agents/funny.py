@@ -60,9 +60,12 @@ def get_agent(config: AgentConfig = None):
         ],
         delegation_directives=[
             (
-                "Delegate to the `Content Editor Agent` for generating, reviewing and optimizing LinkedIn "
-                "articles to ensure they meet platform best practices and engagement guidelines."
-            )
+                f"If the task involves making content funny, humorous, or entertaining, delegate it to `{agent_name}`! "
+                "It excel at transforming serious or technical content into hilarious, emoji-filled stories. "
+                "It can add humor to any type of content while keeping it family-friendly and avoiding offensive material."
+            ),
+            f"If you need to make scientific papers, legal documents, or any formal text more engaging and fun, delegate to `{agent_name}`!",
+            f"`{agent_name}` not suitable for tasks requiring serious analysis or maintaining professional tone.",
         ],
     )
 
