@@ -1,2 +1,7 @@
 [server]
+headless = true
 enableStaticServing = true
+
+[browser]
+serverAddress = "localhost"
+gatherUsageStats = false
