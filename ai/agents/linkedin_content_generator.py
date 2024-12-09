@@ -65,7 +65,12 @@ def get_agent(config: AgentConfig = None):
             (
                 "Delegate to the `Content Editor Agent` for generating, reviewing and optimizing LinkedIn "
                 "articles to ensure they meet platform best practices and engagement guidelines."
-            )
+            ),
+            (
+                f"If a message involves making linkedin content, at the end you should delegate to the `{agent_name}` "
+                "for generating, reviewing and optimizing LinkedIn articles to ensure they meet platform best practices "
+                "and engagement guidelines."
+            ),
         ],
     )
 
