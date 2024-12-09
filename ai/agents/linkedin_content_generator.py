@@ -16,12 +16,7 @@ def get_agent(config: AgentConfig = None):
         agent_config=config,
         tools=[ExaTools(num_results=5, text_length_limit=1000)],
         save_output_to_file=extra_settings.scratch_dir / "{run_id}.md",
-        role=(
-            "I am a LinkedIn content creation specialist with expertise in crafting engaging "
-            "professional content. I excel at writing posts and articles that combine industry "
-            "insights with compelling narratives, helping establish thought leadership and "
-            "drive meaningful engagement on LinkedIn's platform."
-        ),
+        role="I am a LinkedIn content creation specialist with expertise in crafting engaging LinkedIn content.",
         description=(
             "You are a LinkedIn content creation assistant specialized in crafting "
             "posts, articles, and updates that resonate with a professional audience. "
@@ -64,7 +59,7 @@ def get_agent(config: AgentConfig = None):
 
                 Produce content that encourages meaningful engagement and positions the subject as a credible voice in their industry.\
                 """
-            )
+            ).strip()
         ],
         delegation_directives=[
             (
