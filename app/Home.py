@@ -27,9 +27,11 @@ from PIL import Image
 from ai.agents import (
     arxiv,
     base,
+    funny,
     github,
     google_calender,
     journal,
+    linkedin_content_generator,
     patent_writer,
     python,
     settings,
@@ -221,6 +223,14 @@ def main() -> None:
         patent_writer.agent_name: {
             "label": to_label(patent_writer.agent_name),
             "get_agent": patent_writer.get_agent,
+        },
+        linkedin_content_generator.agent_name: {
+            "label": to_label(linkedin_content_generator.agent_name),
+            "get_agent": linkedin_content_generator.get_agent,
+        },
+        funny.agent_name: {
+            "label": to_label(funny.agent_name),
+            "get_agent": funny.get_agent,
         },
     }
 

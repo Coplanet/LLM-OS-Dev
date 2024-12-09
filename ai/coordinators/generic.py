@@ -17,9 +17,11 @@ from phi.vectordb.pgvector import PgVector2
 
 from ai.agents import (
     arxiv,
+    funny,
     github,
     google_calender,
     journal,
+    linkedin_content_generator,
     patent_writer,
     python,
     wikipedia,
@@ -86,7 +88,8 @@ def get_coordinator(
     conditional_agent_enable(github)
     conditional_agent_enable(google_calender)
     conditional_agent_enable(patent_writer)
-
+    conditional_agent_enable(funny)
+    conditional_agent_enable(linkedin_content_generator)
     if not calculator:
         logger.debug("Removing Calculator tool with full functionality.")
     else:
