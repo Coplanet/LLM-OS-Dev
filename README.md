@@ -1,4 +1,25 @@
-## Agent App
+## Development Setup:
+
+```sh
+# install pre-commit hooks (if you haven't already)
+# pre-commit install --hook-type pre-commit --hook-type pre-push
+
+# compile requirements (if you change the requirements/{dev,prod}.in files)
+# pip-compile -v requirements/dev.in -o requirements/dev.txt
+
+# install dependencies
+pip install -r requirements/dev.txt
+
+# upgrade database
+alembic -c db/alembic.ini upgrade head
+
+# run front end
+./run-front
+```
+
+---
+
+## Official LLM-OS Documentation
 
 This repo contains the code for running an agent-app and supports 2 environments:
 
@@ -14,10 +35,8 @@ This repo contains the code for running an agent-app and supports 2 environments
 2. Install workspace and activate the virtual env:
 
 ```sh
-MODE=local ./scripts/install.sh
+MODE=dev ./scripts/install.sh
 source .venv/bin/activate
-pre-commit install --hook-type pre-commit --hook-type pre-push
-
 ```
 
 3. Setup workspace:
@@ -65,14 +84,6 @@ phi ws up
 
 ```sh
 phi ws down
-```
-
-5. Local developments:
-
-```sh
-pip install -r requirements/dev.txt && \
-alembic -c db/alembic.ini upgrade head && \
-./run-front
 ```
 
 ## Next Steps:

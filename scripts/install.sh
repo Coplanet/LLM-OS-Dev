@@ -8,7 +8,7 @@
 CURR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(dirname $CURR_DIR)"
 VENV_DIR="${REPO_ROOT}/.venv"
-MODE="${MODE:-local}"
+MODE="${MODE:-dev}"
 source ${CURR_DIR}/_utils.sh
 
 print_heading "Installing workspace..."
