@@ -8,9 +8,6 @@ from phi.storage.agent.postgres import PgAgentStorage
 from phi.tools import Toolkit
 from phi.tools.calculator import Calculator
 from phi.tools.duckduckgo import DuckDuckGo
-from phi.tools.file import FileTools
-from phi.tools.resend_tools import ResendTools
-from phi.tools.website import WebsiteTools
 from phi.tools.yfinance import YFinanceTools
 from phi.vectordb.pgvector import PgVector2
 
@@ -28,6 +25,9 @@ from ai.agents import (
 )
 from ai.agents.base import AgentTeam
 from ai.agents.settings import AgentConfig, agent_settings
+from ai.tools.email import EmailSenderTools
+from ai.tools.file import FileIOTools
+from ai.tools.website_crawler import WebSiteCrawlerTools
 from db.session import db_url
 from db.settings import db_settings
 from helpers.log import logger
@@ -173,10 +173,10 @@ def get_coordinator(
         logger.debug(
             "Adding File Tools with base directory: %s", extra_settings.scratch_dir
         )
-        tools.append(FileTools(base_dir=extra_settings.scratch_dir))
+        tools.append(FileIOTools(base_dir=extra_settings.scratch_dir))
         extra_instructions.append(
             """\
-            Use the File Tools for managing files in the working directory. Specific use cases include:
+            Use the File IO Tools for managing files in the working directory. Specific use cases include:
 
             - Read Files: Open and read content from files when the user uploads or references one.
             - Save Files: Store data, results, or responses in a file upon request.
@@ -187,25 +187,25 @@ def get_coordinator(
             """
         )
 
-    if not resend_tools:
+    if not resend_tools or not extra_settings.resend_api_key:
         logger.debug(
-            "Removing Resend Tools with API key and from_email: %s",
+            "Removing Email Sender Tools with API key and from_email: %s",
             "onboarding@resend.dev",
         )
     else:
         logger.debug(
-            "Adding Resend Tools with API key and from_email: %s",
+            "Adding Email Sender Tools with API key and from_email: %s",
             "onboarding@resend.dev",
         )
         tools.append(
-            ResendTools(
+            EmailSenderTools(
                 api_key=extra_settings.resend_api_key,
                 from_email="onboarding@resend.dev",
             )
         )
         extra_instructions.append(
             """\
-            Employ the Resend Tools for sending emails. Use this tool to:
+            Employ the Email Sender Tools for sending emails. Use this tool to:
 
             - Compose and send HTML-formatted emails based on user input or specific requests.
             - Send emails to the given address, if the email has not been provided ask for it.
@@ -216,16 +216,16 @@ def get_coordinator(
         )
     if not website_tools:
         logger.debug(
-            "Removing Website Tools to parse a website and add its contents to the knowledge base."
+            "Removing Website Crawler Tools to parse a website and add its contents to the knowledge base."
         )
     else:
         logger.debug(
-            "Adding Website Tools to parse a website and add its contents to the knowledge base."
+            "Adding Website Crawler Tools to parse a website and add its contents to the knowledge base."
         )
-        tools.append(WebsiteTools())
+        tools.append(WebSiteCrawlerTools())
         extra_instructions.append(
             """\
-            Use the Website Tools to parse the content of a website and add it to the knowledge base.
+            Use the Website Crawler Tools to parse the content of a website and add it to the knowledge base.
             This tool is ideal for integrating external web content into the system for future reference or analysis.
             Use it when the user provides a website URL or requests detailed insights from a web page.
             Ensure the content is relevant and valuable before adding it to the knowledge base to maintain its \
