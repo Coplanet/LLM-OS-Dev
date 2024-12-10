@@ -2,16 +2,22 @@ from textwrap import dedent
 
 from phi.tools.arxiv_toolkit import ArxivToolkit
 
+from helpers.tool_processor import process_tools
+
 from .base import Agent, AgentConfig
 
+agent = None
 agent_name = "Arxiv Search Agent"
+available_tools = {ArxivToolkit: {"name": "Arxiv"}}
 
 
 def get_agent(config: AgentConfig = None):
-    return Agent(
+    tools, _ = process_tools(agent_name, config, available_tools)
+
+    agent = Agent(
         name=agent_name,
         agent_config=config,
-        tools=[ArxivToolkit()],
+        tools=tools,
         description=dedent(
             """\
             You are a world-class researcher assigned a very important task.
@@ -27,6 +33,7 @@ def get_agent(config: AgentConfig = None):
             ),
         ],
     )
+    return agent
 
 
-__all__ = ["get_agent", "agent_name"]
+__all__ = ["get_agent", "agent_name", "available_tools", "agent"]

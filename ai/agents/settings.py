@@ -1,12 +1,13 @@
 import os
 from enum import Enum, unique
-from typing import Optional
+from typing import Dict, Optional
 
 from composio_phidata import Action as ComposioAction
 from composio_phidata import ComposioToolSet
 from phi.model.groq import Groq
 from phi.model.ollama import Ollama
 from phi.model.openai import OpenAIChat
+from phi.tools import Toolkit
 from pydantic_settings import BaseSettings
 
 from helpers.log import logger
@@ -63,6 +64,7 @@ class AgentConfig:
     temperature: Optional[float] = None
     enabled: Optional[bool] = None
     max_tokens: Optional[int] = None
+    tools: Optional[Dict[Toolkit, Dict]] = {}
 
     def __init__(
         self,
@@ -71,12 +73,14 @@ class AgentConfig:
         temperature: float,
         enabled: bool,
         max_tokens: int,
+        tools: Dict[Toolkit, Dict] = {},
     ):
         self.provider = provider
         self.model_id = model_id
         self.temperature = temperature
         self.enabled = enabled
         self.max_tokens = max_tokens
+        self.tools = tools
 
     @property
     def is_empty(self):
@@ -90,7 +94,7 @@ class AgentConfig:
 
     @classmethod
     def empty(cls):
-        return cls(None, None, None, None, None)
+        return cls(None, None, None, None, None, {})
 
     def __str__(self):
         return str(
@@ -100,6 +104,7 @@ class AgentConfig:
                 "temperature": self.temperature,
                 "enabled": self.enabled,
                 "max_tokens": self.max_tokens,
+                "tools": [k for k in self.tools.keys()],
             }
         )
 

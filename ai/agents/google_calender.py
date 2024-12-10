@@ -1,29 +1,58 @@
 from textwrap import dedent
 
+from helpers.tool_processor import process_composio_tools
+from helpers.utils import to_title
+
 from .base import Agent, AgentConfig, ComposioAction, agent_settings
 
+agent = None
 agent_name = "Google Calender Agent"
+
+__names = {
+    "GOOGLECALENDAR_FIND_FREE_SLOTS": "Google Calendar: Find Free Slots",
+    "GOOGLECALENDAR_CREATE_EVENT": "Google Calendar: Create Event",
+    "GOOGLECALENDAR_FIND_EVENT": "Google Calendar: Find Event",
+    "GOOGLECALENDAR_GET_CALENDAR": "Google Calendar: Get Calendar",
+    "GOOGLECALENDAR_LIST_CALENDARS": "Google Calendar: List Calendars",
+    "GOOGLECALENDAR_UPDATE_EVENT": "Google Calendar: Update Event",
+    "GOOGLECALENDAR_DELETE_EVENT": "Google Calendar: Delete Event",
+    "GMAIL_FETCH_EMAILS": "Gmail: Fetch Emails",
+    "GMAIL_CREATE_EMAIL_DRAFT": "Gmail: Create Email Draft",
+    "GMAIL_REPLY_TO_THREAD": "Gmail: Reply To Thread",
+}
+
+available_tools = [
+    {
+        "instance": instance,
+        "name": __names.get(instance.name, to_title(instance.name)),
+    }
+    for instance in agent_settings.composio_tools.get_tools(
+        actions=[
+            ComposioAction.GOOGLECALENDAR_FIND_FREE_SLOTS,
+            ComposioAction.GOOGLECALENDAR_CREATE_EVENT,
+            ComposioAction.GOOGLECALENDAR_FIND_EVENT,
+            ComposioAction.GOOGLECALENDAR_GET_CALENDAR,
+            ComposioAction.GOOGLECALENDAR_LIST_CALENDARS,
+            ComposioAction.GOOGLECALENDAR_UPDATE_EVENT,
+            ComposioAction.GOOGLECALENDAR_DELETE_EVENT,
+            ComposioAction.GMAIL_FETCH_EMAILS,
+            ComposioAction.GMAIL_CREATE_EMAIL_DRAFT,
+            ComposioAction.GMAIL_REPLY_TO_THREAD,
+            ComposioAction.GMAIL_CREATE_EMAIL_DRAFT,
+        ]
+    )
+]
+
+print("available_tools:", available_tools, flush=True)
 
 
 def get_agent(config: AgentConfig = None):
-    return Agent(
+    tools, _ = process_composio_tools(agent_name, config, available_tools)
+
+    agent = Agent(
         name=agent_name,
         agent_config=config,
-        tools=agent_settings.composio_tools.get_tools(
-            actions=[
-                ComposioAction.GOOGLECALENDAR_FIND_FREE_SLOTS,
-                ComposioAction.GOOGLECALENDAR_CREATE_EVENT,
-                ComposioAction.GOOGLECALENDAR_FIND_EVENT,
-                ComposioAction.GOOGLECALENDAR_GET_CALENDAR,
-                ComposioAction.GOOGLECALENDAR_LIST_CALENDARS,
-                ComposioAction.GOOGLECALENDAR_UPDATE_EVENT,
-                ComposioAction.GOOGLECALENDAR_DELETE_EVENT,
-                ComposioAction.GMAIL_FETCH_EMAILS,
-                ComposioAction.GMAIL_CREATE_EMAIL_DRAFT,
-                ComposioAction.GMAIL_REPLY_TO_THREAD,
-                ComposioAction.GMAIL_CREATE_EMAIL_DRAFT,
-            ]
-        ),
+        tools=tools,
         description=dedent(
             """\
             Analyze google calender, email, fetch emails, and create event on calendar depending on the email content.
@@ -42,6 +71,7 @@ def get_agent(config: AgentConfig = None):
             ),
         ],
     )
+    return agent
 
 
-__all__ = ["get_agent", "agent_name"]
+__all__ = ["get_agent", "agent_name", "available_tools", "agent"]

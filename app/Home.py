@@ -132,14 +132,26 @@ def encode_image(image_file):
     return f"data:image/jpeg;base64,{encoding}"
 
 
-def get_selected_assistant_config(session_id, label):
+def get_selected_assistant_config(session_id, label, package):
     try:
+        available_tools_manifest = {}
+        if isinstance(package.available_tools, dict):
+            available_tools_manifest = package.available_tools
+        else:
+            for tool in package.available_tools:
+                if not isinstance(tool, dict):
+                    raise ValueError(
+                        f"Tool '{tool.__name__}' is not a dictionary in package '{package.agent_name}'."
+                    )
+                available_tools_manifest[tool.get("name")] = tool
+
         default_configs = {
             "model_type": "OpenAI",
             "model_id": "gpt-4o",
             "temperature": 0,
             "enabled": True,
             "max_tokens": agent_settings.default_max_completion_tokens,
+            "tools": {k: True for k in available_tools_manifest.keys()},
         }
 
         with get_db_context() as db:
@@ -152,6 +164,20 @@ def get_selected_assistant_config(session_id, label):
                 for key in default_configs:
                     if key in config.value_json[label]:
                         default_configs[key] = config.value_json[label][key]
+        tools = {}
+        for tool, config in available_tools_manifest.items():
+            if (
+                (tool in default_configs["tools"])
+                or (
+                    hasattr(tool, "__name__")
+                    and tool.__name__ in default_configs["tools"]
+                )
+                or (
+                    isinstance(config, dict)
+                    and config.get("name") in default_configs["tools"]
+                )
+            ):
+                tools[tool] = config
 
         return settings.AgentConfig(
             provider=default_configs["model_type"],
@@ -159,6 +185,7 @@ def get_selected_assistant_config(session_id, label):
             temperature=default_configs["temperature"],
             enabled=default_configs["enabled"],
             max_tokens=default_configs["max_tokens"],
+            tools=tools,
         )
     except Exception as e:
         logger.error("Error reading get_selected_assistant_config(): %s", e)
@@ -191,46 +218,57 @@ def main() -> None:
             "is_leader": True,
             "label": to_label(coordinator.agent_name),
             "get_agent": coordinator.get_coordinator,
+            "package": coordinator,
         },
         journal.agent_name: {
             "label": to_label(journal.agent_name),
             "get_agent": journal.get_agent,
+            "package": journal,
         },
         python.agent_name: {
             "label": to_label(python.agent_name),
             "get_agent": python.get_agent,
+            "package": python,
         },
         arxiv.agent_name: {
             "label": to_label(arxiv.agent_name),
             "get_agent": arxiv.get_agent,
+            "package": arxiv,
         },
         youtube.agent_name: {
             "label": to_label(youtube.agent_name),
             "get_agent": youtube.get_agent,
+            "package": youtube,
         },
         google_calender.agent_name: {
             "label": google_calender.agent_name.lower().replace(" ", "_"),
             "get_agent": google_calender.get_agent,
+            "package": google_calender,
         },
         github.agent_name: {
             "label": github.agent_name.lower().replace(" ", "_"),
             "get_agent": github.get_agent,
+            "package": github,
         },
         wikipedia.agent_name: {
             "label": to_label(wikipedia.agent_name),
             "get_agent": wikipedia.get_agent,
+            "package": wikipedia,
         },
         patent_writer.agent_name: {
             "label": to_label(patent_writer.agent_name),
             "get_agent": patent_writer.get_agent,
+            "package": patent_writer,
         },
         linkedin_content_generator.agent_name: {
             "label": to_label(linkedin_content_generator.agent_name),
             "get_agent": linkedin_content_generator.get_agent,
+            "package": linkedin_content_generator,
         },
         funny.agent_name: {
             "label": to_label(funny.agent_name),
             "get_agent": funny.get_agent,
+            "package": funny,
         },
     }
 
@@ -250,7 +288,7 @@ def main() -> None:
 
         for agent, agent_config in AGENTS.items():
             config = get_selected_assistant_config(
-                SID, agent_config.get("label", agent)
+                SID, agent_config.get("label", agent), agent_config.get("package")
             )
             if config:
                 if agent_config.get("is_leader", False):
@@ -268,7 +306,7 @@ def main() -> None:
         or (SID and st.session_state["generic_leader"].session_id != SID)
     ):
         logger.debug(">>> Creating leader agent with config: %s", LEADER_CONFIG)
-        generic_leader = coordinator.get_coordinator(
+        coordinator.agent = generic_leader = coordinator.get_coordinator(
             team_config=AGENTS_CONFIG,
             config=LEADER_CONFIG,
             session_id=SID,
@@ -322,7 +360,15 @@ def main() -> None:
 
     # Show popup if triggered
     if st.session_state.show_popup and st.session_state.selected_assistant:
-        show_popup(SID, st.session_state.selected_assistant)
+        selected_assistant = st.session_state.selected_assistant
+        agent = AGENTS[selected_assistant]
+        package = agent.get("package")
+        agent_config = (
+            AGENTS_CONFIG[package.agent_name]
+            if not agent.get("is_leader", False)
+            else LEADER_CONFIG
+        )
+        show_popup(SID, selected_assistant, agent_config, package)
         st.session_state.show_popup = False
         st.session_state.selected_assistant = None
 

@@ -1,16 +1,22 @@
 from phi.tools.youtube_tools import YouTubeTools
 
+from helpers.tool_processor import process_tools
+
 from .base import Agent, AgentConfig
 
+agent = None
 agent_name = "Youtube Agent"
+available_tools = {YouTubeTools: {"name": "YouTube"}}
 
 
 def get_agent(config: AgentConfig = None):
+    tools, _ = process_tools(agent_name, config, available_tools)
+
     # flake8: noqa: E501
-    return Agent(
+    agent = Agent(
         name=agent_name,
         agent_config=config,
-        tools=[YouTubeTools()],
+        tools=tools,
         description=(
             "You are a YouTube agent that has the special skill of understanding "
             "YouTube videos and answering questions about them."
@@ -39,6 +45,7 @@ def get_agent(config: AgentConfig = None):
         add_datetime_to_instructions=True,
         markdown=True,
     )
+    return agent
 
 
-__all__ = ["get_agent", "agent_name"]
+__all__ = ["get_agent", "agent_name", "available_tools", "agent"]

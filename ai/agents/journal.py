@@ -2,19 +2,26 @@ from textwrap import dedent
 
 from phi.tools.exa import ExaTools
 
+from helpers.tool_processor import process_tools
 from workspace.settings import extra_settings
 
 from .base import Agent, AgentConfig
 
+agent = None
 agent_name = "Journal Writer Agent"
+available_tools = {
+    ExaTools: {"name": "Exa", "kwargs": {"num_results": 5, "text_length_limit": 1000}}
+}
 
 
 def get_agent(config: AgentConfig = None):
-    return Agent(
+    tools, _ = process_tools(agent_name, config, available_tools)
+
+    agent = Agent(
         name=agent_name,
         agent_config=config,
         role="Write a research report on a given topic",
-        tools=[ExaTools(num_results=5, text_length_limit=1000)],
+        tools=tools,
         save_output_to_file=extra_settings.scratch_dir / "{run_id}.md",
         description="You are a Senior Report Writer tasked with writing a cover story research report.",
         instructions=[
@@ -60,6 +67,7 @@ def get_agent(config: AgentConfig = None):
             ),
         ],
     )
+    return agent
 
 
-__all__ = ["get_agent", "agent_name"]
+__all__ = ["get_agent", "agent_name", "available_tools", "agent"]
