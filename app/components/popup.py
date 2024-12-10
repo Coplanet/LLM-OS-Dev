@@ -18,11 +18,11 @@ MODELS = {
         },
         # "o1-preview": {
         #     "max_temperature": 2,
-        #     "max_token_size": 128_000,
+        #     "max_token_size": agent_settings.default_max_completion_tokens,
         # },
         # "o1-mini": {
         #     "max_temperature": 2,
-        #     "max_token_size": 128_000,
+        #     "max_token_size": agent_settings.default_max_completion_tokens,
         # },
     },
     "Groq": {
