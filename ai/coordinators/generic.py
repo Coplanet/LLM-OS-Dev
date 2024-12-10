@@ -1,11 +1,10 @@
 from textwrap import dedent
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 
 from phi.embedder.openai import OpenAIEmbedder
 from phi.knowledge.combined import CombinedKnowledgeBase
 from phi.knowledge.pdf import PDFKnowledgeBase, PDFReader
 from phi.storage.agent.postgres import PgAgentStorage
-from phi.tools import Toolkit
 from phi.tools.calculator import Calculator
 from phi.tools.duckduckgo import DuckDuckGo
 from phi.tools.yfinance import YFinanceTools
@@ -31,29 +30,125 @@ from ai.tools.website_crawler import WebSiteCrawlerTools
 from db.session import db_url
 from db.settings import db_settings
 from helpers.log import logger
+from helpers.tool_processor import process_tools
 from workspace.settings import extra_settings
 
 from .base import Coordinator
 
+agent = None
 agent_name = "Coordinator"
+available_tools = {
+    Calculator: {
+        "name": "Calculator",
+        "kwargs": {
+            "add": True,
+            "subtract": True,
+            "multiply": True,
+            "divide": True,
+            "exponentiate": True,
+            "factorial": True,
+            "is_prime": True,
+            "square_root": True,
+        },
+        "extra_instructions": dedent(
+            """\
+            Use the Calculator tool for precise and complex mathematical operations, including addition,
+            subtraction, multiplication, division, exponentiation, factorials, checking if a number is prime,
+            and calculating square roots. This tool is ideal for mathematical queries, computations,
+            or when the user needs help solving equations or understanding numeric concepts.\
+            """
+        ).strip(),
+    },
+    DuckDuckGo: {
+        "name": "DuckDuckGo",
+        "kwargs": {"fixed_max_results": 3},
+        "extra_instructions": dedent(
+            """\
+            Leverage the DuckDuckGo Search tool for quick internet searches, such as finding \
+                up-to-date information,
+            verifying facts, or answering questions beyond the scope of the knowledge base.
+            Use this tool when a direct query requires additional context or when you need to retrieve concise
+            and relevant information (limited to 3 results per search).\
+            """
+        ).strip(),
+    },
+    YFinanceTools: {
+        "name": "YFinance",
+        "kwargs": {
+            "stock_price": True,
+            "company_info": True,
+            "analyst_recommendations": True,
+            "company_news": True,
+        },
+        "extra_instructions": dedent(
+            """\
+            Utilize YFinance tools for financial and stock-related queries. This includes:
+
+            - Stock Price: Retrieve real-time or historical stock prices.
+            - Company Info: Fetch detailed company profiles or background.
+            - Analyst Recommendations: Provide insights into stock recommendations from financial analysts.
+            - Company News: Share recent news articles or updates related to the company.
+
+            These tools are ideal for answering finance-related questions or assisting with investment decisions.\
+            """
+        ).strip(),
+    },
+    FileIOTools: {
+        "name": "File IO",
+        "kwargs": {"base_dir": extra_settings.scratch_dir},
+        "extra_instructions": dedent(
+            """\
+            Use the File IO Tools for managing files in the working directory. Specific use cases include:
+
+            - Read Files: Open and read content from files when the user uploads or references one.
+            - Save Files: Store data, results, or responses in a file upon request.
+            - List Files: Display the contents of the working directory for easy navigation.
+
+            This tool is helpful for file manipulation tasks, processing user-uploaded data, or \
+            saving generated content for future use.\
+            """
+        ).strip(),
+    },
+    EmailSenderTools: {
+        "name": "Email Sender",
+        "kwargs": {
+            "api_key": extra_settings.resend_api_key,
+            "from_email": "onboarding@resend.dev",
+        },
+        "extra_instructions": dedent(
+            """\
+            Employ the Email Sender Tools for sending emails. Use this tool to:
+
+            - Compose and send HTML-formatted emails based on user input or specific requests.
+            - Send emails to the given address, if the email has not been provided ask for it.
+            - Include structured content, such as reports, summaries, or generated data.
+
+            This tool is particularly useful for communication tasks requiring email-based delivery or automation.\
+            """
+        ).strip(),
+    },
+    WebSiteCrawlerTools: {
+        "name": "Website Crawler",
+        "extra_instructions": dedent(
+            """\
+            Use the Website Crawler Tools to parse the content of a website and add it to the knowledge base.
+            This tool is ideal for integrating external web content into the system for future reference or analysis.
+            Use it when the user provides a website URL or requests detailed insights from a web page.
+            Ensure the content is relevant and valuable before adding it to the knowledge base to maintain its \
+                quality and relevance.
+            """
+        ).strip(),
+    },
+}
 
 
 def get_coordinator(
-    calculator: bool = True,
-    ddg_search: bool = True,
-    file_tools: bool = True,
-    finance_tools: bool = True,
-    resend_tools: bool = True,
-    website_tools: bool = True,
-    team_config: Dict[str, AgentConfig] = {},
     config: Optional[AgentConfig] = None,
+    team_config: Dict[str, AgentConfig] = {},
     run_id: Optional[str] = None,
     user_id: Optional[str] = None,
     session_id: Optional[str] = None,
 ):
-    tools: List[Toolkit] = []
-    extra_instructions: List[str] = []
-
     if config is None:
         config = AgentConfig.empty()
 
@@ -63,22 +158,25 @@ def get_coordinator(
         config.enabled = True
         config.temperature = 0
         config.max_tokens = agent_settings.default_max_completion_tokens
+        config.tools = available_tools
 
     team_members = AgentTeam()
 
     def conditional_agent_enable(pkg):
         config: AgentConfig = team_config.get(pkg.agent_name)
-        if not config or config.is_empty:
+
+        if not config or config.is_empty or config.enabled:
+            pkg.agent = pkg.get_agent(
+                config if config and not config.is_empty else None
+            )
+
+        if pkg.agent:
             logger.debug("Activating %s", pkg.agent_name)
-            team_members.activate(pkg.get_agent())
-            return
+            team_members.activate(pkg.agent)
 
-        if not config.enabled:
+        else:
+            pkg.agent = None
             logger.debug("DEACTICATING %s", pkg.agent_name)
-            return
-
-        logger.debug("Activating %s", pkg.agent_name)
-        team_members.activate(pkg.get_agent(config))
 
     conditional_agent_enable(python)
     conditional_agent_enable(youtube)
@@ -90,148 +188,8 @@ def get_coordinator(
     conditional_agent_enable(patent_writer)
     conditional_agent_enable(funny)
     conditional_agent_enable(linkedin_content_generator)
-    if not calculator:
-        logger.debug("Removing Calculator tool with full functionality.")
-    else:
-        logger.debug("Adding Calculator tool with full functionality.")
-        tools.append(
-            Calculator(
-                add=True,
-                subtract=True,
-                multiply=True,
-                divide=True,
-                exponentiate=True,
-                factorial=True,
-                is_prime=True,
-                square_root=True,
-            )
-        )
-        extra_instructions.append(
-            dedent(
-                """\
-                Use the Calculator tool for precise and complex mathematical operations, including addition,
-                subtraction, multiplication, division, exponentiation, factorials, checking if a number is prime,
-                and calculating square roots. This tool is ideal for mathematical queries, computations,
-                or when the user needs help solving equations or understanding numeric concepts.\
-                """
-            ).strip()
-        )
 
-    if not ddg_search:
-        logger.debug("Removing DuckDuckGo search tool.")
-    else:
-        logger.debug("Adding DuckDuckGo search tool with fixed max results: 3.")
-        tools.append(DuckDuckGo(fixed_max_results=3))
-        extra_instructions.append(
-            dedent(
-                """\
-                Leverage the DuckDuckGo Search tool for quick internet searches, such as finding \
-                    up-to-date information,
-                verifying facts, or answering questions beyond the scope of the knowledge base.
-                Use this tool when a direct query requires additional context or when you need to retrieve concise
-                and relevant information (limited to 3 results per search).\
-                """
-            ).strip()
-        )
-
-    if not finance_tools:
-        logger.debug(
-            "Removing YFinance Tools for stock price, company info, analyst recommendations, and company news."
-        )
-    else:
-        logger.debug(
-            "Adding YFinance Tools for stock price, company info, analyst recommendations, and company news."
-        )
-        tools.append(
-            YFinanceTools(
-                stock_price=True,
-                company_info=True,
-                analyst_recommendations=True,
-                company_news=True,
-            )
-        )
-        extra_instructions.append(
-            dedent(
-                """\
-                Utilize YFinance tools for financial and stock-related queries. This includes:
-
-                - Stock Price: Retrieve real-time or historical stock prices.
-                - Company Info: Fetch detailed company profiles or background.
-                - Analyst Recommendations: Provide insights into stock recommendations from financial analysts.
-                - Company News: Share recent news articles or updates related to the company.
-
-                These tools are ideal for answering finance-related questions or assisting with investment decisions.\
-                """
-            ).strip()
-        )
-
-    if not file_tools:
-        logger.debug(
-            "Removing File Tools with base directory: %s", extra_settings.scratch_dir
-        )
-    else:
-        logger.debug(
-            "Adding File Tools with base directory: %s", extra_settings.scratch_dir
-        )
-        tools.append(FileIOTools(base_dir=extra_settings.scratch_dir))
-        extra_instructions.append(
-            """\
-            Use the File IO Tools for managing files in the working directory. Specific use cases include:
-
-            - Read Files: Open and read content from files when the user uploads or references one.
-            - Save Files: Store data, results, or responses in a file upon request.
-            - List Files: Display the contents of the working directory for easy navigation.
-
-            This tool is helpful for file manipulation tasks, processing user-uploaded data, or \
-            saving generated content for future use.\
-            """
-        )
-
-    if not resend_tools or not extra_settings.resend_api_key:
-        logger.debug(
-            "Removing Email Sender Tools with API key and from_email: %s",
-            "onboarding@resend.dev",
-        )
-    else:
-        logger.debug(
-            "Adding Email Sender Tools with API key and from_email: %s",
-            "onboarding@resend.dev",
-        )
-        tools.append(
-            EmailSenderTools(
-                api_key=extra_settings.resend_api_key,
-                from_email="onboarding@resend.dev",
-            )
-        )
-        extra_instructions.append(
-            """\
-            Employ the Email Sender Tools for sending emails. Use this tool to:
-
-            - Compose and send HTML-formatted emails based on user input or specific requests.
-            - Send emails to the given address, if the email has not been provided ask for it.
-            - Include structured content, such as reports, summaries, or generated data.
-
-            This tool is particularly useful for communication tasks requiring email-based delivery or automation.\
-            """
-        )
-    if not website_tools:
-        logger.debug(
-            "Removing Website Crawler Tools to parse a website and add its contents to the knowledge base."
-        )
-    else:
-        logger.debug(
-            "Adding Website Crawler Tools to parse a website and add its contents to the knowledge base."
-        )
-        tools.append(WebSiteCrawlerTools())
-        extra_instructions.append(
-            """\
-            Use the Website Crawler Tools to parse the content of a website and add it to the knowledge base.
-            This tool is ideal for integrating external web content into the system for future reference or analysis.
-            Use it when the user provides a website URL or requests detailed insights from a web page.
-            Ensure the content is relevant and valuable before adding it to the knowledge base to maintain its \
-                quality and relevance.
-            """
-        )
+    tools, extra_instructions = process_tools(agent_name, config, available_tools)
 
     logger.debug(
         "Initializing combined knowledge base with sources and vector database."

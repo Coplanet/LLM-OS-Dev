@@ -1,10 +1,11 @@
 import streamlit as st
 
-from ai.agents.settings import agent_settings
+from ai.agents.settings import AgentConfig, agent_settings
 from app.utils import to_label
 from db.session import get_db_context
 from db.tables import UserConfig
 from helpers.log import logger
+from helpers.utils import to_title
 
 MODELS = {
     "OpenAI": {
@@ -46,7 +47,7 @@ PROVIDERS_ORDER = ["OpenAI", "Groq"]
 
 
 @st.dialog("Configure Agent")
-def show_popup(session_id, assistant_name):
+def show_popup(session_id, assistant_name, config: AgentConfig, package):
     label = to_label(assistant_name)
 
     st.markdown(f"Agent: **{assistant_name}**")
@@ -84,6 +85,47 @@ def show_popup(session_id, assistant_name):
         max_tokens,
     )
 
+    enabled_tools = {}
+    available_tools_manifest = {}
+
+    if package.available_tools:
+        st.markdown("---")
+        st.markdown("### Agent Tools")
+
+        enabled_tools = {tool.__class__: True for tool in package.agent.tools}
+
+        if isinstance(package.available_tools, dict):
+            available_tools_manifest = package.available_tools
+        else:
+            enabled_tools_ = {}
+            for tool in package.agent.tools:
+                enabled_tools_[tool.name] = True
+
+            for tool in package.available_tools:
+                if not isinstance(tool, dict):
+                    raise ValueError(
+                        f"Tool '{tool.__name__}' is not a dictionary in package '{package.agent_name}'."
+                    )
+
+                available_tools_manifest[tool.get("name")] = tool
+                if tool["instance"].name in enabled_tools_:
+                    enabled_tools[tool.get("name")] = True
+
+        for klass, config in available_tools_manifest.items():
+            value = st.checkbox(
+                config.get(
+                    "name",
+                    to_title(klass.__name__) if hasattr(klass, "__name__") else klass,
+                ),
+                value=(klass in enabled_tools),
+            )
+            if value:
+                enabled_tools[klass] = True
+
+            elif klass in enabled_tools:
+                if klass in enabled_tools:
+                    del enabled_tools[klass]
+
     col1, col2 = st.columns(2)
     with col1:
         if st.button("Cancel"):
@@ -95,11 +137,21 @@ def show_popup(session_id, assistant_name):
         if st.button("Save"):
             st.session_state.show_popup = False
             st.session_state["generic_leader"] = None
+
+            tools = {}
+            if available_tools_manifest:
+                tools = {
+                    getattr(k, "__name__", k): True
+                    for k in available_tools_manifest.keys()
+                    if k in enabled_tools
+                }
+
             new_configs = {
                 "model_type": provider,
                 "model_id": model_id,
                 "temperature": temperature,
                 "max_tokens": max_tokens,
+                "tools": tools,
             }
             logger.info("New configs: %s", new_configs)
             with get_db_context() as db:

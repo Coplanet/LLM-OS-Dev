@@ -1,5 +1,7 @@
 from phi.agent.python import PythonAgent
 
+from helpers.tool_processor import process_tools
+
 from .base import Agent, AgentConfig
 from .settings import extra_settings
 
@@ -12,13 +14,18 @@ class IPythonAgent(Agent, PythonAgent):
         super().__init__(*args, **kwargs)
 
 
+agent = None
 agent_name = "Python Agent"
+available_tools = {}
 
 
 def get_agent(config: AgentConfig = None):
-    return Agent(
+    tools, _ = process_tools(agent_name, config, available_tools)
+
+    agent = Agent(
         name=agent_name,
         agent_config=config,
+        tools=tools,
         role="Advanced Python Code Writer and Executor",
         pip_install=True,
         description=(
@@ -33,6 +40,7 @@ def get_agent(config: AgentConfig = None):
             "To write and run Python code, delegate the task to the `Python Agent`."
         ],
     )
+    return agent
 
 
-__all__ = ["get_agent", "agent_name"]
+__all__ = ["get_agent", "agent_name", "available_tools", "agent"]
