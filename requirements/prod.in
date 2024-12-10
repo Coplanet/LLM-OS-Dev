@@ -1,5 +1,5 @@
 ipython
-phidata[aws]>=2.6,<2.7
+phidata[aws]>=2.6.5,<2.7
 
 groq
 xlrd
