@@ -34,8 +34,8 @@ class AgentSettings(BaseSettings):
         os.getenv("DEFAULT_MAX_COMPLETION_TOKENS", 16000)
     )
 
-    debug_mode: bool = False
-    show_tool_calls: bool = True
+    debug_mode: bool = os.getenv("AGENTS_DEBUG_MODE", "false").lower() == "true"
+    show_tool_calls: bool = os.getenv("SHOW_TOOL_CALLS", "true").lower() == "true"
     composio_tools: Optional[ComposioToolSet] = None
 
     def __init__(self, *args, **kwargs):

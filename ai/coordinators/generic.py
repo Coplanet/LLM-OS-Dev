@@ -265,6 +265,11 @@ def get_coordinator(
                 "after 3 attempts, proceed to follow your WORKFLOW and skip the knowledge base."
             ),
             (
+                "VERY IMPORTANT: Remember, **as a leader**, your primary role is to delegate effectively and "
+                "empower your agent team. Before diving into any task yourself, consider whether it can be "
+                "assigned to your team members."
+            ),
+            (
                 "IMPORTANT: **Prioritize** using **your available tools** before considering delegation. "
                 "If no suitable tool is found, delegate the task to the appropriate team member."
             ),
