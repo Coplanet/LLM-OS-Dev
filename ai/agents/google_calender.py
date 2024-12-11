@@ -43,8 +43,6 @@ available_tools = [
     )
 ]
 
-print("available_tools:", available_tools, flush=True)
-
 
 def get_agent(config: AgentConfig = None):
     tools, _ = process_composio_tools(agent_name, config, available_tools)

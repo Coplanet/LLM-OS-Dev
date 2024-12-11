@@ -212,6 +212,7 @@ def get_coordinator(
 
     logger.debug("Loading the knowledge base (recreate=False).")
 
+    # flake8: noqa: E501
     agent = Coordinator.build(
         team_members,
         model=config.get_model,
@@ -247,23 +248,25 @@ def get_coordinator(
         instructions=[
             dedent(
                 """\
-                    WORKFLOW: When the user sends a message, first **think** and determine if:
-                        - You can answer using the tools available to you.
-                        - You need to search the knowledge base (limited to 3 attempts with specific refinements).
-                        - You need to search the internet if the knowledge base does not yield results.
-                        - You need to delegate the task to a team member.
-                        - You need to ask a clarifying question.\
-                    """
+                WORKFLOW: When the user sends a message, first **think** and determine if:
+                    - You need to search the knowledge base (limited to 3 attempts with specific refinements).
+                    - You need to answer using the tools available to you.
+                    - You need to search the internet if the knowledge base does not yield results.
+                    - You need to delegate the task to a team member.
+                    - You need to ask a clarifying question.
+
+                After you conclude your thought process, **respond** to the user with the appropriate action in the given order above.\
+                """
             ).strip(),
             (
-                "IMPORTANT: **Prioritize** using **your available tools** before considering delegation. "
-                "If no suitable tool is found, delegate the task to the appropriate team member."
-            ),
-            (
-                "IMPORTANT: If the user asks about a topic, attempt to search your knowledge "
+                "IMPORTANT: If the user asks about a topic, **FIRST** attempt to search your knowledge "
                 "base using the `search_knowledge_base` tool **up to 3 times**. Each attempt "
                 "should refine the query for better results. If no relevant results are found "
                 "after 3 attempts, proceed to follow your WORKFLOW and skip the knowledge base."
+            ),
+            (
+                "IMPORTANT: **Prioritize** using **your available tools** before considering delegation. "
+                "If no suitable tool is found, delegate the task to the appropriate team member."
             ),
             (
                 "IMPORTANT: If you do not find relevant information in the knowledge base after "
