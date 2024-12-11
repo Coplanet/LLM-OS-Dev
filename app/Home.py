@@ -474,26 +474,28 @@ def main() -> None:
             st.session_state["url_scrape_key"] = 0
             st.session_state["input_url"] = ""
 
-        input_url = st.sidebar.text_input(
-            "Add URL to Knowledge Base",
-            type="default",
-            key=st.session_state["url_scrape_key"],
-        )
-        add_url_button = st.sidebar.button("Add URL")
-        if add_url_button:
-            if input_url is not None:
-                alert = st.sidebar.info("Processing URLs...", icon="ℹ️")
-                if f"{input_url}_scraped" not in st.session_state:
-                    scraper = WebsiteReader(max_links=10, max_depth=3)
-                    web_documents: List[Document] = scraper.read(input_url)
-                    if web_documents:
-                        generic_leader.knowledge.load_documents(
-                            web_documents, upsert=True
-                        )
-                    else:
-                        st.sidebar.error("Could not read website")
-                    st.session_state[f"{input_url}_uploaded"] = True
-                alert.empty()
+        # TODO: Improve this section digestion speed
+        if False:
+            input_url = st.sidebar.text_input(
+                "Add URL to Knowledge Base",
+                type="default",
+                key=st.session_state["url_scrape_key"],
+            )
+            add_url_button = st.sidebar.button("Add URL")
+            if add_url_button:
+                if input_url is not None:
+                    alert = st.sidebar.info("Processing URLs...", icon="ℹ️")
+                    if f"{input_url}_scraped" not in st.session_state:
+                        scraper = WebsiteReader(max_links=10, max_depth=3)
+                        web_documents: List[Document] = scraper.read(input_url)
+                        if web_documents:
+                            generic_leader.knowledge.load_documents(
+                                web_documents, upsert=True
+                            )
+                        else:
+                            st.sidebar.error("Could not read website")
+                        st.session_state[f"{input_url}_uploaded"] = True
+                    alert.empty()
 
         # -*- Add documents to knowledge base
         if "file_uploader_key" not in st.session_state:
