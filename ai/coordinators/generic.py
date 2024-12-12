@@ -265,6 +265,10 @@ def get_coordinator(
                 "after 3 attempts, proceed to follow your WORKFLOW and skip the knowledge base."
             ),
             (
+                f"VERY IMPORTANT: When an agent/tool didn't return anything **when it supposed to return something**, retry and **enforce** the agent to return the result. "
+                "Make sure to **think** before retrying and enforce the agent to return the result if the empty result is accepted or not."
+            ),
+            (
                 "VERY IMPORTANT: Remember, **as a leader**, your primary role is to delegate effectively and "
                 "empower your agent team. Before diving into any task yourself, consider whether it can be "
                 "assigned to your team members."
