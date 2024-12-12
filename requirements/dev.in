@@ -1,0 +1,10 @@
+-r prod.in
+
+flake8
+flake8-isort
+coverage
+black
+djlint
+pylint-django
+pre-commit
+pip-tools

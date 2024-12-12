@@ -1,0 +1,9 @@
+# ignore inputs
+inputs
+
+# ignore outputs
+output
+
+# ignore secrets
+secrets/*
+!secrets/.git-keep
