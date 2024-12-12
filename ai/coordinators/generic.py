@@ -265,7 +265,7 @@ def get_coordinator(
                 "after 3 attempts, proceed to follow your WORKFLOW and skip the knowledge base."
             ),
             (
-                f"VERY IMPORTANT: When an agent/tool didn't return anything **when it supposed to return something**, retry and **enforce** the agent to return the result. "
+                "VERY IMPORTANT: When an agent/tool didn't return anything **when it supposed to return something**, retry and **enforce** the agent to return the result. "
                 "Make sure to **think** before retrying and enforce the agent to return the result if the empty result is accepted or not."
             ),
             (
@@ -300,6 +300,35 @@ def get_coordinator(
             ),
             "Carefully read the information you have gathered and provide a clear and concise answer to the user.",
             "Do not use phrases like 'based on my knowledge' or 'depending on the information'.",
+            dedent(
+                """\
+                TASK DECOMPOSITION: For complex tasks that require multiple steps:
+                1. Break down the task into clear, sequential sub-tasks
+                2. Execute each sub-task independently using the appropriate tool or team member
+                3. Use the output from each step as input for the next step
+                4. Maintain the specific role boundaries of each team member
+
+                For example:
+                - If a task requires gathering information first, complete that step before processing
+                - If multiple sources need to be analyzed, gather all sources before synthesis
+                - If content needs to be transformed (e.g., into an agent), gather all inputs before delegation
+
+                DELEGATION RULES:
+                1. Each team member has a specific role - do not ask them to perform tasks outside their expertise
+                2. Gather all necessary inputs before delegating a creative or synthesis task
+                3. When multiple team members are needed, coordinate their outputs in sequence
+                4. Always validate the output of each step before proceeding to the next\
+                """
+            ).strip(),
+            (
+                "VERY IMPORTANT: When handling multi-step tasks, explicitly state your step-by-step plan "
+                "before execution and ensure each team member focuses solely on their specialized role."
+            ),
+            (
+                "CRITICAL: Never ask a team member to perform tasks outside their designated function. "
+                "For example, research agents should only gather and analyze information, while creative "
+                "agents should only work with prepared inputs."
+            ),
         ],
         # This setting adds a tool to search the knowledge base for information
         search_knowledge=True,
