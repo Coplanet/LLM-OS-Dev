@@ -87,8 +87,6 @@ def get_agent(config: AgentConfig = None):
 
             9. Abstract:
             - Provide a concise (150 words or fewer) summary of the invention.
-
-            return the patent:\
             """
         ).strip(),
         delegation_directives=[
@@ -109,6 +107,10 @@ def get_agent(config: AgentConfig = None):
             (
                 f"IMPORTANT: return the output of the `{agent_name}` without any additional formatting or "
                 "comments or contribution to the output."
+            ),
+            (
+                f"VERY IMPORTANT: Make sure to **ALWAYS** return the patent in a very professional and readable format if the `{agent_name}` "
+                "didn't return anything retry and enforce the agent to return the patent in a very professional and readable format to the user."
             ),
         ],
     )
