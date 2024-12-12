@@ -1,4 +1,0 @@
-#!/bin/bash
-
-export $(grep -v '^#' .env | xargs)
-ipython -m streamlit run app/Home.py

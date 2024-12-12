@@ -1,5 +1,0 @@
-#!/bin/bash
-
-export PYTHONPATH=`pwd`
-export $(grep -v '^#' $PYTHONPATH/.env | xargs)
-python $*
