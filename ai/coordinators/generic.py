@@ -8,6 +8,7 @@ from phi.storage.agent.postgres import PgAgentStorage
 from phi.tools.calculator import Calculator
 from phi.tools.duckduckgo import DuckDuckGo
 from phi.tools.yfinance import YFinanceTools
+from phi.tools.youtube_tools import YouTubeTools
 from phi.vectordb.pgvector import PgVector2
 
 from ai.agents import (
@@ -20,7 +21,6 @@ from ai.agents import (
     patent_writer,
     python,
     wikipedia,
-    youtube,
 )
 from ai.agents.base import AgentTeam
 from ai.agents.settings import AgentConfig, agent_settings
@@ -38,6 +38,23 @@ from .base import Coordinator
 agent = None
 agent_name = "Coordinator"
 available_tools = {
+    YouTubeTools: {
+        "name": "YouTube",
+        "extra_instructions": dedent(
+            """\
+            Use the YouTube tool to search for and analyze YouTube videos.
+
+            To analyze YouTube videos, delegate to the Youtube tool. Youtube tool can:
+            - Extract video captions from YouTube URLs (for transcript requests)
+            - Extract and analyze video metadata and captions for analysis requests
+            - Provide video summaries and answer questions about content
+
+            IMPORTANT: **For transcript-only** requests, the Youtube tool will return raw captions without analysis. **DO NOT modify or process this response**.
+            NOTE: The Youtube tool works best with videos that have captions available.
+            Do NOT delegate non-YouTube video analysis tasks to Youtube tool agent.
+            """
+        ).strip(),
+    },
     Calculator: {
         "name": "Calculator",
         "kwargs": {
@@ -60,7 +77,7 @@ available_tools = {
         ).strip(),
     },
     DuckDuckGo: {
-        "name": "DuckDuckGo",
+        "name": "Search (DuckDuckGo)",
         "kwargs": {"fixed_max_results": 3},
         "extra_instructions": dedent(
             """\
@@ -179,7 +196,6 @@ def get_coordinator(
             logger.debug("DEACTICATING %s", pkg.agent_name)
 
     conditional_agent_enable(python)
-    conditional_agent_enable(youtube)
     conditional_agent_enable(arxiv)
     conditional_agent_enable(journal)
     conditional_agent_enable(wikipedia)
@@ -266,7 +282,8 @@ def get_coordinator(
             ),
             (
                 "VERY IMPORTANT: When an agent/tool didn't return anything **when it supposed to return something**, retry and **enforce** the agent to return the result. "
-                "Make sure to **think** before retrying and enforce the agent to return the result if the empty result is accepted or not."
+                "Make sure to **think** before retrying and enforce the agent to return the result if the empty result is accepted or not. "
+                "**NOTE** If the agent returns **error message**, don't retry and just return the error message."
             ),
             (
                 "VERY IMPORTANT: Remember, **as a leader**, your primary role is to delegate effectively and "
