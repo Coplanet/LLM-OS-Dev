@@ -31,7 +31,7 @@ __icons = {
     "GOOGLECALENDAR_DELETE_EVENT": "fa-regular fa-calendar-xmark",
     "GMAIL_FETCH_EMAILS": "fa-regular fa-envelope-open",
     "GMAIL_CREATE_EMAIL_DRAFT": "fa-regular fa-envelope",
-    "GMAIL_REPLY_TO_THREAD": "fa-regular fa-reply",
+    "GMAIL_REPLY_TO_THREAD": "fa-solid fa-reply",
 }
 
 available_tools = [

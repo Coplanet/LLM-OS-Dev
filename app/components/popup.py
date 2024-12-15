@@ -13,7 +13,7 @@ MODELS = {
             "max_temperature": 2,
             "max_token_size": agent_settings.default_max_completion_tokens,
         },
-        "gpt-4o-Mini": {
+        "gpt-4o-mini": {
             "max_temperature": 2,
             "max_token_size": agent_settings.default_max_completion_tokens,
         },
