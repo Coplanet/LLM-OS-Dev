@@ -21,10 +21,24 @@ __names = {
     "GMAIL_REPLY_TO_THREAD": "Gmail: Reply To Thread",
 }
 
+__icons = {
+    "GOOGLECALENDAR_FIND_FREE_SLOTS": "fa-solid fa-calendar-day",
+    "GOOGLECALENDAR_CREATE_EVENT": "fa-regular fa-calendar-plus",
+    "GOOGLECALENDAR_FIND_EVENT": "fa-solid fa-calendar-week",
+    "GOOGLECALENDAR_GET_CALENDAR": "fa-regular fa-calendar-minus",
+    "GOOGLECALENDAR_LIST_CALENDARS": "fa-regular fa-calendar-days",
+    "GOOGLECALENDAR_UPDATE_EVENT": "fa-regular fa-calendar-check",
+    "GOOGLECALENDAR_DELETE_EVENT": "fa-regular fa-calendar-xmark",
+    "GMAIL_FETCH_EMAILS": "fa-regular fa-envelope-open",
+    "GMAIL_CREATE_EMAIL_DRAFT": "fa-regular fa-envelope",
+    "GMAIL_REPLY_TO_THREAD": "fa-solid fa-reply",
+}
+
 available_tools = [
     {
         "instance": instance,
         "name": __names.get(instance.name, to_title(instance.name)),
+        "icon": __icons.get(instance.name, to_title(instance.name)),
     }
     for instance in agent_settings.composio_tools.get_tools(
         actions=[
@@ -38,7 +52,6 @@ available_tools = [
             ComposioAction.GMAIL_FETCH_EMAILS,
             ComposioAction.GMAIL_CREATE_EMAIL_DRAFT,
             ComposioAction.GMAIL_REPLY_TO_THREAD,
-            ComposioAction.GMAIL_CREATE_EMAIL_DRAFT,
         ]
     )
 ]

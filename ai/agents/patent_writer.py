@@ -10,7 +10,11 @@ from .base import Agent, AgentConfig
 agent = None
 agent_name = "Patent Writer Agent"
 available_tools = {
-    ExaTools: {"name": "Exa", "kwargs": {"num_results": 5, "text_length_limit": 1000}}
+    ExaTools: {
+        "name": "Exa",
+        "kwargs": {"num_results": 5, "text_length_limit": 1000},
+        "icon": "fa-solid fa-magnifying-glass",
+    }
 }
 
 

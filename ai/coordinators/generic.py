@@ -5,14 +5,15 @@ from phi.embedder.openai import OpenAIEmbedder
 from phi.knowledge.combined import CombinedKnowledgeBase
 from phi.knowledge.pdf import PDFKnowledgeBase, PDFReader
 from phi.storage.agent.postgres import PgAgentStorage
+from phi.tools.arxiv_toolkit import ArxivToolkit
 from phi.tools.calculator import Calculator
 from phi.tools.duckduckgo import DuckDuckGo
+from phi.tools.wikipedia import WikipediaTools
 from phi.tools.yfinance import YFinanceTools
 from phi.tools.youtube_tools import YouTubeTools
 from phi.vectordb.pgvector import PgVector2
 
 from ai.agents import (
-    arxiv,
     funny,
     github,
     google_calender,
@@ -20,7 +21,6 @@ from ai.agents import (
     linkedin_content_generator,
     patent_writer,
     python,
-    wikipedia,
 )
 from ai.agents.base import AgentTeam
 from ai.agents.settings import AgentConfig, agent_settings
@@ -54,7 +54,10 @@ available_tools = {
             Do NOT delegate non-YouTube video analysis tasks to Youtube tool agent.
             """
         ).strip(),
+        "icon": "fa-brands fa-youtube",
     },
+    ArxivToolkit: {"name": "Arxiv", "icon": "fa-solid fa-book-open"},
+    WikipediaTools: {"name": "Wikipedia", "icon": "fab fa-wikipedia-w"},
     Calculator: {
         "name": "Calculator",
         "kwargs": {
@@ -75,6 +78,7 @@ available_tools = {
             or when the user needs help solving equations or understanding numeric concepts.\
             """
         ).strip(),
+        "icon": "fa-solid fa-calculator",
     },
     DuckDuckGo: {
         "name": "Search (DuckDuckGo)",
@@ -88,6 +92,7 @@ available_tools = {
             and relevant information (limited to 3 results per search).\
             """
         ).strip(),
+        "icon": "fa-solid fa-magnifying-glass",
     },
     YFinanceTools: {
         "name": "YFinance",
@@ -109,6 +114,7 @@ available_tools = {
             These tools are ideal for answering finance-related questions or assisting with investment decisions.\
             """
         ).strip(),
+        "icon": "fa-solid fa-chart-line",
     },
     FileIOTools: {
         "name": "File IO",
@@ -125,6 +131,7 @@ available_tools = {
             saving generated content for future use.\
             """
         ).strip(),
+        "icon": "fa-solid fa-file-alt",
     },
     EmailSenderTools: {
         "name": "Email Sender",
@@ -143,6 +150,7 @@ available_tools = {
             This tool is particularly useful for communication tasks requiring email-based delivery or automation.\
             """
         ).strip(),
+        "icon": "fa-solid fa-envelope",
     },
     WebSiteCrawlerTools: {
         "name": "Website Crawler",
@@ -155,6 +163,7 @@ available_tools = {
                 quality and relevance.
             """
         ).strip(),
+        "icon": "fa-solid fa-globe",
     },
 }
 
@@ -196,9 +205,7 @@ def get_coordinator(
             logger.debug("DEACTICATING %s", pkg.agent_name)
 
     conditional_agent_enable(python)
-    conditional_agent_enable(arxiv)
     conditional_agent_enable(journal)
-    conditional_agent_enable(wikipedia)
     conditional_agent_enable(github)
     conditional_agent_enable(google_calender)
     conditional_agent_enable(patent_writer)

@@ -24,7 +24,6 @@ from phi.tools.streamlit.components import (
 from PIL import Image
 
 from ai.agents import (
-    arxiv,
     base,
     funny,
     github,
@@ -34,7 +33,6 @@ from ai.agents import (
     patent_writer,
     python,
     settings,
-    wikipedia,
 )
 from ai.agents.settings import agent_settings
 from ai.coordinators import generic as coordinator
@@ -87,6 +85,18 @@ st.markdown(
             color: #fff;
             background-color: #c82333;
             border-color: #bd2130;
+        }
+        .row-widget.stCheckbox {
+            min-height: unset !important;
+        }
+        .stColumn {
+            overflow-x: hidden;
+        }
+        .stVerticalBlock {
+            gap: 0.75rem !important;
+        }
+        .stHorizontalBlock {
+            gap: 0.5rem !important;
         }
     </style>
     """,
@@ -229,11 +239,6 @@ def main() -> None:
             "get_agent": python.get_agent,
             "package": python,
         },
-        arxiv.agent_name: {
-            "label": to_label(arxiv.agent_name),
-            "get_agent": arxiv.get_agent,
-            "package": arxiv,
-        },
         google_calender.agent_name: {
             "label": google_calender.agent_name.lower().replace(" ", "_"),
             "get_agent": google_calender.get_agent,
@@ -243,11 +248,6 @@ def main() -> None:
             "label": github.agent_name.lower().replace(" ", "_"),
             "get_agent": github.get_agent,
             "package": github,
-        },
-        wikipedia.agent_name: {
-            "label": to_label(wikipedia.agent_name),
-            "get_agent": wikipedia.get_agent,
-            "package": wikipedia,
         },
         patent_writer.agent_name: {
             "label": to_label(patent_writer.agent_name),

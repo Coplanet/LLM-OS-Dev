@@ -11,11 +11,15 @@ agent_name = "GitHub Agent"
 __names = {
     "GITHUB_STAR_A_REPOSITORY_FOR_THE_AUTHENTICATED_USER": "Github: Star Repository"
 }
+__icons = {
+    "GITHUB_STAR_A_REPOSITORY_FOR_THE_AUTHENTICATED_USER": "fa-solid fa-star",
+}
 
 available_tools = [
     {
         "instance": instance,
         "name": __names.get(instance.name, to_title(instance.name)),
+        "icon": __icons.get(instance.name, to_title(instance.name)),
     }
     for instance in agent_settings.composio_tools.get_tools(
         actions=[

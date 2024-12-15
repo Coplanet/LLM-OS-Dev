@@ -13,7 +13,7 @@ MODELS = {
             "max_temperature": 2,
             "max_token_size": agent_settings.default_max_completion_tokens,
         },
-        "gpt-4o-Mini": {
+        "gpt-4o-mini": {
             "max_temperature": 2,
             "max_token_size": agent_settings.default_max_completion_tokens,
         },
@@ -112,13 +112,43 @@ def show_popup(session_id, assistant_name, config: AgentConfig, package):
                     enabled_tools[tool.get("name")] = True
 
         for klass, config in available_tools_manifest.items():
-            value = st.checkbox(
-                config.get(
-                    "name",
-                    to_title(klass.__name__) if hasattr(klass, "__name__") else klass,
-                ),
-                value=(klass in enabled_tools),
+            # Create columns for layout
+            col1, col2 = st.columns([1, 11])
+
+            name = config.get(
+                "name",
+                to_title(klass.__name__) if hasattr(klass, "__name__") else klass,
             )
+            icon = config.get("icon", None)
+            # Create columns for layout
+            col1, col2 = None, None
+
+            if icon:
+                col1, col2 = st.columns([0.05, 0.95])
+            else:
+                col1 = st.columns(1)
+
+            with col1:
+                value: str = st.checkbox(
+                    name,
+                    value=(klass in enabled_tools),
+                    label_visibility="collapsed" if icon else "visible",
+                    key=f"checkbox_{name}",
+                )
+
+            if icon:
+                with col2:
+                    st.markdown(
+                        f"""
+                        <span style="position: relative">
+                            <span style="top: 17px; position: absolute; width: 100vw;">
+                                <i class="{icon}" style="margin-right: 10px;"></i> {name}
+                            </span>
+                        </span>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+
             if value:
                 enabled_tools[klass] = True
 
