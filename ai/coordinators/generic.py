@@ -141,11 +141,9 @@ available_tools = {
         },
         "extra_instructions": dedent(
             """\
-            Employ the Email Sender Tools for sending emails. Use this tool to:
+            Utilize the Email Sender Tools exclusively for sending emails. This tool is designed to:
 
-            - Compose and send HTML-formatted emails based on user input or specific requests.
-            - Send emails to the given address, if the email has not been provided ask for it.
-            - Include structured content, such as reports, summaries, or generated data.
+            - Sending emails to the given address, if the email has not been provided ask for it.
 
             This tool is particularly useful for communication tasks requiring email-based delivery or automation.\
             """
