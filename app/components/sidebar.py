@@ -38,7 +38,7 @@ def create_sidebar(session_id, agents: Dict[str, Callable[[], Agent]]) -> None:
             pre_value = st.session_state[feature_name] and agent_enabled
 
             # Create columns for layout
-            col1, col2, col3 = st.columns([1, 7, 6])
+            col1, col2, col3 = st.columns([0.1, 0.7, 0.15])
 
             with col1:
                 new_value = True
@@ -56,7 +56,7 @@ def create_sidebar(session_id, agents: Dict[str, Callable[[], Agent]]) -> None:
                     st.markdown(
                         f"""
                         <span style="position: relative">
-                            <span style="top: 27px; position: absolute; width: 100vw;">
+                            <span style="top: 17px; position: absolute; width: 100vw;">
                                 <i class="{icon}" style="margin-right: 10px;"></i> {checkbox_text}
                             </span>
                         </span>
@@ -70,7 +70,7 @@ def create_sidebar(session_id, agents: Dict[str, Callable[[], Agent]]) -> None:
                     <style>
                         .st-key-gear_{label} button {{
                             float: right;
-                            background: none; border: none; cursor: pointer; margin-top: -10px; font-size: 18px;
+                            background: none; border: none; cursor: pointer; margin-top: -20px; font-size: 18px;
                         }}
                         .st-key-gear_{label} button:after {{ clear: both }}
                     </style>
