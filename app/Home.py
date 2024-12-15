@@ -35,7 +35,6 @@ from ai.agents import (
     python,
     settings,
     wikipedia,
-    youtube,
 )
 from ai.agents.settings import agent_settings
 from ai.coordinators import generic as coordinator
@@ -234,11 +233,6 @@ def main() -> None:
             "label": to_label(arxiv.agent_name),
             "get_agent": arxiv.get_agent,
             "package": arxiv,
-        },
-        youtube.agent_name: {
-            "label": to_label(youtube.agent_name),
-            "get_agent": youtube.get_agent,
-            "package": youtube,
         },
         google_calender.agent_name: {
             "label": google_calender.agent_name.lower().replace(" ", "_"),
