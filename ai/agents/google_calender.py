@@ -69,8 +69,6 @@ def get_agent(config: AgentConfig = None):
             """\
             Analyze google calender, email, fetch emails, and create event on calendar depending on the email content.
             You should also draft an email in response to the sender of the previous email.
-            IMPORTANT: You cannot **send** any email. You can only draft the email.
-            IMPORTANT: You cannot **reply** to the email on behalf of the sender. You can only draft the email.\
             """
         ),
         delegation_directives=[
@@ -87,8 +85,8 @@ def get_agent(config: AgentConfig = None):
                 - Use `{agent_name}` to **Create Email Draf** to draft responses or new emails based on the content of received emails.
                 - Use `{agent_name}` to **Reply To Thread** to draft a reply to an existing email thread, ensuring the response is appropriate and relevant.
 
-                IMPORTANT: You cannot **send** any email. You can only draft the email.
-                IMPORTANT: You cannot **reply** to the email on behalf of the sender. You can only draft the email.
+                IMPORTANT: Using `{agent_name}`, you cannot **send** any email. You can only draft the email -- consider other tools for sending emails.
+                IMPORTANT: Using `{agent_name}`, you cannot **reply** to the email on behalf of the sender. You can only draft the email -- consider other tools for replying to emails.
                 """
             ).strip(),
         ],

@@ -54,6 +54,9 @@ class Settings:
     gpt_api_key: Optional[str] = os.getenv("OPENAI_API_KEY", None)
     resend_api_key: Optional[str] = os.getenv("RESEND_API_KEY", None)
     groq_api_key: Optional[str] = os.getenv("GROQ_API_KEY", None)
+    resend_email_address: Optional[str] = os.getenv(
+        "RESEND_EMAIL_ADDRESS", "info@test.coplanet.com"
+    )
 
     @property
     def scratch_dir(self):

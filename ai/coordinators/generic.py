@@ -137,7 +137,7 @@ available_tools = {
         "name": "Email Sender",
         "kwargs": {
             "api_key": extra_settings.resend_api_key,
-            "from_email": "onboarding@resend.dev",
+            "from_email": extra_settings.resend_email_address,
         },
         "extra_instructions": dedent(
             """\
