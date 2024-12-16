@@ -60,6 +60,7 @@ available_tools = [
 def get_agent(config: AgentConfig = None):
     tools, _ = process_composio_tools(agent_name, config, available_tools)
 
+    # flake8: noqa: E501
     agent = Agent(
         name=agent_name,
         agent_config=config,
@@ -74,12 +75,22 @@ def get_agent(config: AgentConfig = None):
         ),
         delegation_directives=[
             dedent(
-                """\
-                To analyze google calender, email, fetch emails, and create event on calendar
-                depending on the email content and write the email as draft,
-                delegate the task to the `Google Calender Agent`.\
+                f"""
+                - Use `{agent_name}` to **Find Free Slot**  to identify available time slots in the calendar for scheduling new events.
+                - Use `{agent_name}` to **Create Event** to add new events to the calendar based on user input or email content.
+                - Use `{agent_name}` to **Find Event** to search for specific events in the calendar using event details or keywords.
+                - Use `{agent_name}` to **Get Calendar** to retrieve details of a specific calendar, including events and settings.
+                - Use `{agent_name}` to **List Calendars** to list all available calendars associated with the user's account.
+                - Use `{agent_name}` to **Update Event** to modify existing events in the calendar, such as changing the time or location.
+                - Use `{agent_name}` to **Delete Event** to remove events from the calendar when requested by the user.
+                - Use `{agent_name}` to **Fetch Emails** to retrieve emails from the user's inbox for analysis or event creation.
+                - Use `{agent_name}` to **Create Email Draf** to draft responses or new emails based on the content of received emails.
+                - Use `{agent_name}` to **Reply To Thread** to draft a reply to an existing email thread, ensuring the response is appropriate and relevant.
+
+                IMPORTANT: You cannot **send** any email. You can only draft the email.
+                IMPORTANT: You cannot **reply** to the email on behalf of the sender. You can only draft the email.
                 """
-            ),
+            ).strip(),
         ],
     )
     return agent
