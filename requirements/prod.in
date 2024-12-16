@@ -1,5 +1,5 @@
 ipython
-phidata[aws]>=2.6.5,<2.7
+phidata[aws]>=2.7,<2.8
 
 groq
 xlrd
@@ -18,6 +18,7 @@ beautifulsoup4
 composio_openai
 composio-phidata
 duckduckgo-search
+google-generativeai
 youtube-transcript-api
 
 -r ./phidata.txt
