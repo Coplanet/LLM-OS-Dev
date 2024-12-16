@@ -26,12 +26,12 @@ MODELS = {
         #     "max_token_size": agent_settings.default_max_completion_tokens,
         # },
     },
-    # "Google": {
-    #     "gemini-2.0-flash-exp": {
-    #         "max_temperature": 2,
-    #         "max_token_size": 8_192,
-    #     },
-    # },
+    "Google": {
+        "gemini-2.0-flash-exp": {
+            "max_temperature": 2,
+            "max_token_size": 8_192,
+        },
+    },
     "Groq": {
         "llama3-groq-70b-8192-tool-use-preview": {
             "max_temperature": 2,
@@ -51,8 +51,8 @@ MODELS = {
 
 PROVIDERS_ORDER = [
     "OpenAI",
-    # "Google",
     "Groq",
+    "Google",
 ]
 
 
