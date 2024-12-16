@@ -8,6 +8,7 @@ from phi.knowledge.pdf import PDFKnowledgeBase, PDFReader
 from phi.storage.agent.postgres import PgAgentStorage
 from phi.tools.arxiv_toolkit import ArxivToolkit
 from phi.tools.calculator import Calculator
+from phi.tools.dalle import Dalle
 from phi.tools.duckduckgo import DuckDuckGo
 from phi.tools.wikipedia import WikipediaTools
 from phi.tools.yfinance import YFinanceTools
@@ -40,6 +41,15 @@ agent = None
 agent_name = "Coordinator"
 available_tools = OrderedDict(
     {
+        Dalle: {
+            "name": "DALL-E Image Generator",
+            "extra_instructions": dedent(
+                """\
+                Use the Dalle tool to generate images.
+                """
+            ).strip(),
+            "icon": "fa-solid fa-image",
+        },
         YouTubeTools: {
             "name": "YouTube",
             "extra_instructions": dedent(
