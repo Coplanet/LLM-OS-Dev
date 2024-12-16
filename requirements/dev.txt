@@ -65,6 +65,7 @@ build==1.2.2.post1
 cachetools==5.5.0
     # via
     #   -r requirements/./phidata.txt
+    #   google-auth
     #   streamlit
 certifi==2024.8.30
     # via
@@ -187,12 +188,42 @@ gitpython==3.1.43
     #   -r requirements/./phidata.txt
     #   phidata
     #   streamlit
+google-ai-generativelanguage==0.6.10
+    # via google-generativeai
+google-api-core[grpc]==2.24.0
+    # via
+    #   google-ai-generativelanguage
+    #   google-api-python-client
+    #   google-generativeai
+google-api-python-client==2.155.0
+    # via google-generativeai
+google-auth==2.37.0
+    # via
+    #   google-ai-generativelanguage
+    #   google-api-core
+    #   google-api-python-client
+    #   google-auth-httplib2
+    #   google-generativeai
+google-auth-httplib2==0.2.0
+    # via google-api-python-client
+google-generativeai==0.8.3
+    # via -r requirements/prod.in
+googleapis-common-protos==1.66.0
+    # via
+    #   google-api-core
+    #   grpcio-status
 greenlet==3.1.1
     # via
     #   -r requirements/./phidata.txt
     #   sqlalchemy
 groq==0.13.0
     # via -r requirements/prod.in
+grpcio==1.68.1
+    # via
+    #   google-api-core
+    #   grpcio-status
+grpcio-status==1.68.1
+    # via google-api-core
 h11==0.14.0
     # via
     #   -r requirements/./phidata.txt
@@ -204,6 +235,10 @@ httpcore==1.0.6
     # via
     #   -r requirements/./phidata.txt
     #   httpx
+httplib2==0.22.0
+    # via
+    #   google-api-python-client
+    #   google-auth-httplib2
 httptools==0.6.2
     # via
     #   -r requirements/./phidata.txt
@@ -369,7 +404,7 @@ pexpect==4.9.0
     # via ipython
 pgvector==0.3.5
     # via -r requirements/./phidata.txt
-phidata[aws]==2.6.5
+phidata[aws]==2.7.2
     # via
     #   -r requirements/prod.in
     #   composio-phidata
@@ -402,9 +437,19 @@ propcache==0.2.1
     # via
     #   aiohttp
     #   yarl
+proto-plus==1.25.0
+    # via
+    #   google-ai-generativelanguage
+    #   google-api-core
 protobuf==5.28.2
     # via
     #   -r requirements/./phidata.txt
+    #   google-ai-generativelanguage
+    #   google-api-core
+    #   google-generativeai
+    #   googleapis-common-protos
+    #   grpcio-status
+    #   proto-plus
     #   streamlit
 psycopg[binary]==3.1.19
     # via -r requirements/./phidata.txt
@@ -420,6 +465,12 @@ pyarrow==17.0.0
     # via
     #   -r requirements/./phidata.txt
     #   streamlit
+pyasn1==0.6.1
+    # via
+    #   pyasn1-modules
+    #   rsa
+pyasn1-modules==0.4.1
+    # via google-auth
 pycodestyle==2.12.1
     # via flake8
 pycparser==2.22
@@ -429,6 +480,7 @@ pydantic==2.9.2
     #   -r requirements/./phidata.txt
     #   composio-core
     #   fastapi
+    #   google-generativeai
     #   groq
     #   ollama
     #   openai
@@ -461,6 +513,8 @@ pylint-plugin-utils==0.8.2
     # via pylint-django
 pynacl==1.5.0
     # via paramiko
+pyparsing==3.2.0
+    # via httplib2
 pypdf==5.0.1
     # via -r requirements/./phidata.txt
 pyperclip==1.9.0
@@ -521,6 +575,7 @@ requests==2.32.3
     #   composio-core
     #   docker
     #   exa-py
+    #   google-api-core
     #   pysher
     #   resend
     #   streamlit
@@ -542,6 +597,8 @@ rpds-py==0.22.3
     #   -r requirements/./phidata.txt
     #   jsonschema
     #   referencing
+rsa==4.9
+    # via google-auth
 ruff==0.6.9
     # via -r requirements/./phidata.txt
 s3transfer==0.10.3
@@ -616,6 +673,7 @@ tqdm==4.66.5
     # via
     #   -r requirements/./phidata.txt
     #   djlint
+    #   google-generativeai
     #   openai
 traitlets==5.14.3
     # via
@@ -641,6 +699,7 @@ typing-extensions==4.12.2
     #   altair
     #   exa-py
     #   fastapi
+    #   google-generativeai
     #   groq
     #   mypy
     #   openai
@@ -658,6 +717,8 @@ tzdata==2024.2
     # via
     #   -r requirements/./phidata.txt
     #   pandas
+uritemplate==4.1.1
+    # via google-api-python-client
 urllib3==2.2.3
     # via
     #   -r requirements/./phidata.txt

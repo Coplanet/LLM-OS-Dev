@@ -2,7 +2,7 @@ from textwrap import dedent
 from typing import Generic, List, Optional, TypeVar
 
 from phi.agent import Agent as PhiAgent
-from phi.model import Model
+from phi.model.base import Model
 from phi.model.groq import Groq
 from phi.model.ollama import Ollama
 from phi.model.openai import OpenAIChat
