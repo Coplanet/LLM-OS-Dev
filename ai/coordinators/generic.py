@@ -1,3 +1,4 @@
+from collections import OrderedDict
 from textwrap import dedent
 from typing import Dict, Optional
 
@@ -37,11 +38,12 @@ from .base import Coordinator
 
 agent = None
 agent_name = "Coordinator"
-available_tools = {
-    YouTubeTools: {
-        "name": "YouTube",
-        "extra_instructions": dedent(
-            """\
+available_tools = OrderedDict(
+    {
+        YouTubeTools: {
+            "name": "YouTube",
+            "extra_instructions": dedent(
+                """\
             Use the YouTube tool to search for and analyze YouTube videos.
 
             To analyze YouTube videos, delegate to the Youtube tool. Youtube tool can:
@@ -53,57 +55,21 @@ available_tools = {
             NOTE: The Youtube tool works best with videos that have captions available.
             Do NOT delegate non-YouTube video analysis tasks to Youtube tool agent.
             """
-        ).strip(),
-        "icon": "fa-brands fa-youtube",
-    },
-    ArxivToolkit: {"name": "Arxiv", "icon": "fa-solid fa-book-open"},
-    WikipediaTools: {"name": "Wikipedia", "icon": "fab fa-wikipedia-w"},
-    Calculator: {
-        "name": "Calculator",
-        "kwargs": {
-            "add": True,
-            "subtract": True,
-            "multiply": True,
-            "divide": True,
-            "exponentiate": True,
-            "factorial": True,
-            "is_prime": True,
-            "square_root": True,
+            ).strip(),
+            "icon": "fa-brands fa-youtube",
         },
-        "extra_instructions": dedent(
-            """\
-            Use the Calculator tool for precise and complex mathematical operations, including addition,
-            subtraction, multiplication, division, exponentiation, factorials, checking if a number is prime,
-            and calculating square roots. This tool is ideal for mathematical queries, computations,
-            or when the user needs help solving equations or understanding numeric concepts.\
-            """
-        ).strip(),
-        "icon": "fa-solid fa-calculator",
-    },
-    DuckDuckGo: {
-        "name": "Search (DuckDuckGo)",
-        "kwargs": {"fixed_max_results": 3},
-        "extra_instructions": dedent(
-            """\
-            Leverage the DuckDuckGo Search tool for quick internet searches, such as finding \
-                up-to-date information,
-            verifying facts, or answering questions beyond the scope of the knowledge base.
-            Use this tool when a direct query requires additional context or when you need to retrieve concise
-            and relevant information (limited to 3 results per search).\
-            """
-        ).strip(),
-        "icon": "fa-solid fa-magnifying-glass",
-    },
-    YFinanceTools: {
-        "name": "YFinance",
-        "kwargs": {
-            "stock_price": True,
-            "company_info": True,
-            "analyst_recommendations": True,
-            "company_news": True,
-        },
-        "extra_instructions": dedent(
-            """\
+        ArxivToolkit: {"name": "Arxiv", "icon": "fa-solid fa-book-open"},
+        WikipediaTools: {"name": "Wikipedia", "icon": "fab fa-wikipedia-w"},
+        YFinanceTools: {
+            "name": "YFinance",
+            "kwargs": {
+                "stock_price": True,
+                "company_info": True,
+                "analyst_recommendations": True,
+                "company_news": True,
+            },
+            "extra_instructions": dedent(
+                """\
             Utilize YFinance tools for financial and stock-related queries. This includes:
 
             - Stock Price: Retrieve real-time or historical stock prices.
@@ -113,14 +79,45 @@ available_tools = {
 
             These tools are ideal for answering finance-related questions or assisting with investment decisions.\
             """
-        ).strip(),
-        "icon": "fa-solid fa-chart-line",
-    },
-    FileIOTools: {
-        "name": "File IO",
-        "kwargs": {"base_dir": extra_settings.scratch_dir},
-        "extra_instructions": dedent(
-            """\
+            ).strip(),
+            "icon": "fa-solid fa-chart-line",
+        },
+        DuckDuckGo: {
+            "name": "Search (DuckDuckGo)",
+            "kwargs": {"fixed_max_results": 3},
+            "extra_instructions": dedent(
+                """\
+            Leverage the DuckDuckGo Search tool for quick internet searches, such as finding \
+                up-to-date information,
+            verifying facts, or answering questions beyond the scope of the knowledge base.
+            Use this tool when a direct query requires additional context or when you need to retrieve concise
+            and relevant information (limited to 3 results per search).\
+            """
+            ).strip(),
+            "icon": "fa-solid fa-magnifying-glass",
+        },
+        EmailSenderTools: {
+            "name": "Email Sender",
+            "kwargs": {
+                "api_key": extra_settings.resend_api_key,
+                "from_email": extra_settings.resend_email_address,
+            },
+            "extra_instructions": dedent(
+                """\
+            Utilize the Email Sender Tools exclusively for sending emails. This tool is designed to:
+
+            - Sending emails to the given address, if the email has not been provided ask for it.
+
+            This tool is particularly useful for communication tasks requiring email-based delivery or automation.\
+            """
+            ).strip(),
+            "icon": "fa-solid fa-envelope",
+        },
+        FileIOTools: {
+            "name": "File IO",
+            "kwargs": {"base_dir": extra_settings.scratch_dir},
+            "extra_instructions": dedent(
+                """\
             Use the File IO Tools for managing files in the working directory. Specific use cases include:
 
             - Read Files: Open and read content from files when the user uploads or references one.
@@ -130,40 +127,46 @@ available_tools = {
             This tool is helpful for file manipulation tasks, processing user-uploaded data, or \
             saving generated content for future use.\
             """
-        ).strip(),
-        "icon": "fa-solid fa-file-alt",
-    },
-    EmailSenderTools: {
-        "name": "Email Sender",
-        "kwargs": {
-            "api_key": extra_settings.resend_api_key,
-            "from_email": extra_settings.resend_email_address,
+            ).strip(),
+            "icon": "fa-solid fa-file-alt",
         },
-        "extra_instructions": dedent(
-            """\
-            Utilize the Email Sender Tools exclusively for sending emails. This tool is designed to:
-
-            - Sending emails to the given address, if the email has not been provided ask for it.
-
-            This tool is particularly useful for communication tasks requiring email-based delivery or automation.\
-            """
-        ).strip(),
-        "icon": "fa-solid fa-envelope",
-    },
-    WebSiteCrawlerTools: {
-        "name": "Website Crawler",
-        "extra_instructions": dedent(
-            """\
+        WebSiteCrawlerTools: {
+            "name": "Website Crawler",
+            "extra_instructions": dedent(
+                """\
             Use the Website Crawler Tools to parse the content of a website and add it to the knowledge base.
             This tool is ideal for integrating external web content into the system for future reference or analysis.
             Use it when the user provides a website URL or requests detailed insights from a web page.
             Ensure the content is relevant and valuable before adding it to the knowledge base to maintain its \
                 quality and relevance.
             """
-        ).strip(),
-        "icon": "fa-solid fa-globe",
-    },
-}
+            ).strip(),
+            "icon": "fa-solid fa-globe",
+        },
+        Calculator: {
+            "name": "Calculator",
+            "kwargs": {
+                "add": True,
+                "subtract": True,
+                "multiply": True,
+                "divide": True,
+                "exponentiate": True,
+                "factorial": True,
+                "is_prime": True,
+                "square_root": True,
+            },
+            "extra_instructions": dedent(
+                """\
+            Use the Calculator tool for precise and complex mathematical operations, including addition,
+            subtraction, multiplication, division, exponentiation, factorials, checking if a number is prime,
+            and calculating square roots. This tool is ideal for mathematical queries, computations,
+            or when the user needs help solving equations or understanding numeric concepts.\
+            """
+            ).strip(),
+            "icon": "fa-solid fa-calculator",
+        },
+    }
+)
 
 
 def get_coordinator(
@@ -241,6 +244,8 @@ def get_coordinator(
         role="Lead the team to complete the task",
         # Add tools to the Assistant
         tools=tools,
+        # Enable reasoning
+        reasoning=True,
         # Introduce knowledge base to the leader
         knowledge_base=knowledge_base,
         # Set addication context to the system's prompt

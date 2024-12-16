@@ -26,6 +26,12 @@ MODELS = {
         #     "max_token_size": agent_settings.default_max_completion_tokens,
         # },
     },
+    # "Google": {
+    #     "gemini-2.0-flash-exp": {
+    #         "max_temperature": 2,
+    #         "max_token_size": 8_192,
+    #     },
+    # },
     "Groq": {
         "llama3-groq-70b-8192-tool-use-preview": {
             "max_temperature": 2,
@@ -43,7 +49,11 @@ MODELS = {
     },
 }
 
-PROVIDERS_ORDER = ["OpenAI", "Groq"]
+PROVIDERS_ORDER = [
+    "OpenAI",
+    # "Google",
+    "Groq",
+]
 
 
 @st.dialog("Configure Agent")
@@ -126,7 +136,7 @@ def show_popup(session_id, assistant_name, config: AgentConfig, package):
             if icon:
                 col1, col2 = st.columns([0.05, 0.95])
             else:
-                col1 = st.columns(1)
+                col1 = st.columns(1)[0]
 
             with col1:
                 value: str = st.checkbox(

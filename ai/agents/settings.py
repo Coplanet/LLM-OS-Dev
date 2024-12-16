@@ -4,8 +4,8 @@ from typing import Dict, Optional
 
 from composio_phidata import Action as ComposioAction
 from composio_phidata import ComposioToolSet
+from phi.model.google import Gemini
 from phi.model.groq import Groq
-from phi.model.ollama import Ollama
 from phi.model.openai import OpenAIChat
 from phi.tools import Toolkit
 from pydantic_settings import BaseSettings
@@ -121,7 +121,7 @@ class AgentConfig:
 
     @property
     def get_model(self):
-        models = {"OpenAI", "Groq", "Ollama"}
+        models = {"OpenAI", "Groq", "Google"}
         if self.is_empty or self.provider is None:
             return self.default_model()
 
@@ -145,10 +145,11 @@ class AgentConfig:
                 model_class = Groq
                 model_id = self.model_id or "llama3-groq-70b-8192-tool-use-preview"
                 configs["api_key"] = extra_settings.groq_api_key
-            case "Ollama":
-                model_class = Ollama
-                model_id = self.model_id or "llama3.2"
-                configs["host"] = extra_settings.ollama_host
+
+            case "Google":
+                model_class = Gemini
+                model_id = self.model_id or "gemini-1.5-flash"
+                configs["api_key"] = extra_settings.gemini_api_key
 
             case _:
                 logger.warning("Model '%s' didn't match!", self.provider)

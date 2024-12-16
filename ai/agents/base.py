@@ -3,8 +3,8 @@ from typing import Generic, List, Optional, TypeVar
 
 from phi.agent import Agent as PhiAgent
 from phi.model.base import Model
+from phi.model.google import Gemini
 from phi.model.groq import Groq
-from phi.model.ollama import Ollama
 from phi.model.openai import OpenAIChat
 
 from helpers.log import logger
@@ -53,8 +53,8 @@ class Agent(PhiAgent):
             return "OpenAI"
         if isinstance(self.model, Groq):
             return "Groq"
-        if isinstance(self.model, Ollama):
-            return "Ollama"
+        if isinstance(self.model, Gemini):
+            return "Google"
         logger.warning(f"Model type '{self.model}' is not defined!")
         return None
 
