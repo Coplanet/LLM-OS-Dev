@@ -52,6 +52,7 @@ class Settings:
     ws_root: Path = ROOT_DIR
     ollama_host: Optional[str] = os.getenv("OLLAMA_HOST", "localhost")
     gpt_api_key: Optional[str] = os.getenv("OPENAI_API_KEY", None)
+    gemini_api_key: Optional[str] = os.getenv("GEMINI_API_KEY", None)
     resend_api_key: Optional[str] = os.getenv("RESEND_API_KEY", None)
     groq_api_key: Optional[str] = os.getenv("GROQ_API_KEY", None)
     resend_email_address: Optional[str] = os.getenv(
