@@ -345,7 +345,7 @@ pexpect==4.9.0
     # via ipython
 pgvector==0.3.5
     # via -r requirements/prod.in
-phidata[aws]==2.7.2
+phidata[aws]==2.7.3
     # via
     #   -r requirements/prod.in
     #   composio-phidata
