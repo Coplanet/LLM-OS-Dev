@@ -448,12 +448,7 @@ def main() -> None:
                     response += delta.content  # type: ignore
                     resp_container.markdown(response)
                 end = time()
-                exec_time = "Time to response: {:.2f} seconds".format(end - start)
-                logger.debug(exec_time)
-                st.markdown(
-                    f"<small style='color: #444;font-size: 10px;'>{exec_time}</small>",
-                    unsafe_allow_html=True,
-                )
+                logger.debug("Time to response: {:.2f} seconds".format(end - start))
             st.session_state["messages"].append(
                 {"role": "assistant", "content": response}
             )

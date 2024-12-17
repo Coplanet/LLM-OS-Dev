@@ -56,7 +56,7 @@ PROVIDERS_ORDER = [
 ]
 
 
-@st.dialog("Configure Agent")
+@st.dialog("Configure Agent", width="large")
 def show_popup(session_id, assistant_name, config: AgentConfig, package):
     label = to_label(assistant_name)
 

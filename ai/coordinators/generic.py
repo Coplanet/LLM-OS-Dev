@@ -61,6 +61,7 @@ agent = None
 agent_name = "Coordinator"
 available_tools = [
     {
+        "order": 100,
         "instance": Dalle(),
         "name": "DALL-E Image Generator",
         "extra_instructions": dedent(
@@ -71,6 +72,7 @@ available_tools = [
         "icon": "fa-solid fa-image",
     },
     {
+        "order": 200,
         "instance": YouTubeTools(),
         "name": "YouTube",
         "extra_instructions": dedent(
@@ -90,16 +92,19 @@ available_tools = [
         "icon": "fa-brands fa-youtube",
     },
     {
+        "order": 300,
         "instance": ArxivToolkit(),
         "name": "Arxiv",
         "icon": "fa-solid fa-book-open",
     },
     {
+        "order": 400,
         "instance": WikipediaTools(),
         "name": "Wikipedia",
         "icon": "fab fa-wikipedia-w",
     },
     {
+        "order": 500,
         "instance": YFinanceTools(
             stock_price=True,
             company_info=True,
@@ -122,6 +127,7 @@ available_tools = [
         "icon": "fa-solid fa-chart-line",
     },
     {
+        "order": 600,
         "instance": DuckDuckGo(fixed_max_results=3),
         "name": "Search (DuckDuckGo)",
         "extra_instructions": dedent(
@@ -136,6 +142,7 @@ available_tools = [
         "icon": "fa-solid fa-magnifying-glass",
     },
     {
+        "order": 700,
         "instance": EmailSenderTools(
             api_key=extra_settings.resend_api_key,
             from_email=extra_settings.resend_email_address,
@@ -153,6 +160,7 @@ available_tools = [
         "icon": "fa-solid fa-envelope",
     },
     {
+        "order": 800,
         "instance": FileIOTools(base_dir=extra_settings.scratch_dir),
         "name": "File IO",
         "extra_instructions": dedent(
@@ -170,6 +178,7 @@ available_tools = [
         "icon": "fa-solid fa-file-alt",
     },
     {
+        "order": 900,
         "instance": WebSiteCrawlerTools(),
         "name": "Website Crawler",
         "extra_instructions": dedent(
@@ -184,6 +193,7 @@ available_tools = [
         "icon": "fa-solid fa-globe",
     },
     {
+        "order": 1000,
         "instance": Calculator(
             add=True,
             subtract=True,
@@ -207,28 +217,37 @@ available_tools = [
     },
 ]
 
-available_tools += [
-    {
-        "instance": instance,
-        "name": __names.get(instance.name, to_title(instance.name)),
-        "icon": __icons.get(instance.name, to_title(instance.name)),
-    }
-    for instance in agent_settings.composio_tools.get_tools(
-        actions=[
-            ComposioAction.GOOGLECALENDAR_FIND_FREE_SLOTS,
-            ComposioAction.GOOGLECALENDAR_CREATE_EVENT,
-            ComposioAction.GOOGLECALENDAR_FIND_EVENT,
-            ComposioAction.GOOGLECALENDAR_GET_CALENDAR,
-            ComposioAction.GOOGLECALENDAR_LIST_CALENDARS,
-            ComposioAction.GOOGLECALENDAR_UPDATE_EVENT,
-            ComposioAction.GOOGLECALENDAR_DELETE_EVENT,
-            ComposioAction.GMAIL_FETCH_EMAILS,
-            ComposioAction.GMAIL_CREATE_EMAIL_DRAFT,
-            ComposioAction.GMAIL_REPLY_TO_THREAD,
-            ComposioAction.GITHUB_STAR_A_REPOSITORY_FOR_THE_AUTHENTICATED_USER,
-        ]
-    )
+composio_actions = [
+    ComposioAction.GOOGLECALENDAR_FIND_FREE_SLOTS,
+    ComposioAction.GOOGLECALENDAR_CREATE_EVENT,
+    ComposioAction.GOOGLECALENDAR_FIND_EVENT,
+    ComposioAction.GOOGLECALENDAR_GET_CALENDAR,
+    ComposioAction.GOOGLECALENDAR_LIST_CALENDARS,
+    ComposioAction.GOOGLECALENDAR_UPDATE_EVENT,
+    ComposioAction.GOOGLECALENDAR_DELETE_EVENT,
+    ComposioAction.GMAIL_FETCH_EMAILS,
+    ComposioAction.GMAIL_CREATE_EMAIL_DRAFT,
+    ComposioAction.GMAIL_REPLY_TO_THREAD,
+    ComposioAction.GITHUB_STAR_A_REPOSITORY_FOR_THE_AUTHENTICATED_USER,
 ]
+
+for order, instance in enumerate(
+    agent_settings.composio_tools.get_tools(actions=composio_actions)
+):
+    name = __names.get(instance.name, to_title(instance.name))
+    instance.description = f"Use `{instance.name} Tool` to {name}"
+    available_tools.append(
+        {
+            "order": 500 + order + 1,
+            "instance": instance,
+            "name": name,
+            "icon": __icons.get(instance.name, to_title(instance.name)),
+            "extra_instructions": instance.description,
+        }
+    )
+
+
+available_tools = sorted(available_tools, key=lambda x: x["order"])
 
 
 def get_coordinator(
