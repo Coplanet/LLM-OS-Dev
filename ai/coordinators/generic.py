@@ -254,8 +254,6 @@ def get_coordinator(
         role="Lead the team to complete the task",
         # Add tools to the Assistant
         tools=tools,
-        # Enable reasoning
-        reasoning=True,
         # Introduce knowledge base to the leader
         knowledge_base=knowledge_base,
         # Set addication context to the system's prompt

@@ -12,7 +12,6 @@ dependencies = [
   "fastapi[standard]",
   "mypy",
   "nest_asyncio",
-  "openai",
   "pgvector",
   "pillow",
   "psycopg[binary]",
