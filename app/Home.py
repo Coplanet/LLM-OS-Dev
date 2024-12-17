@@ -27,8 +27,6 @@ from PIL import Image
 from ai.agents import (
     base,
     funny,
-    github,
-    google_calender,
     journal,
     linkedin_content_generator,
     patent_writer,
@@ -239,16 +237,6 @@ def main() -> None:
             "label": to_label(python.agent_name),
             "get_agent": python.get_agent,
             "package": python,
-        },
-        google_calender.agent_name: {
-            "label": google_calender.agent_name.lower().replace(" ", "_"),
-            "get_agent": google_calender.get_agent,
-            "package": google_calender,
-        },
-        github.agent_name: {
-            "label": github.agent_name.lower().replace(" ", "_"),
-            "get_agent": github.get_agent,
-            "package": github,
         },
         patent_writer.agent_name: {
             "label": to_label(patent_writer.agent_name),
