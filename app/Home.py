@@ -1,6 +1,7 @@
 import base64
 from io import BytesIO
 from os import getenv
+from time import time
 from typing import Dict, List
 from urllib.parse import quote
 
@@ -450,6 +451,7 @@ def main() -> None:
             with st.spinner("Thinking..."):
                 resp_container = st.empty()
                 response = ""
+                start = time()
                 for delta in generic_leader.run(
                     message=question,
                     images=uploaded_images,
@@ -457,6 +459,13 @@ def main() -> None:
                 ):
                     response += delta.content  # type: ignore
                     resp_container.markdown(response)
+                end = time()
+                exec_time = "Time to response: {:.2f} seconds".format(end - start)
+                logger.debug(exec_time)
+                st.markdown(
+                    f"<small style='color: #444;font-size: 10px;'>{exec_time}</small>",
+                    unsafe_allow_html=True,
+                )
             st.session_state["messages"].append(
                 {"role": "assistant", "content": response}
             )
