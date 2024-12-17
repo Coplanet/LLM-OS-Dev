@@ -5,6 +5,7 @@ groq
 xlrd
 arxiv
 ollama
+openai>=1.52.0
 resend
 exa-py
 pandas
@@ -21,4 +22,22 @@ duckduckgo-search
 google-generativeai
 youtube-transcript-api
 
--r ./phidata.txt
+alembic
+beautifulsoup4
+duckduckgo-search
+fastapi[standard]
+mypy
+nest_asyncio
+pgvector
+pillow
+psycopg[binary]
+pypdf
+pytest
+python-docx
+ruff
+sqlalchemy
+streamlit==1.39.0
+tiktoken
+typer
+types-beautifulsoup4
+types-Pillow
