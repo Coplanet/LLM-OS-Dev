@@ -1,8 +1,9 @@
 import base64
+import re
 from io import BytesIO
 from os import getenv
 from time import time
-from typing import Dict, List
+from typing import Dict, List, Optional
 from urllib.parse import quote
 
 import nest_asyncio
@@ -17,12 +18,14 @@ from phi.document.reader.json import JSONReader
 from phi.document.reader.pdf import PDFReader
 from phi.document.reader.text import TextReader
 from phi.document.reader.website import WebsiteReader
+from phi.model.content import Image
+from phi.model.message import Message
 from phi.tools.streamlit.components import (
     check_password,
     get_openai_key_sidebar,
     get_username_sidebar,
 )
-from PIL import Image
+from PIL import Image as PILImage
 
 from ai.agents import (
     base,
@@ -133,7 +136,7 @@ def restart_agent():
 
 
 def encode_image(image_file):
-    image = Image.open(image_file)
+    image = PILImage.open(image_file)
     buffer = BytesIO()
     image.save(buffer, format="JPEG")
     encoding = base64.b64encode(buffer.getvalue()).decode("utf-8")
@@ -390,6 +393,12 @@ def main() -> None:
         for i in range(len(agent_chat_history)):
             if agent_chat_history[i].get("content") is None:
                 null_content.append(i)
+            elif isinstance(agent_chat_history[i]["content"], str):
+                agent_chat_history[i]["content"] = re.sub(
+                    r"[\n\s]*!\[[^\]]+?\]\([^\)]+?\)",
+                    "",
+                    agent_chat_history[i]["content"],
+                )
         # remove null content using the indices:
         for i in reversed(null_content):
             agent_chat_history.pop(i)
@@ -424,7 +433,11 @@ def main() -> None:
                         if item["type"] == "text":
                             st.write(item["text"])
                         elif item["type"] == "image_url":
-                            st.image(item["image_url"]["url"], use_column_width=True)
+                            st.image(
+                                item["image_url"]["url"],
+                                caption=item.get("image_caption"),
+                                use_column_width=True,
+                            )
                 else:
                     st.write(content)
 
@@ -443,12 +456,54 @@ def main() -> None:
                     stream=True,
                 ):
                     response += delta.content  # type: ignore
+                    response = re.sub(r"[\n\s]*!\[[^\]]+?\]\([^\)]+?\)", "", response)
                     resp_container.markdown(response)
                 end = time()
                 logger.debug("Time to response: {:.2f} seconds".format(end - start))
-            st.session_state["messages"].append(
-                {"role": "assistant", "content": response}
-            )
+
+            # Get the images
+            image_outputs: Optional[List[Image]] = generic_leader.get_images()
+            # Render the images
+            if image_outputs:
+                logger.debug("Rendering '{}' images...".format(len(image_outputs)))
+                contents = []
+                contents.append({"type": "text", "text": response})
+
+                for img in image_outputs:
+                    if isinstance(img, dict):
+                        img = Image.model_validate(img)
+
+                    if not isinstance(img, Image):
+                        logger.error(
+                            "Image is not a valid Image model; it is a: {} [skipping]".format(
+                                type(img)
+                            )
+                        )
+                        continue
+
+                    contents.append(
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": img.url},
+                            "image_caption": img.original_prompt,
+                        }
+                    )
+                    st.image(img.url, caption=img.original_prompt)
+
+                generic_leader.images = []
+
+                st.session_state["messages"].append(
+                    {"role": "assistant", "content": contents}
+                )
+                generic_leader.memory.add_message(
+                    Message(role="assistant", content=contents[1:])
+                )
+                generic_leader.write_to_storage()
+
+            else:
+                st.session_state["messages"].append(
+                    {"role": "assistant", "content": response}
+                )
 
     # Load knowledge base
     if generic_leader.knowledge:
