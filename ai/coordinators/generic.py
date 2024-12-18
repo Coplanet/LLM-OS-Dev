@@ -1,4 +1,3 @@
-from collections import OrderedDict
 from textwrap import dedent
 from typing import Dict, Optional
 
@@ -15,15 +14,7 @@ from phi.tools.yfinance import YFinanceTools
 from phi.tools.youtube_tools import YouTubeTools
 from phi.vectordb.pgvector import PgVector2
 
-from ai.agents import (
-    funny,
-    github,
-    google_calender,
-    journal,
-    linkedin_content_generator,
-    patent_writer,
-    python,
-)
+from ai.agents import funny, journal, linkedin_content_generator, patent_writer, python
 from ai.agents.base import AgentTeam
 from ai.agents.settings import AgentConfig, agent_settings
 from ai.tools.email import EmailSenderTools
@@ -36,24 +27,28 @@ from helpers.tool_processor import process_tools
 from workspace.settings import extra_settings
 
 from .base import Coordinator
+from .composio_tools import COMPOSIO_ACTIONS
 
 agent = None
 agent_name = "Coordinator"
-available_tools = OrderedDict(
+available_tools = [
     {
-        Dalle: {
-            "name": "DALL-E Image Generator",
-            "extra_instructions": dedent(
-                """\
+        "order": 100,
+        "instance": Dalle(),
+        "name": "DALL-E",
+        "extra_instructions": dedent(
+            """\
                 Use the Dalle tool to generate images.
                 """
-            ).strip(),
-            "icon": "fa-solid fa-image",
-        },
-        YouTubeTools: {
-            "name": "YouTube",
-            "extra_instructions": dedent(
-                """\
+        ).strip(),
+        "icon": "fa-solid fa-image",
+    },
+    {
+        "order": 200,
+        "instance": YouTubeTools(),
+        "name": "YouTube",
+        "extra_instructions": dedent(
+            """\
             Use the YouTube tool to search for and analyze YouTube videos.
 
             To analyze YouTube videos, delegate to the Youtube tool. Youtube tool can:
@@ -65,21 +60,32 @@ available_tools = OrderedDict(
             NOTE: The Youtube tool works best with videos that have captions available.
             Do NOT delegate non-YouTube video analysis tasks to Youtube tool agent.
             """
-            ).strip(),
-            "icon": "fa-brands fa-youtube",
-        },
-        ArxivToolkit: {"name": "Arxiv", "icon": "fa-solid fa-book-open"},
-        WikipediaTools: {"name": "Wikipedia", "icon": "fab fa-wikipedia-w"},
-        YFinanceTools: {
-            "name": "YFinance",
-            "kwargs": {
-                "stock_price": True,
-                "company_info": True,
-                "analyst_recommendations": True,
-                "company_news": True,
-            },
-            "extra_instructions": dedent(
-                """\
+        ).strip(),
+        "icon": "fa-brands fa-youtube",
+    },
+    {
+        "order": 300,
+        "instance": ArxivToolkit(),
+        "name": "Arxiv",
+        "icon": "fa-solid fa-book-open",
+    },
+    {
+        "order": 400,
+        "instance": WikipediaTools(),
+        "name": "Wikipedia",
+        "icon": "fab fa-wikipedia-w",
+    },
+    {
+        "order": 500,
+        "instance": YFinanceTools(
+            stock_price=True,
+            company_info=True,
+            analyst_recommendations=True,
+            company_news=True,
+        ),
+        "name": "YFinance",
+        "extra_instructions": dedent(
+            """\
             Utilize YFinance tools for financial and stock-related queries. This includes:
 
             - Stock Price: Retrieve real-time or historical stock prices.
@@ -89,45 +95,48 @@ available_tools = OrderedDict(
 
             These tools are ideal for answering finance-related questions or assisting with investment decisions.\
             """
-            ).strip(),
-            "icon": "fa-solid fa-chart-line",
-        },
-        DuckDuckGo: {
-            "name": "Search (DuckDuckGo)",
-            "kwargs": {"fixed_max_results": 3},
-            "extra_instructions": dedent(
-                """\
+        ).strip(),
+        "icon": "fa-solid fa-chart-line",
+    },
+    {
+        "order": 600,
+        "instance": DuckDuckGo(fixed_max_results=3),
+        "name": "Search (DDG)",
+        "extra_instructions": dedent(
+            """\
             Leverage the DuckDuckGo Search tool for quick internet searches, such as finding \
                 up-to-date information,
             verifying facts, or answering questions beyond the scope of the knowledge base.
             Use this tool when a direct query requires additional context or when you need to retrieve concise
             and relevant information (limited to 3 results per search).\
             """
-            ).strip(),
-            "icon": "fa-solid fa-magnifying-glass",
-        },
-        EmailSenderTools: {
-            "name": "Email Sender",
-            "kwargs": {
-                "api_key": extra_settings.resend_api_key,
-                "from_email": extra_settings.resend_email_address,
-            },
-            "extra_instructions": dedent(
-                """\
+        ).strip(),
+        "icon": "fa-solid fa-magnifying-glass",
+    },
+    {
+        "order": 700,
+        "instance": EmailSenderTools(
+            api_key=extra_settings.resend_api_key,
+            from_email=extra_settings.resend_email_address,
+        ),
+        "name": "Email Sender",
+        "extra_instructions": dedent(
+            """\
             Utilize the Email Sender Tools exclusively for sending emails. This tool is designed to:
 
             - Sending emails to the given address, if the email has not been provided ask for it.
 
             This tool is particularly useful for communication tasks requiring email-based delivery or automation.\
             """
-            ).strip(),
-            "icon": "fa-solid fa-envelope",
-        },
-        FileIOTools: {
-            "name": "File IO",
-            "kwargs": {"base_dir": extra_settings.scratch_dir},
-            "extra_instructions": dedent(
-                """\
+        ).strip(),
+        "icon": "fa-solid fa-envelope",
+    },
+    {
+        "order": 800,
+        "instance": FileIOTools(base_dir=extra_settings.scratch_dir),
+        "name": "File IO",
+        "extra_instructions": dedent(
+            """\
             Use the File IO Tools for managing files in the working directory. Specific use cases include:
 
             - Read Files: Open and read content from files when the user uploads or references one.
@@ -137,46 +146,68 @@ available_tools = OrderedDict(
             This tool is helpful for file manipulation tasks, processing user-uploaded data, or \
             saving generated content for future use.\
             """
-            ).strip(),
-            "icon": "fa-solid fa-file-alt",
-        },
-        WebSiteCrawlerTools: {
-            "name": "Website Crawler",
-            "extra_instructions": dedent(
-                """\
+        ).strip(),
+        "icon": "fa-solid fa-file-alt",
+    },
+    {
+        "order": 900,
+        "instance": WebSiteCrawlerTools(),
+        "name": "Website Crawler",
+        "extra_instructions": dedent(
+            """\
             Use the Website Crawler Tools to parse the content of a website and add it to the knowledge base.
             This tool is ideal for integrating external web content into the system for future reference or analysis.
             Use it when the user provides a website URL or requests detailed insights from a web page.
             Ensure the content is relevant and valuable before adding it to the knowledge base to maintain its \
                 quality and relevance.
             """
-            ).strip(),
-            "icon": "fa-solid fa-globe",
-        },
-        Calculator: {
-            "name": "Calculator",
-            "kwargs": {
-                "add": True,
-                "subtract": True,
-                "multiply": True,
-                "divide": True,
-                "exponentiate": True,
-                "factorial": True,
-                "is_prime": True,
-                "square_root": True,
-            },
-            "extra_instructions": dedent(
-                """\
+        ).strip(),
+        "icon": "fa-solid fa-globe",
+    },
+    {
+        "order": 1000,
+        "instance": Calculator(
+            add=True,
+            subtract=True,
+            multiply=True,
+            divide=True,
+            exponentiate=True,
+            factorial=True,
+            is_prime=True,
+            square_root=True,
+        ),
+        "name": "Calculator",
+        "extra_instructions": dedent(
+            """\
             Use the Calculator tool for precise and complex mathematical operations, including addition,
             subtraction, multiplication, division, exponentiation, factorials, checking if a number is prime,
             and calculating square roots. This tool is ideal for mathematical queries, computations,
             or when the user needs help solving equations or understanding numeric concepts.\
             """
-            ).strip(),
-            "icon": "fa-solid fa-calculator",
-        },
-    }
-)
+        ).strip(),
+        "icon": "fa-solid fa-calculator",
+    },
+]
+
+for group, details in COMPOSIO_ACTIONS.items():
+    for order, instance in enumerate(
+        agent_settings.composio_tools.get_tools(actions=details["actions"])
+    ):
+        name = details["name"]
+        instance.description = f"Use `{instance.name} Tool` to {name}"
+        available_tools.append(
+            {
+                "group": name,
+                "order": 500 + order + 1,
+                "instance": instance,
+                "name": instance.name,
+                "icon": details["icon"],
+                "extra_instructions": instance.description,
+            }
+        )
+
+
+available_tools = sorted(available_tools, key=lambda x: x["order"])
 
 
 def get_coordinator(
@@ -217,8 +248,6 @@ def get_coordinator(
 
     conditional_agent_enable(python)
     conditional_agent_enable(journal)
-    conditional_agent_enable(github)
-    conditional_agent_enable(google_calender)
     conditional_agent_enable(patent_writer)
     conditional_agent_enable(funny)
     conditional_agent_enable(linkedin_content_generator)

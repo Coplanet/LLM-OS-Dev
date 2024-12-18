@@ -9,13 +9,13 @@ from .base import Agent, AgentConfig
 
 agent = None
 agent_name = "LinkedIn Agent"
-available_tools = {
-    ExaTools: {
-        "name": "Exa",
-        "kwargs": {"num_results": 5, "text_length_limit": 1000},
+available_tools = [
+    {
+        "instance": ExaTools(num_results=5, text_length_limit=1000),
+        "name": "Search (Exa)",
         "icon": "fa-solid fa-magnifying-glass",
     }
-}
+]
 
 
 def get_agent(config: AgentConfig = None):

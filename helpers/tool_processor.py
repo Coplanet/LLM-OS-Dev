@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from phi.tools import Toolkit
 from phi.tools.function import Function
@@ -8,19 +8,13 @@ from ai.agents.settings import AgentConfig
 from .log import logger
 
 
-def process_tools(
+def _process_tools_dict(
     agent_name: str,
     config: Optional[AgentConfig],
     available_tools: Dict[Toolkit.__class__, dict],
 ) -> Tuple[List[Toolkit], List[str]]:
     tools = []
     extra_instructions = []
-
-    if not config:
-        config = AgentConfig.empty()
-
-    if config.is_empty:
-        config.tools = available_tools
 
     for tool in config.tools or {}:
         if tool in available_tools:
@@ -52,19 +46,13 @@ def process_tools(
     return tools, extra_instructions
 
 
-def process_composio_tools(
+def _process_tools_list(
     agent_name: str,
     config: Optional[AgentConfig],
     available_tools: List[Dict[str, Any]],
 ) -> Tuple[List[Function], List[str]]:
     tools = []
     extra_instructions = []
-
-    if not config:
-        config = AgentConfig.empty()
-
-    if config.is_empty:
-        config.tools = available_tools
 
     available_tools_manifest = {}
 
@@ -81,10 +69,6 @@ def process_composio_tools(
             tool = tool.get("name")
 
         if tool in available_tools_manifest:
-            logger.debug(
-                f"Adding '{tool}' tool to '{agent_name}' with full functionality."
-            )
-
             logger.debug(
                 f"Adding '{tool}' tool to '{agent_name}' with full functionality."
             )
@@ -112,3 +96,27 @@ def process_composio_tools(
             )
 
     return tools, extra_instructions
+
+
+def process_tools(
+    agent_name: str,
+    config: Optional[AgentConfig],
+    available_tools: Union[List[Dict[str, Any]], Dict[Toolkit.__class__, dict]],
+) -> Tuple[List[Toolkit], List[str]]:
+
+    if not config:
+        config = AgentConfig.empty()
+
+    if config.is_empty:
+        config.tools = available_tools
+
+    if isinstance(available_tools, dict):
+        return _process_tools_dict(agent_name, config, available_tools)
+
+    elif isinstance(available_tools, list):
+        return _process_tools_list(agent_name, config, available_tools)
+
+    else:
+        raise ValueError(
+            "Invalid type for available_tools. Expected a dictionary or list."
+        )

@@ -7,7 +7,7 @@ from .base import Agent, AgentConfig
 
 agent = None
 agent_name = "Outlier Funny agent"
-available_tools = {}
+available_tools = []
 
 
 def get_agent(config: AgentConfig = None):
