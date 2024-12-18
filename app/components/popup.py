@@ -148,46 +148,50 @@ def show_popup(session_id, assistant_name, config: AgentConfig, package):
 
             enabled_tools[key] = enable_all or key in enabled_tools
 
+        col_index = 0
+        super_cols = st.columns([0.33, 0.33, 0.33])
+
         for key, manifest in available_tools_manifest.items():
-            # Create columns for layout
-            col1, col2 = st.columns([1, 11])
+            with super_cols[col_index % 3]:
+                icon = manifest["icon"]
+                name = manifest["name"]
+                # Create columns for layout
+                col1, col2 = None, None
 
-            icon = manifest["icon"]
-            name = manifest["name"]
-            # Create columns for layout
-            col1, col2 = None, None
+                if icon:
+                    col1, col2 = st.columns([0.1, 0.9])
+                else:
+                    col1 = st.columns(1)[0]
 
-            if icon:
-                col1, col2 = st.columns([0.05, 0.95])
-            else:
-                col1 = st.columns(1)[0]
-
-            with col1:
-                value: str = st.checkbox(
-                    name,
-                    value=enable_all or (key in enabled_tools),
-                    label_visibility="collapsed" if icon else "visible",
-                    key=f"checkbox_{key}",
-                )
-
-            if icon:
-                with col2:
-                    st.markdown(
-                        f"""
-                        <span style="position: relative">
-                            <span style="top: 17px; position: absolute; width: 100vw;">
-                                <i class="{icon}" style="margin-right: 10px;"></i> {name}
-                            </span>
-                        </span>
-                        """,
-                        unsafe_allow_html=True,
+                with col1:
+                    value: str = st.checkbox(
+                        name,
+                        value=enable_all or (key in enabled_tools),
+                        label_visibility="collapsed" if icon else "visible",
+                        key=f"checkbox_{key}",
+                        help=name,
                     )
 
-            if value:
-                enabled_tools[key] = True
+                if icon:
+                    with col2:
+                        st.markdown(
+                            f"""
+                            <span style="position: relative">
+                                <span style="top: 17px; position: absolute; width: 100vw;">
+                                    <i class="{icon}" style="margin-right: 10px;"></i> {name}
+                                </span>
+                            </span>
+                            """,
+                            unsafe_allow_html=True,
+                        )
 
-            elif key in enabled_tools:
-                del enabled_tools[key]
+                if value:
+                    enabled_tools[key] = True
+
+                elif key in enabled_tools:
+                    del enabled_tools[key]
+
+            col_index += 1
 
     col1, col2 = st.columns(2)
     with col1:
