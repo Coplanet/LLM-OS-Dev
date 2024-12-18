@@ -5,7 +5,6 @@ from app.utils import to_label
 from db.session import get_db_context
 from db.tables import UserConfig
 from helpers.log import logger
-from helpers.utils import to_title
 
 MODELS = {
     "OpenAI": {
@@ -102,34 +101,59 @@ def show_popup(session_id, assistant_name, config: AgentConfig, package):
         st.markdown("---")
         st.markdown("### Agent Tools")
 
-        enabled_tools = {tool.__class__: True for tool in package.agent.tools}
+        config: UserConfig = None
 
-        if isinstance(package.available_tools, dict):
-            available_tools_manifest = package.available_tools
-        else:
-            enabled_tools_ = {}
-            for tool in package.agent.tools:
-                enabled_tools_[tool.name] = True
+        with get_db_context() as db:
+            config = UserConfig.get_models_config(db, session_id)
 
-            for tool in package.available_tools:
-                if not isinstance(tool, dict):
-                    raise ValueError(
-                        f"Tool '{tool.__name__}' is not a dictionary in package '{package.agent_name}'."
-                    )
+        if not config:
+            raise ValueError(f"No config found for session: '{session_id}'")
 
-                available_tools_manifest[tool.get("name")] = tool
-                if tool["instance"].name in enabled_tools_:
-                    enabled_tools[tool.get("name")] = True
+        enabled_tools = config.value_json.get(label, {}).get("tools", {})
+        disable_all = enabled_tools.get("disable_all", False)
+        enable_all = enabled_tools.get("enable_all", not enabled_tools)
 
-        for klass, config in available_tools_manifest.items():
+        if not isinstance(package.available_tools, list):
+            raise ValueError(
+                f"Available tools for '{package.agent_name}' are not a list."
+            )
+
+        for tool in package.available_tools:
+            if not isinstance(tool, dict):
+                raise ValueError(
+                    f"Tool '{tool.__name__}' is not a dictionary in package '{package.agent_name}'."
+                )
+
+            icon = tool.get("icon", None)
+            name = tool.get("name", None)
+            key = name
+
+            if "group" in tool:
+                key = f"group:{tool['group']}"
+                name = tool["group"]
+
+            if name is None:
+                raise ValueError(
+                    f"Tool '{tool.__name__}' is not a dictionary in package '{package.agent_name}'."
+                )
+
+            available_tools_manifest[key] = {
+                "name": name,
+                "icon": icon,
+            }
+
+            if not enable_all:
+                if disable_all or key not in enabled_tools:
+                    continue
+
+            enabled_tools[key] = enable_all or key in enabled_tools
+
+        for key, manifest in available_tools_manifest.items():
             # Create columns for layout
             col1, col2 = st.columns([1, 11])
 
-            name = config.get(
-                "name",
-                to_title(klass.__name__) if hasattr(klass, "__name__") else klass,
-            )
-            icon = config.get("icon", None)
+            icon = manifest["icon"]
+            name = manifest["name"]
             # Create columns for layout
             col1, col2 = None, None
 
@@ -141,9 +165,9 @@ def show_popup(session_id, assistant_name, config: AgentConfig, package):
             with col1:
                 value: str = st.checkbox(
                     name,
-                    value=(klass in enabled_tools),
+                    value=enable_all or (key in enabled_tools),
                     label_visibility="collapsed" if icon else "visible",
-                    key=f"checkbox_{name}",
+                    key=f"checkbox_{key}",
                 )
 
             if icon:
@@ -160,11 +184,10 @@ def show_popup(session_id, assistant_name, config: AgentConfig, package):
                     )
 
             if value:
-                enabled_tools[klass] = True
+                enabled_tools[key] = True
 
-            elif klass in enabled_tools:
-                if klass in enabled_tools:
-                    del enabled_tools[klass]
+            elif key in enabled_tools:
+                del enabled_tools[key]
 
     col1, col2 = st.columns(2)
     with col1:
@@ -178,13 +201,17 @@ def show_popup(session_id, assistant_name, config: AgentConfig, package):
             st.session_state.show_popup = False
             st.session_state["generic_leader"] = None
 
-            tools = {}
-            if available_tools_manifest:
-                tools = {
-                    getattr(k, "__name__", k): True
-                    for k in available_tools_manifest.keys()
-                    if k in enabled_tools
-                }
+            tools = enabled_tools
+
+            if available_tools_manifest and not tools:
+                tools["disable_all"] = True
+
+            if (
+                available_tools_manifest
+                and tools
+                and set(tools.keys()) == set(available_tools_manifest.keys())
+            ):
+                tools["enable_all"] = True
 
             new_configs = {
                 "model_type": provider,

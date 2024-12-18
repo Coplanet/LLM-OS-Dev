@@ -73,10 +73,6 @@ def _process_tools_list(
                 f"Adding '{tool}' tool to '{agent_name}' with full functionality."
             )
 
-            logger.debug(
-                f"Adding '{tool}' tool to '{agent_name}' with full functionality."
-            )
-
             if "instance" not in available_tools_manifest[tool]:
                 raise ValueError(
                     f"Tool '{tool}' does not have an instance in package '{agent_name}'."

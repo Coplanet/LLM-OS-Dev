@@ -144,14 +144,21 @@ def get_selected_assistant_config(session_id, label, package):
     try:
         available_tools_manifest = {}
         if isinstance(package.available_tools, dict):
-            available_tools_manifest = package.available_tools
-        else:
-            for tool in package.available_tools:
-                if not isinstance(tool, dict):
-                    raise ValueError(
-                        f"Tool '{tool.__name__}' is not a dictionary in package '{package.agent_name}'."
-                    )
-                available_tools_manifest[tool.get("name")] = tool
+            raise ValueError("Available tools must be a list of dictionaries")
+
+        for tool in package.available_tools:
+            if not isinstance(tool, dict):
+                raise ValueError(
+                    f"Tool '{tool.__name__}' is not a dictionary in package '{package.agent_name}'."
+                )
+            name = tool.get("name", None)
+            key = name
+
+            if "group" in tool:
+                key = f"group:{tool['group']}"
+            if key not in available_tools_manifest:
+                available_tools_manifest[key] = []
+            available_tools_manifest[key].append(tool)
 
         default_configs = {
             "model_type": "OpenAI",
@@ -173,19 +180,10 @@ def get_selected_assistant_config(session_id, label, package):
                     if key in config.value_json[label]:
                         default_configs[key] = config.value_json[label][key]
         tools = {}
-        for tool, config in available_tools_manifest.items():
-            if (
-                (tool in default_configs["tools"])
-                or (
-                    hasattr(tool, "__name__")
-                    and tool.__name__ in default_configs["tools"]
-                )
-                or (
-                    isinstance(config, dict)
-                    and config.get("name") in default_configs["tools"]
-                )
-            ):
-                tools[tool] = config
+        for key, subtools in available_tools_manifest.items():
+            if key in default_configs["tools"]:
+                for tool in subtools:
+                    tools[tool.get("name")] = tool
 
         return settings.AgentConfig(
             provider=default_configs["model_type"],
@@ -273,11 +271,10 @@ def main() -> None:
             config = get_selected_assistant_config(
                 SID, agent_config.get("label", agent), agent_config.get("package")
             )
-            if config:
-                if agent_config.get("is_leader", False):
-                    LEADER_CONFIG = config
-                else:
-                    AGENTS_CONFIG[agent] = config
+            if agent_config.get("is_leader", False):
+                LEADER_CONFIG = config
+            else:
+                AGENTS_CONFIG[agent] = config
 
         logger.debug("Agents Config: ")
         for agent, config in AGENTS_CONFIG.items():

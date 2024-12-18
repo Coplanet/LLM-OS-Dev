@@ -16,7 +16,7 @@ class IPythonAgent(Agent, PythonAgent):
 
 agent = None
 agent_name = "Python Agent"
-available_tools = {}
+available_tools = []
 
 
 def get_agent(config: AgentConfig = None):
