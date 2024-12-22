@@ -79,7 +79,7 @@ composio-openai==0.5.50
     # via
     #   -r requirements/prod.in
     #   composio-phidata
-composio-phidata==0.5.50
+composio-phidata==0.6.5
     # via -r requirements/prod.in
 cryptography==44.0.0
     # via paramiko

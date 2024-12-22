@@ -17,7 +17,7 @@ python-pptx
 composio_core
 beautifulsoup4
 composio_openai
-composio-phidata
+composio-phidata>=0.6.4
 duckduckgo-search
 google-generativeai
 youtube-transcript-api
