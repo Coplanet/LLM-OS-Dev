@@ -105,21 +105,6 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-with st.expander(":point_down: Examples:"):
-    examples = [
-        "Report on the latest AI technology updates at your choice from YouTube channels.",
-        "Identify the best AI framework on GitHub and star it upon confirmation.",
-        "Summarize a Wikipedia page and YouTube video on quantum computers.",
-    ]
-    for example in examples:
-        st.markdown(
-            f"- {example} <a href='?q={quote(example)}' target='_self'>[Try it!]</a>",
-            unsafe_allow_html=True,
-        )
-    st.markdown(
-        "Feel free to unleash your creativity and explore the full potential of this platform."
-    )
-
 
 def restart_agent():
     logger.debug(">>> Restarting Agent")
@@ -208,6 +193,21 @@ def main() -> None:
     # Get username
     username = "CoPlanet" if getenv("RUNTIME_ENV") == "dev" else get_username_sidebar()
     if username:
+        with st.expander(":point_down: Examples:"):
+            examples = [
+                "Report on the latest AI technology updates at your choice from YouTube channels.",
+                "Identify the best AI framework on GitHub and star it upon confirmation.",
+                "Summarize a Wikipedia page and YouTube video on quantum computers.",
+            ]
+            for example in examples:
+                st.markdown(
+                    f"- {example} <a href='?q={quote(example)}' target='_self'>[Try it!]</a>",
+                    unsafe_allow_html=True,
+                )
+            st.markdown(
+                "Feel free to unleash your creativity and explore the full potential of this platform."
+            )
+
         st.sidebar.info(f":technologist: User: {username}")
     else:
         st.markdown("---")
