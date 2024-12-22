@@ -1,16 +1,18 @@
 name: Build ECR Images
 
-on: workflow_dispatch
+on:
+  push:
+    branches:
+      - main
 
 permissions:
-  # For AWS OIDC Token access as per https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services#updating-your-github-actions-workflow
-  id-token: write # This is required for requesting the JWT
-  contents: read # This is required for actions/checkout
+  id-token: write
+  contents: read
 
 env:
-  ECR_REPO: YOUR ECR REPO
+  ECR_REPO: 577638388865.dkr.ecr.us-east-1.amazonaws.com/llm-os
   # Create role using https://aws.amazon.com/blogs/security/use-iam-roles-to-connect-github-actions-to-actions-in-aws/
-  AWS_ROLE: YOUR_ROLE_ARN
+  AWS_ROLE: arn:aws:iam::577638388865:role/GithubAction
   AWS_REGION: us-east-1
 
 jobs:
@@ -41,4 +43,4 @@ jobs:
           file: Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ${{ env.ECR_REPO }}/agent-app:dev, ${{ env.ECR_REPO }}/agent-app:prd
+          tags: ${{ env.ECR_REPO }}/agent-app:prd
