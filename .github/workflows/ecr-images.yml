@@ -1,6 +1,10 @@
 name: Build and Deploy ECR Images
 
 on:
+  workflow_run:
+    workflows: ["Validate"]
+    types:
+      - completed
   push:
     branches:
       - main
@@ -59,4 +63,5 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
       - name: Deploy with phi
         run: |
+          pip install -Ur requirements/prod.txt &&
           phi ws up --env prd --infra aws -y
