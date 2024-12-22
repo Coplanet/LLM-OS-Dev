@@ -214,6 +214,7 @@ prd_streamlit = Streamlit(
     use_cache=ws_settings.use_cache,
     skip_delete=skip_delete,
     save_output=save_output,
+    force=True,
     # Do not wait for the service to stabilize
     wait_for_create=False,
     # Do not wait for the service to be deleted

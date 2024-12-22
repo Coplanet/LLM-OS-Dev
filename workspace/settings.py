@@ -46,10 +46,6 @@ ws_settings = WorkspaceSettings(
     image_name="agent-app",
     # Repository for the image
     image_repo="577638388865.dkr.ecr.us-east-1.amazonaws.com/llm-os",
-    # Build images locally
-    build_images=True,
-    # Push images after building
-    push_images=True,
 )
 
 
