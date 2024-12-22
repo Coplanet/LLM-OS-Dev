@@ -393,6 +393,10 @@ def get_coordinator(
                 "For example, research agents should only gather and analyze information, while creative "
                 "agents should only work with prepared inputs."
             ),
+            (
+                "**IMPORTANT**: When sending emails, always use HTML format. if the input is not HTML "
+                "(e.g. markdown), convert it to HTML before sending it."
+            ),
         ],
         # This setting adds a tool to search the knowledge base for information
         search_knowledge=True,
