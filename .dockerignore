@@ -28,4 +28,4 @@ env
 .ipynb_checkpoints
 
 requirements/*
-!requirements/prod.txt
+!requirements/prod.in

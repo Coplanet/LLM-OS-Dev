@@ -32,18 +32,24 @@ ws_settings = WorkspaceSettings(
     # Region for AWS resources
     aws_region="us-east-1",
     # Availability Zones for AWS resources
-    aws_az1="us-east-1a",
-    aws_az2="us-east-1b",
+    aws_az1="us-east-1b",
+    aws_az2="us-east-1c",
+    aws_profile="PowerUserAccess-577638388865",
     # Subnet IDs in the aws_region
-    # subnet_ids=["subnet-xyz", "subnet-xyz"],
+    subnet_ids=[
+        "subnet-064e43373507fc6a1",
+        "subnet-02b914b335534c283",
+        "subnet-0ccc7cbf93d781e11",
+    ],
     # -*- Image Settings
     # Name of the image
     image_name="agent-app",
     # Repository for the image
-    image_repo="127.0.0.1:5000",
-    # image_repo="phidata",
+    image_repo="577638388865.dkr.ecr.us-east-1.amazonaws.com/llm-os",
     # Build images locally
     build_images=True,
+    # Push images after building
+    push_images=True,
 )
 
 
