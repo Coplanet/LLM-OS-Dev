@@ -346,14 +346,6 @@ def get_coordinator(
                 "3 attempts, use the `duckduckgo_search` tool to search the internet."
             ),
             (
-                "IMPORTANT: If the user provides a YouTube link or URL, delegate the task to the "
-                "YouTube Assistant team member to fetch and process the full captions of the video."
-            ),
-            (
-                "IMPORTANT: If the user provides a Wikipedia link or URL or asks about Wikipedia, "
-                "delegate the task to the Wikipedia Assistant team member."
-            ),
-            (
                 "If the user asks to summarize the conversation, use the `get_chat_history` "
                 "tool with None as the argument."
             ),
