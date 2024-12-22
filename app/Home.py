@@ -57,7 +57,7 @@ SESSION_KEY = "sid"
 nest_asyncio.apply()
 st.set_page_config(page_title="CoPlanet AI", page_icon=f"{IMAGE_DIR}/favicon.png")
 
-st.title("CoPlanet AI 2")
+st.title("CoPlanet AI")
 st.markdown(
     f"""\
     ##### <img src="{IMAGE_DIR}/coplanet.png" alt="Logo" style="width: 30px; margin-right: 10px;"> \
