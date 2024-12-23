@@ -190,6 +190,8 @@ def show_popup(session_id, assistant_name, config: AgentConfig, package):
 
                 elif key in enabled_tools:
                     del enabled_tools[key]
+                    if "enable_all" in enabled_tools:
+                        del enabled_tools["enable_all"]
 
             col_index += 1
 

@@ -1,5 +1,5 @@
 ipython
-phidata[aws]>=2.7.4
+phidata[aws]>=2.7.5
 
 groq
 xlrd
@@ -10,6 +10,7 @@ resend
 exa-py
 pandas
 openpyxl
+requests
 yfinance
 wikipedia
 sentry-sdk
