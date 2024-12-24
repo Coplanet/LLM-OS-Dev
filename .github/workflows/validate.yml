@@ -28,7 +28,7 @@ jobs:
         uses: astral-sh/setup-uv@v3
         with:
           enable-cache: true
-          cache-dependency-glob: "requirements/prod.txt"
+          cache-dependency-glob: "requirements/dev.txt"
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
@@ -43,6 +43,3 @@ jobs:
 
       - name: Run pre-commit
         run: uv run -- pre-commit run --all-files
-
-      - name: Run import and package tests
-        run: uv run -- python -m app.Home

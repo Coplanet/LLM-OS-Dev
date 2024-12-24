@@ -61,6 +61,7 @@ class AgentSettings(BaseSettings):
 class AgentConfig:
     provider: Optional[str] = None
     model_id: Optional[str] = None
+    model_kwargs: Optional[Dict] = {}
     temperature: Optional[float] = None
     enabled: Optional[bool] = None
     max_tokens: Optional[int] = None
@@ -70,6 +71,7 @@ class AgentConfig:
         self,
         provider: str,
         model_id: str,
+        model_kwargs: Dict,
         temperature: float,
         enabled: bool,
         max_tokens: int,
@@ -77,6 +79,7 @@ class AgentConfig:
     ):
         self.provider = provider
         self.model_id = model_id
+        self.model_kwargs = model_kwargs
         self.temperature = temperature
         self.enabled = enabled
         self.max_tokens = max_tokens
@@ -94,7 +97,7 @@ class AgentConfig:
 
     @classmethod
     def empty(cls):
-        return cls(None, None, None, None, None, {})
+        return cls(None, None, None, None, None, None, {})
 
     def __str__(self):
         return str(
@@ -105,6 +108,7 @@ class AgentConfig:
                 "enabled": self.enabled,
                 "max_tokens": self.max_tokens,
                 "tools": [k for k in self.tools.keys()],
+                "model_kwargs": self.model_kwargs,
             }
         )
 
@@ -114,9 +118,10 @@ class AgentConfig:
     @classmethod
     def default_model(cls):
         return OpenAIChat(
-            id="gpt-4o",
+            id="gpt-4o-audio-preview",
             max_tokens=agent_settings.default_max_completion_tokens,
             temperature=agent_settings.default_temperature,
+            modalities=["text"],
         )
 
     @property
@@ -160,6 +165,7 @@ class AgentConfig:
             temperature=self.temperature,
             max_tokens=self.max_tokens,
             **configs,
+            **self.model_kwargs,
         )
 
 
