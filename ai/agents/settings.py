@@ -118,7 +118,7 @@ class AgentConfig:
     @classmethod
     def default_model(cls):
         return OpenAIChat(
-            id="gpt-4o-audio-preview",
+            id="gpt-4o",
             max_tokens=agent_settings.default_max_completion_tokens,
             temperature=agent_settings.default_temperature,
             modalities=["text"],

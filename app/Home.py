@@ -167,7 +167,7 @@ def get_selected_assistant_config(session_id, label, package):
 
         default_configs = {
             "model_type": "OpenAI",
-            "model_id": "gpt-4o-audio-preview",
+            "model_id": "gpt-4o",
             "model_kwargs": {},
             "temperature": 0,
             "enabled": True,
