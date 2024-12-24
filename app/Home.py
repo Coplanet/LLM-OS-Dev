@@ -1,4 +1,5 @@
 import base64
+import os
 import re
 from io import BytesIO
 from os import getenv
@@ -202,6 +203,8 @@ def get_selected_assistant_config(session_id, label, package):
 
 
 def main() -> None:
+    if os.getenv("TESTING_ENV", False):
+        return
     # Get OpenAI key
     get_openai_key_sidebar()
 
