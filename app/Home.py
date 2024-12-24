@@ -9,6 +9,7 @@ from urllib.parse import quote
 import nest_asyncio
 import sqlalchemy as sql
 import streamlit as st
+from audio_recorder_streamlit import audio_recorder
 from phi.agent import Agent
 from phi.document import Document
 from phi.document.reader import Reader
@@ -48,6 +49,7 @@ from app.utils import to_label
 from db.session import get_db_context
 from db.tables import UserConfig
 from helpers.log import logger
+from helpers.utils import audio2text, audio_text2data, text2audio
 
 STATIC_DIR = "app/static"
 IMAGE_DIR = f"{STATIC_DIR}/images"
@@ -99,6 +101,19 @@ st.markdown(
         }
         .stHorizontalBlock {
             gap: 0.5rem !important;
+        }
+        .st-key-voice_input_container {
+            padding: 0.5rem;
+            border-top: 1px solid #ccc;
+            border-bottom: 1px solid #ccc;
+        }
+        .st-key-voice_input_container:hover {
+            background-color: #f0f0f0;
+        }
+        .st-key-voice_input_recorder {
+            pointer-events:none;
+            opacity: 0.5;
+            color: #ccc;
         }
     </style>
     """,
@@ -416,7 +431,46 @@ def main() -> None:
                 {"role": "assistant", "content": "Ask me anything..."}
             ]
 
-    if prompt := st.chat_input():
+    AUDIO_ERROR = None
+    with st.sidebar:
+        with st.container(key="voice_input_container"):
+            st.warning("This feature is not working in yet!")
+            # define sample rate
+            AUDIO_SAMPLE_RATE = 44_100
+            # Add an audio recorder for voice messages
+            if audio_bytes := audio_recorder(
+                text="Voice Input",
+                icon_size="1x",
+                sample_rate=AUDIO_SAMPLE_RATE,
+                key="voice_input_recorder",
+            ):
+                # expecting the output should be byte
+                if not isinstance(audio_bytes, bytes):
+                    raise Exception("Recorded audio is not an instance of bytes")
+                # reject audio with less than 2 seconds
+                if len(audio_bytes) < 2 * AUDIO_SAMPLE_RATE:
+                    AUDIO_ERROR = st.error(
+                        "Recording cannot be less than 2 seconds!", icon="⚠"
+                    )
+                    audio_bytes = None
+
+                if audio_bytes:
+                    if AUDIO_ERROR:
+                        AUDIO_ERROR.empty()
+                        AUDIO_ERROR = None
+                    logger.debug(
+                        "Audio recorded byte with size of: %s", len(audio_bytes)
+                    )
+
+    # Process the text or audio input
+    if audio_bytes:
+        audio_bytes = audio2text(audio_bytes)
+        # Here you can add logic to process the audio message
+        st.session_state["messages"].append(
+            {"role": "user", "content": [{"type": "audio", "audio": audio_bytes}]}
+        )
+
+    elif prompt := st.chat_input():
         st.session_state["messages"].append({"role": "user", "content": prompt})
 
     last_user_message_container = None
@@ -450,6 +504,11 @@ def main() -> None:
                                 user_last_message_image_render = True
                             else:
                                 user_last_message_image_render = False
+                        elif item["type"] == "audio":
+                            st.audio(
+                                text2audio(item["audio"]),
+                                format="audio/wav",
+                            )
                 else:
                     st.write(content)
 
@@ -457,6 +516,18 @@ def main() -> None:
     last_message = st.session_state["messages"][-1]
     if last_message.get("role") == "user":
         question = last_message["content"]
+        if isinstance(question, list):
+            if question[0].get("type") == "audio":
+                audio_bytes = {
+                    "data": audio_text2data(question[0]["audio"]),
+                    "format": "wav",
+                }
+                question = "Your input prompt is in the audio"
+                generic_leader.memory.add_message(
+                    Message(role="user", content=last_message["content"])
+                )
+                generic_leader.write_to_storage()
+
         with st.chat_message("assistant"):
             with st.spinner("Thinking..."):
                 resp_container = st.empty()
@@ -465,6 +536,7 @@ def main() -> None:
                 for delta in generic_leader.run(
                     message=question,
                     images=uploaded_images,
+                    audio=audio_bytes,
                     stream=True,
                 ):
                     response += delta.content  # type: ignore
@@ -472,6 +544,9 @@ def main() -> None:
                     resp_container.markdown(response)
                 end = time()
                 logger.debug("Time to response: {:.2f} seconds".format(end - start))
+
+                if audio_bytes:
+                    audio_bytes = None
 
             # Get the images
             image_outputs: Optional[List[Image]] = generic_leader.get_images()
