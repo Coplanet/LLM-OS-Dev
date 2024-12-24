@@ -387,6 +387,7 @@ def main() -> None:
                                     "content": chat["response"]["content"],
                                 }
                             )
+
     if agent_chat_history:
         logger.debug("Loading chat history")
         null_content = []
@@ -418,6 +419,8 @@ def main() -> None:
     if prompt := st.chat_input():
         st.session_state["messages"].append({"role": "user", "content": prompt})
 
+    last_user_message_container = None
+    user_last_message_image_render = False
     # Display existing chat messages
     for message in st.session_state["messages"]:
         # Skip system and tool messages
@@ -426,7 +429,12 @@ def main() -> None:
         # Display the message
         message_role = message.get("role")
         if message_role is not None:
-            with st.chat_message(message_role):
+            chat_message_container = st.chat_message(message_role)
+            if message_role == "user":
+                last_user_message_container = chat_message_container
+            else:
+                last_user_message_container = None
+            with chat_message_container:
                 content = message.get("content")
                 if isinstance(content, list):
                     for item in content:
@@ -438,6 +446,10 @@ def main() -> None:
                                 caption=item.get("image_caption"),
                                 use_column_width=True,
                             )
+                            if message_role == "user":
+                                user_last_message_image_render = True
+                            else:
+                                user_last_message_image_render = False
                 else:
                     st.write(content)
 
@@ -463,6 +475,26 @@ def main() -> None:
 
             # Get the images
             image_outputs: Optional[List[Image]] = generic_leader.get_images()
+
+            if uploaded_images and not user_last_message_image_render:
+                memory = generic_leader.read_from_storage().memory
+                if (
+                    memory
+                    and "messages" in memory
+                    and isinstance(memory["messages"], list)
+                    and len(memory["messages"]) > 1
+                ):
+                    previous_message = memory["messages"][-2]
+                    if (
+                        previous_message.get("role") == "user"
+                        and previous_message.get("images")
+                        and isinstance(previous_message["images"], list)
+                        and previous_message["images"]
+                    ):
+                        with last_user_message_container:
+                            for img in previous_message["images"]:
+                                st.image(img)
+
             # Render the images
             if image_outputs:
                 logger.debug("Rendering '{}' images...".format(len(image_outputs)))
@@ -550,6 +582,7 @@ def main() -> None:
                 ),
                 icon="🧠",
             )
+            uploaded_images = []
             for uploaded_file in uploaded_files_:
                 document_name = uploaded_file.name
                 if f"{document_name}_uploaded" not in st.session_state:
@@ -593,9 +626,8 @@ def main() -> None:
                                 )
                                 st.session_state["uploaded_files"].append(document_name)
                             else:
-                                st.session_state["uploaded_images"].append(
-                                    auto_rag_documents
-                                )
+                                for image in auto_rag_documents:
+                                    uploaded_images.append(image.content)
                         else:
                             st.sidebar.error(
                                 "Could not read document: {}".format(document_name)
@@ -613,6 +645,8 @@ def main() -> None:
                             "Could not read document: {}".format(document_name)
                         )
                         continue
+            if uploaded_images:
+                st.session_state["uploaded_images"] = uploaded_images
             st.session_state["file_uploader_key"] += 1
             alert.empty()
 
