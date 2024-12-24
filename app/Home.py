@@ -441,6 +441,7 @@ def main() -> None:
             if audio_bytes := audio_recorder(
                 text="Voice Input",
                 icon_size="1x",
+                pause_threshold=5,
                 sample_rate=AUDIO_SAMPLE_RATE,
                 key="voice_input_recorder",
             ):
@@ -448,7 +449,7 @@ def main() -> None:
                 if not isinstance(audio_bytes, bytes):
                     raise Exception("Recorded audio is not an instance of bytes")
                 # reject audio with less than 2 seconds
-                if len(audio_bytes) < 2 * AUDIO_SAMPLE_RATE:
+                if len(audio_bytes) < 2 * 4 * AUDIO_SAMPLE_RATE:
                     AUDIO_ERROR = st.error(
                         "Recording cannot be less than 2 seconds!", icon="⚠"
                     )
@@ -459,7 +460,9 @@ def main() -> None:
                         AUDIO_ERROR.empty()
                         AUDIO_ERROR = None
                     logger.debug(
-                        "Audio recorded byte with size of: %s", len(audio_bytes)
+                        "Audio recorded: {:,} seconds".format(
+                            len(audio_bytes) / (AUDIO_SAMPLE_RATE * 4)
+                        )
                     )
 
     # Process the text or audio input
