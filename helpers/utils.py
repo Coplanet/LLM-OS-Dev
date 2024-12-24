@@ -9,7 +9,7 @@ def to_title(text: str) -> str:
 def audio_text2data(text: str) -> str:
     splits = text.split(";base64,")
     if len(splits) > 1:
-        return splits[1]
+        return splits[1:]
     return text
 
 

@@ -44,7 +44,7 @@ from ai.document.reader.excel import ExcelReader
 from ai.document.reader.general import GenericReader
 from ai.document.reader.image import ImageReader
 from ai.document.reader.pptx import PPTXReader
-from app.components.popup import show_popup
+from app.components.popup import AUDIO_SUPPORTED_MODELS, show_popup
 from app.components.sidebar import create_sidebar
 from app.utils import to_label
 from db.session import get_db_context
@@ -111,10 +111,11 @@ st.markdown(
         .st-key-voice_input_container:hover {
             background-color: #f0f0f0;
         }
-        .st-key-voice_input_recorder {
-            pointer-events:none;
-            opacity: 0.5;
-            color: #ccc;
+        .st-key-unsupported_model_container {
+            padding: 0.5rem;
+            border: 1px solid #ffa0a0;
+            background-color: #f0f0f0;
+            color: #aa0000;
         }
     </style>
     """,
@@ -166,7 +167,8 @@ def get_selected_assistant_config(session_id, label, package):
 
         default_configs = {
             "model_type": "OpenAI",
-            "model_id": "gpt-4o",
+            "model_id": "gpt-4o-audio-preview",
+            "model_kwargs": {},
             "temperature": 0,
             "enabled": True,
             "max_tokens": agent_settings.default_max_completion_tokens,
@@ -192,6 +194,7 @@ def get_selected_assistant_config(session_id, label, package):
         return settings.AgentConfig(
             provider=default_configs["model_type"],
             model_id=default_configs["model_id"],
+            model_kwargs=default_configs.get("model_kwargs", {}),
             temperature=default_configs["temperature"],
             enabled=default_configs["enabled"],
             max_tokens=default_configs["max_tokens"],
@@ -282,7 +285,7 @@ def main() -> None:
         else None
     )
 
-    LEADER_CONFIG = settings.AgentConfig.empty()
+    COORDINATOR_CONFIG = settings.AgentConfig.empty()
     AGENTS_CONFIG: Dict[str, settings.AgentConfig] = {}
 
     if SID:
@@ -293,7 +296,7 @@ def main() -> None:
                 SID, agent_config.get("label", agent), agent_config.get("package")
             )
             if agent_config.get("is_leader", False):
-                LEADER_CONFIG = config
+                COORDINATOR_CONFIG = config
             else:
                 AGENTS_CONFIG[agent] = config
 
@@ -306,10 +309,10 @@ def main() -> None:
         or st.session_state["generic_leader"] is None
         or (SID and st.session_state["generic_leader"].session_id != SID)
     ):
-        logger.debug(">>> Creating leader agent with config: %s", LEADER_CONFIG)
+        logger.debug(">>> Creating leader agent with config: %s", COORDINATOR_CONFIG)
         coordinator.agent = generic_leader = coordinator.get_coordinator(
             team_config=AGENTS_CONFIG,
-            config=LEADER_CONFIG,
+            config=COORDINATOR_CONFIG,
             session_id=SID,
         )
         st.session_state["generic_leader"] = generic_leader
@@ -367,7 +370,7 @@ def main() -> None:
         agent_config = (
             AGENTS_CONFIG[package.agent_name]
             if not agent.get("is_leader", False)
-            else LEADER_CONFIG
+            else COORDINATOR_CONFIG
         )
         show_popup(SID, selected_assistant, agent_config, package)
         st.session_state.show_popup = False
@@ -524,19 +527,48 @@ def main() -> None:
         question = last_message["content"]
         if isinstance(question, list):
             if question[0].get("type") == "audio":
+                current_audio_upated = bool(audio_bytes)
                 audio_bytes = {
                     "data": audio_text2data(question[0]["audio"]),
                     "format": "wav",
                 }
-                question = "Your input prompt is in the audio"
-                generic_leader.memory.add_message(
-                    Message(role="user", content=last_message["content"])
-                )
-                generic_leader.write_to_storage()
+                question = "Your input prompt is in the audio."
+                if current_audio_upated:
+                    generic_leader.memory.add_message(
+                        Message(role="user", content=last_message["content"])
+                    )
+                    generic_leader.write_to_storage()
 
         with st.chat_message("assistant"):
             with st.spinner("Thinking..."):
                 resp_container = st.empty()
+
+                if audio_bytes:
+                    if (
+                        COORDINATOR_CONFIG.provider not in AUDIO_SUPPORTED_MODELS
+                        or COORDINATOR_CONFIG.model_id
+                        not in AUDIO_SUPPORTED_MODELS[COORDINATOR_CONFIG.provider]
+                    ):
+                        with st.container(key="unsupported_model_container"):
+                            st.markdown(
+                                """
+                                **Unsupported Model!**
+
+                                Audio input is not supported for this model;
+                                Please choose a model that supports audio input:\n\n
+                                | Provider | Model |
+                                | -------- | ----- |
+                                """
+                                + "\n".join(
+                                    [
+                                        f"| {provider} | {model} |"
+                                        for provider, models in AUDIO_SUPPORTED_MODELS.items()
+                                        for model in models
+                                    ]
+                                )
+                            )
+                        return
+
                 response = ""
                 start = time()
                 for delta in generic_leader.run(

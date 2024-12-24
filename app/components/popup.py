@@ -8,6 +8,13 @@ from helpers.log import logger
 
 MODELS = {
     "OpenAI": {
+        "gpt-4o-audio-preview": {
+            "max_temperature": 2,
+            "max_token_size": agent_settings.default_max_completion_tokens,
+            "kwargs": {
+                "modalities": ["text"],
+            },
+        },
         "gpt-4o": {
             "max_temperature": 2,
             "max_token_size": agent_settings.default_max_completion_tokens,
@@ -45,6 +52,12 @@ MODELS = {
             "max_token_size": 32_000,
         },
         "llama-3.3-70b-versatile": {"max_temperature": 2, "max_token_size": 32_000},
+    },
+}
+
+AUDIO_SUPPORTED_MODELS = {
+    "OpenAI": {
+        "gpt-4o-audio-preview",
     },
 }
 
@@ -222,6 +235,7 @@ def show_popup(session_id, assistant_name, config: AgentConfig, package):
             new_configs = {
                 "model_type": provider,
                 "model_id": model_id,
+                "model_kwargs": MODEL_CONFIG.get("kwargs", {}),
                 "temperature": temperature,
                 "max_tokens": max_tokens,
                 "tools": tools,
