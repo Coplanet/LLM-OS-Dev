@@ -3,7 +3,7 @@ import os
 import re
 from io import BytesIO
 from os import getenv
-from time import time
+from time import sleep, time
 from typing import Dict, List, Optional
 from urllib.parse import quote
 
@@ -29,24 +29,17 @@ from phi.tools.streamlit.components import (
 )
 from PIL import Image as PILImage
 
-from ai.agents import (
-    base,
-    funny,
-    journal,
-    linkedin_content_generator,
-    patent_writer,
-    python,
-    settings,
-)
+from ai.agents import base, settings
 from ai.agents.settings import agent_settings
+from ai.agents.voice_transcriptor import voice2prompt
 from ai.coordinators import generic as coordinator
 from ai.document.reader.excel import ExcelReader
 from ai.document.reader.general import GenericReader
 from ai.document.reader.image import ImageReader
 from ai.document.reader.pptx import PPTXReader
-from app.components.popup import AUDIO_SUPPORTED_MODELS, show_popup
+from app.components.available_agents import AGENTS
+from app.components.popup import show_popup
 from app.components.sidebar import create_sidebar
-from app.utils import to_label
 from db.session import get_db_context
 from db.tables import UserConfig
 from helpers.log import logger
@@ -54,6 +47,7 @@ from helpers.utils import audio2text, audio_text2data, text2audio
 
 STATIC_DIR = "app/static"
 IMAGE_DIR = f"{STATIC_DIR}/images"
+CSS_DIR = f"{STATIC_DIR}/css"
 
 SESSION_KEY = "sid"
 
@@ -72,55 +66,10 @@ st.markdown(
     """<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.0/css/all.min.css">""",
     unsafe_allow_html=True,
 )
-st.markdown(
-    """
-    <style>
-        /* Target the sidebar container */
-        [data-testid="stSidebarContent"] {
-            overflow-x: hidden;
-        }
-        .st-key-delete_knowledge_base button,
-        .st-key-delete_all_session_button button {
-            color: #fff;
-            background-color: #dc3545;
-            border-color: #dc3545;
-        }
-        .st-key-delete_knowledge_base button:hover,
-        .st-key-delete_all_session_button button:hover {
-            color: #fff;
-            background-color: #c82333;
-            border-color: #bd2130;
-        }
-        .row-widget.stCheckbox {
-            min-height: unset !important;
-        }
-        .stColumn {
-            overflow-x: hidden;
-        }
-        .stVerticalBlock {
-            gap: 0.75rem !important;
-        }
-        .stHorizontalBlock {
-            gap: 0.5rem !important;
-        }
-        .st-key-voice_input_container {
-            padding: 0.5rem;
-            border-top: 1px solid #ccc;
-            border-bottom: 1px solid #ccc;
-        }
-        .st-key-voice_input_container:hover {
-            background-color: #f0f0f0;
-        }
-        .st-key-unsupported_model_container {
-            padding: 0.5rem;
-            border: 1px solid #ffa0a0;
-            background-color: #f0f0f0;
-            color: #aa0000;
-        }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
+
+# load css
+with open(f"{CSS_DIR}/main.css", "r") as file:
+    st.markdown(f"<style>{file.read()}</style>", unsafe_allow_html=True)
 
 
 def restart_agent():
@@ -239,43 +188,6 @@ def main() -> None:
     if "show_popup" not in st.session_state:
         st.session_state.show_popup = False
         st.session_state.selected_assistant = None
-
-    # Define agents dictionary
-    AGENTS = {
-        coordinator.agent_name: {
-            "icon": "fa-solid fa-sitemap",
-            "selectable": False,
-            "is_leader": True,
-            "label": to_label(coordinator.agent_name),
-            "get_agent": coordinator.get_coordinator,
-            "package": coordinator,
-        },
-        journal.agent_name: {
-            "label": to_label(journal.agent_name),
-            "get_agent": journal.get_agent,
-            "package": journal,
-        },
-        python.agent_name: {
-            "label": to_label(python.agent_name),
-            "get_agent": python.get_agent,
-            "package": python,
-        },
-        patent_writer.agent_name: {
-            "label": to_label(patent_writer.agent_name),
-            "get_agent": patent_writer.get_agent,
-            "package": patent_writer,
-        },
-        linkedin_content_generator.agent_name: {
-            "label": to_label(linkedin_content_generator.agent_name),
-            "get_agent": linkedin_content_generator.get_agent,
-            "package": linkedin_content_generator,
-        },
-        funny.agent_name: {
-            "label": to_label(funny.agent_name),
-            "get_agent": funny.get_agent,
-            "package": funny,
-        },
-    }
 
     # Get the Agent
     generic_leader: Agent
@@ -440,7 +352,6 @@ def main() -> None:
     AUDIO_ERROR = None
     with st.sidebar:
         with st.container(key="voice_input_container"):
-            st.warning("This feature is not working in yet!")
             # define sample rate
             AUDIO_SAMPLE_RATE = 44_100
             # Add an audio recorder for voice messages
@@ -479,7 +390,7 @@ def main() -> None:
             {"role": "user", "content": [{"type": "audio", "audio": audio_bytes}]}
         )
 
-    elif prompt := st.chat_input():
+    if prompt := st.chat_input():
         st.session_state["messages"].append({"role": "user", "content": prompt})
 
     last_user_message_container = None
@@ -523,17 +434,14 @@ def main() -> None:
 
     # If last message is from a user, generate a new response
     last_message = st.session_state["messages"][-1]
+
     if last_message.get("role") == "user":
         question = last_message["content"]
         if isinstance(question, list):
             if question[0].get("type") == "audio":
-                current_audio_upated = bool(audio_bytes)
-                audio_bytes = {
-                    "data": audio_text2data(question[0]["audio"]),
-                    "format": "wav",
-                }
-                question = "Your input prompt is in the audio."
-                if current_audio_upated:
+                current_audio_uploaded = bool(audio_bytes)
+                audio_bytes = audio_text2data(question[0]["audio"])
+                if current_audio_uploaded:
                     generic_leader.memory.add_message(
                         Message(role="user", content=last_message["content"])
                     )
@@ -541,47 +449,58 @@ def main() -> None:
 
         with st.chat_message("assistant"):
             with st.spinner("Thinking..."):
+                response = ""
                 resp_container = st.empty()
+                voice_transcribe: bool = False
+                is_prompt: bool = False
+                prompt: str = ""
+
+                start = time()
 
                 if audio_bytes:
-                    if (
-                        COORDINATOR_CONFIG.provider not in AUDIO_SUPPORTED_MODELS
-                        or COORDINATOR_CONFIG.model_id
-                        not in AUDIO_SUPPORTED_MODELS[COORDINATOR_CONFIG.provider]
+                    is_prompt, prompt, transcription = voice2prompt(audio_bytes)
+                    audio_bytes = None
+
+                    if is_prompt:
+                        question = prompt
+
+                    else:
+                        generic_leader.memory.add_message(
+                            Message(role="assistant", content=prompt)
+                        )
+                        generic_leader.write_to_storage()
+
+                        voice_transcribe = True
+                        for world in transcription.split(" "):
+                            response += world + " "
+                            resp_container.markdown(response)
+                            sleep(0.1)
+
+                if not voice_transcribe:
+                    for delta in generic_leader.run(
+                        message=question,
+                        images=uploaded_images,
+                        audio=audio_bytes,
+                        stream=True,
                     ):
-                        with st.container(key="unsupported_model_container"):
-                            st.markdown(
-                                """
-                                **Unsupported Model!**
+                        response += delta.content  # type: ignore
+                        response = re.sub(
+                            r"[\n\s]*!\[[^\]]+?\]\([^\)]+?\)", "", response
+                        )
+                        resp_container.markdown(response)
 
-                                Audio input is not supported for this model;
-                                Please choose a model that supports audio input:\n\n
-                                | Provider | Model |
-                                | -------- | ----- |
-                                """
-                                + "\n".join(
-                                    [
-                                        f"| {provider} | {model} |"
-                                        for provider, models in AUDIO_SUPPORTED_MODELS.items()
-                                        for model in models
-                                    ]
-                                )
-                            )
-                        return
-
-                response = ""
-                start = time()
-                for delta in generic_leader.run(
-                    message=question,
-                    images=uploaded_images,
-                    audio=audio_bytes,
-                    stream=True,
-                ):
-                    response += delta.content  # type: ignore
-                    response = re.sub(r"[\n\s]*!\[[^\]]+?\]\([^\)]+?\)", "", response)
-                    resp_container.markdown(response)
                 end = time()
                 logger.debug("Time to response: {:.2f} seconds".format(end - start))
+
+                if not voice_transcribe and is_prompt and prompt:
+                    # remove the last role="user" message because since it's the generated prompt
+                    # we have already have the input voice in message history and we don't need to
+                    # store it the transcripted voice in the memory
+                    for i in range(len(generic_leader.memory.messages) - 1, -1, -1):
+                        if generic_leader.memory.messages[i].role == "user":
+                            del generic_leader.memory.messages[i]
+                            break
+                    generic_leader.write_to_storage()
 
                 if audio_bytes:
                     audio_bytes = None

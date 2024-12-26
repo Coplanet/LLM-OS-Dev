@@ -1,0 +1,43 @@
+
+/* Target the sidebar container */
+[data-testid="stSidebarContent"] {
+    overflow-x: hidden;
+}
+.st-key-delete_knowledge_base button,
+.st-key-delete_all_session_button button {
+    color: #fff;
+    background-color: #dc3545;
+    border-color: #dc3545;
+}
+.st-key-delete_knowledge_base button:hover,
+.st-key-delete_all_session_button button:hover {
+    color: #fff;
+    background-color: #c82333;
+    border-color: #bd2130;
+}
+.row-widget.stCheckbox {
+    min-height: unset !important;
+}
+.stColumn {
+    overflow-x: hidden;
+}
+.stVerticalBlock {
+    gap: 0.75rem !important;
+}
+.stHorizontalBlock {
+    gap: 0.5rem !important;
+}
+.st-key-voice_input_container {
+    padding: 0.5rem;
+    border-top: 1px solid #ccc;
+    border-bottom: 1px solid #ccc;
+}
+.st-key-voice_input_container:hover {
+    background-color: #f0f0f0;
+}
+.st-key-unsupported_model_container {
+    padding: 0.5rem;
+    border: 1px solid #ffa0a0;
+    background-color: #f0f0f0;
+    color: #aa0000;
+}

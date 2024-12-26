@@ -56,6 +56,7 @@ MODELS = {
 }
 
 AUDIO_SUPPORTED_MODELS = {
+    "Google": {"gemini-2.0-flash-exp"},
     "OpenAI": {
         "gpt-4o-audio-preview",
     },
