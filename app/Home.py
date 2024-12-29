@@ -403,6 +403,10 @@ def main() -> None:
         # Display the message
         message_role = message.get("role")
         if message_role is not None:
+            # Skip audio messages for now
+            if message_role == "user" and isinstance(message.get("content"), list):
+                if message.get("content")[0].get("type") == "audio":
+                    continue
             chat_message_container = st.chat_message(message_role)
             if message_role == "user":
                 last_user_message_container = chat_message_container
@@ -424,7 +428,8 @@ def main() -> None:
                                 user_last_message_image_render = True
                             else:
                                 user_last_message_image_render = False
-                        elif item["type"] == "audio":
+                        # We disable audio rendering for now
+                        elif item["type"] == "audio" and False:
                             st.audio(
                                 text2audio(item["audio"]),
                                 format="audio/wav",
@@ -455,10 +460,14 @@ def main() -> None:
                 is_prompt: bool = False
                 prompt: str = ""
 
-                start = time()
-
                 if audio_bytes:
+                    start = time()
                     is_prompt, prompt, transcription = voice2prompt(audio_bytes)
+                    end = time()
+                    logger.debug(
+                        "Time to voice2prompt: {:.2f} seconds".format(end - start)
+                    )
+
                     audio_bytes = None
 
                     if is_prompt:
@@ -477,6 +486,7 @@ def main() -> None:
                             sleep(0.1)
 
                 if not voice_transcribe:
+                    start = time()
                     for delta in generic_leader.run(
                         message=question,
                         images=uploaded_images,
@@ -489,8 +499,12 @@ def main() -> None:
                         )
                         resp_container.markdown(response)
 
-                end = time()
-                logger.debug("Time to response: {:.2f} seconds".format(end - start))
+                    end = time()
+                    logger.debug(
+                        "Time to response from coordinator: {:.2f} seconds".format(
+                            end - start
+                        )
+                    )
 
                 if not voice_transcribe and is_prompt and prompt:
                     # remove the last role="user" message because since it's the generated prompt
