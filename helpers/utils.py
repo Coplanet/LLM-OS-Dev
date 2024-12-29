@@ -13,13 +13,12 @@ def audio_text2data(text: str) -> str:
     return text
 
 
+def audio_encode(audio_bytes: bytes) -> str:
+    return base64.b64encode(audio_bytes).decode("utf-8")
+
+
 def audio2text(audio_bytes: bytes, format: str = "wav") -> str:
-    return (
-        "data:audio/"
-        + format
-        + ";base64,"
-        + base64.b64encode(audio_bytes).decode("utf-8")
-    )
+    return "data:audio/" + format + ";base64," + audio_encode(audio_bytes)
 
 
 def text2audio(text: str) -> bytes:

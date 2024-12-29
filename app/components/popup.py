@@ -12,7 +12,8 @@ MODELS = {
             "max_temperature": 2,
             "max_token_size": agent_settings.default_max_completion_tokens,
             "kwargs": {
-                "modalities": ["text"],
+                "modalities": ["text", "audio"],
+                "audio": {"voice": "alloy", "format": "wav"},
             },
         },
         "gpt-4o": {

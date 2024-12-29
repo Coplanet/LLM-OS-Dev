@@ -42,6 +42,14 @@ agent = Agent(
             do not generate a prompt for the next agent.
             """
         ).strip(),
+        (
+            "**VERY CRITICAL:** Keep the language of the transcription and prompt same as the "
+            "original input voice if possible."
+        ),
+        (
+            "**IMPORTANT:** If user haven't EXPLICITLY asked for TRANSCRIPTION, Make sure you "
+            "generate a prompt for the next agent."
+        ),
         "Next agent prompt is anything except the audio transcription.",
         "If the transcription is not clear, return an empty string for the next agent's prompt.",
         "**IMPORTANT:** Be very specific in the next agent's prompt, do not be vague.",
