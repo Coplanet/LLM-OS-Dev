@@ -1,12 +1,14 @@
 import base64
 import os
 import re
+import tempfile
 from io import BytesIO
 from os import getenv
 from time import sleep, time
 from typing import Dict, List, Optional
 from urllib.parse import quote
 
+import google.generativeai as genai
 import nest_asyncio
 import sqlalchemy as sql
 import streamlit as st
@@ -453,6 +455,58 @@ def main() -> None:
                     generic_leader.write_to_storage()
 
         with st.chat_message("assistant"):
+            uploaded_videos_ = []
+            uploaded_videos = st.session_state.get("uploaded_videos", [])
+            if uploaded_videos:
+                if COORDINATOR_CONFIG.provider != "Google":
+                    st.error("Videos are only supported for Google provider")
+                else:
+                    with st.spinner("Uploading videos..."):
+                        if "genai_uploaded_videos" not in st.session_state:
+                            st.session_state["genai_uploaded_videos"] = {}
+
+                        for video in uploaded_videos:
+                            # if already uploaded?
+                            if (
+                                video.file_id
+                                in st.session_state["genai_uploaded_videos"]
+                            ):
+                                uploaded_videos_.append(
+                                    st.session_state["genai_uploaded_videos"][
+                                        video.file_id
+                                    ]
+                                )
+                                continue
+                            # store audio bytes in a temp file
+                            with tempfile.NamedTemporaryFile(
+                                suffix="." + video.name.split(".")[-1]
+                            ) as temp_file:
+                                temp_file.write(video.read())
+                                temp_file_path = temp_file.name
+                                while True:
+                                    gfile = genai.upload_file(
+                                        temp_file_path, mime_type=video.type
+                                    )
+                                    if gfile and gfile.state.name != "FAILED":
+                                        break
+                                uploaded_videos_.append(gfile)
+
+                            st.session_state["genai_uploaded_videos"][
+                                video.file_id
+                            ] = gfile
+
+                        all_uploaded = False
+                        while not all_uploaded:
+                            all_uploaded = True
+                            for gfile in uploaded_videos_:
+                                if (
+                                    genai.get_file(gfile.name).state.name
+                                    == "PROCESSING"
+                                ):
+                                    all_uploaded = False
+                                    sleep(1)
+                                    break
+
             with st.spinner("Thinking..."):
                 response = ""
                 resp_container = st.empty()
@@ -487,9 +541,11 @@ def main() -> None:
 
                 if not voice_transcribe:
                     start = time()
+
                     for delta in generic_leader.run(
                         message=question,
                         images=uploaded_images,
+                        videos=uploaded_videos_,
                         audio=audio_bytes,
                         stream=True,
                     ):
@@ -617,7 +673,7 @@ def main() -> None:
         if "file_uploader_key" not in st.session_state:
             st.session_state["file_uploader_key"] = 100
         uploaded_files_ = st.sidebar.file_uploader(
-            "Add a Document (image files, .pdf, .csv, .pptx, .txt, .md, .docx, .json, .xlsx, .xls and etc)",
+            "Add a Document (video & image files, .pdf, .csv, .pptx, .txt, .md, .docx, .json, .xlsx, .xls and etc)",
             key=st.session_state["file_uploader_key"],
             accept_multiple_files=True,
         )
@@ -629,13 +685,20 @@ def main() -> None:
                 icon="🧠",
             )
             uploaded_images = []
+            uploaded_videos = []
             for uploaded_file in uploaded_files_:
                 document_name = uploaded_file.name
                 if f"{document_name}_uploaded" not in st.session_state:
                     file_type = uploaded_file.name.split(".")[-1].lower()
 
                     reader: Reader
-                    if file_type == "pdf":
+
+                    if file_type in ["mp4", "avi", "mkv", "mov", "wmv", "flv", "webm"]:
+                        if "uploaded_videos" not in st.session_state:
+                            st.session_state["uploaded_videos"] = []
+                        st.session_state["uploaded_videos"].append(uploaded_file)
+                        continue
+                    elif file_type == "pdf":
                         reader = PDFReader()
                     elif file_type == "csv":
                         reader = CSVReader()
