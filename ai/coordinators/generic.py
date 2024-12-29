@@ -7,7 +7,6 @@ from phi.knowledge.pdf import PDFKnowledgeBase, PDFReader
 from phi.storage.agent.postgres import PgAgentStorage
 from phi.tools.arxiv_toolkit import ArxivToolkit
 from phi.tools.calculator import Calculator
-from phi.tools.dalle import Dalle
 from phi.tools.duckduckgo import DuckDuckGo
 from phi.tools.wikipedia import WikipediaTools
 from phi.tools.yfinance import YFinanceTools
@@ -19,6 +18,7 @@ from ai.agents.base import AgentTeam
 from ai.agents.settings import AgentConfig, agent_settings
 from ai.tools.email import EmailSenderTools
 from ai.tools.file import FileIOTools
+from ai.tools.stability import Stability
 from ai.tools.website_crawler import WebSiteCrawlerTools
 from db.session import db_url
 from db.settings import db_settings
@@ -34,12 +34,12 @@ agent_name = "Coordinator"
 available_tools = [
     {
         "order": 100,
-        "instance": Dalle(),
-        "name": "DALL-E",
+        "instance": Stability(),
+        "name": "Stability",
         "extra_instructions": dedent(
             """\
-                Use the Dalle tool to generate images.
-                """
+            Use the Stability tool to generate images.
+            """
         ).strip(),
         "icon": "fa-solid fa-image",
     },
