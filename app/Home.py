@@ -652,6 +652,10 @@ def main() -> None:
 
             # Render the images
             if image_outputs:
+                image_outputs_ = {}
+                for img in image_outputs:
+                    image_outputs_[img.id] = img
+                image_outputs = list(image_outputs_.values())
                 logger.debug("Rendering '{}' images...".format(len(image_outputs)))
                 contents = []
                 contents.append({"type": "text", "text": response})
