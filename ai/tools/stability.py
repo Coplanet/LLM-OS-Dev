@@ -1,3 +1,4 @@
+import base64
 import io
 import os
 from hashlib import sha256
@@ -58,6 +59,137 @@ class Stability(Toolkit):
             )
 
         self.register(self.create_image)
+        self.register(self.search_and_replace)
+
+    def _req(
+        self,
+        url: str,
+        data: dict = {},
+        files: dict = {"none": ""},
+    ) -> requests.Response:
+        if "output_format" not in data:
+            data["output_format"] = self.output_format
+
+        if "aspect_ratio" not in data:
+            data["aspect_ratio"] = self.aspect_ratio
+
+        return requests.post(
+            url,
+            headers={"authorization": f"Bearer {self.api_key}", "accept": "image/*"},
+            files=files,
+            data=data,
+        )
+
+    def _store_in_s3(
+        self,
+        agent: Agent,
+        response: requests.Response,
+        original_prompt: str = "",
+        revised_prompt: str = "",
+        **include_in_name,
+    ) -> str:
+        if "original_prompt" not in include_in_name:
+            include_in_name["original_prompt"] = original_prompt
+
+        if "revised_prompt" not in include_in_name:
+            include_in_name["revised_prompt"] = revised_prompt
+
+        if not original_prompt:
+            original_prompt = include_in_name["original_prompt"]
+
+        if not revised_prompt:
+            revised_prompt = include_in_name["revised_prompt"]
+
+        if not revised_prompt:
+            revised_prompt = original_prompt
+
+        file_name = "{}/{}-{}-{}.{}".format(
+            self.s3_path,
+            self.model,
+            sha256(str(include_in_name).encode()).hexdigest(),
+            time(),
+            self.output_format,
+        )
+        if response.status_code == 200:
+            # upload to AWS S3
+            session = boto3.Session(
+                aws_access_key_id=self.s3_access_key,
+                aws_secret_access_key=self.s3_secret_key,
+                region_name=self.s3_region,
+            )
+
+            s3_client = session.client("s3")
+            # Wrap the response content in a BytesIO object
+            file_obj = io.BytesIO(response.content)
+            s3_client.upload_fileobj(
+                file_obj,
+                self.s3_bucket,
+                file_name,
+            )
+            # get the url presigned
+            url = s3_client.generate_presigned_url(
+                "get_object",
+                Params={"Bucket": self.s3_bucket, "Key": file_name},
+                ExpiresIn=3600 * 24 * 30,
+            )
+
+        else:
+            raise Exception(str(response.json()))
+
+        logger.debug("Image generated successfully")
+
+        # Update the run response with the image URLs
+        agent.add_image(
+            Image(
+                id=file_name,
+                url=url,
+                original_prompt=original_prompt,
+                revised_prompt=revised_prompt,
+            )
+        )
+        return "Image has been generated successfully and will be displayed below"
+
+    def _latest_user_image(self, agent: Agent) -> Optional[bytes]:
+        for index in list(range(len(agent.run_response.messages) - 1, -1, -1)):
+            if (
+                agent.run_response.messages[index].role == "user"
+                and agent.run_response.messages[index].images
+            ):
+                return base64.b64decode(
+                    agent.run_response.messages[index].images[-1].split("base64,")[1]
+                )
+
+        return None
+
+    def search_and_replace(self, agent: Agent, prompt: str, search_prompt: str) -> str:
+        """Use this function to search for a prompt and replace it with the new prompt.
+        for the same prompt don't send parallel requests. it will be handled by the toolkit.
+        it will parse the latest user images and edit them.
+
+        Args:
+            prompt (str): The new image's prompt to replace.
+            search_prompt (str): The prompt to search objects or areas in the image.
+
+        Returns:
+            str: A message indicating if the image has been generated successfully or an error message.
+        """
+        image = self._latest_user_image(agent)
+
+        if not image:
+            return "No image found"
+
+        response = self._req(
+            "https://api.stability.ai/v2beta/stable-image/edit/search-and-replace",
+            files={"image": image},
+            data={
+                "prompt": prompt,
+                "search_prompt": search_prompt,
+            },
+        )
+
+        self._store_in_s3(agent, response, prompt, f"{prompt} -> {search_prompt}")
+
+        return "Image has been edited successfully and will be displayed below"
 
     def create_image(self, agent: Agent, prompt: str) -> str:
         """Use this function to generate an image for a prompt.
@@ -73,66 +205,16 @@ class Stability(Toolkit):
 
         try:
             logger.debug(f"Generating image using prompt: {prompt}")
-            response = requests.post(
+
+            response = self._req(
                 f"https://api.stability.ai/v2beta/stable-image/generate/{self.model}",
-                headers={
-                    "authorization": f"Bearer {self.api_key}",
-                    "accept": "image/*",
-                },
-                files={"none": ""},
                 data={
                     "prompt": prompt,
-                    "output_format": self.output_format,
-                    "aspect_ratio": self.aspect_ratio,
                 },
             )
 
-            file_name = "{}/{}-{}-{}.{}".format(
-                self.s3_path,
-                self.model,
-                sha256(prompt.encode()).hexdigest(),
-                time(),
-                self.output_format,
-            )
+            return self._store_in_s3(agent, response, prompt)
 
-            if response.status_code == 200:
-                # upload to AWS S3
-                session = boto3.Session(
-                    aws_access_key_id=self.s3_access_key,
-                    aws_secret_access_key=self.s3_secret_key,
-                    region_name=self.s3_region,
-                )
-
-                s3_client = session.client("s3")
-                # Wrap the response content in a BytesIO object
-                file_obj = io.BytesIO(response.content)
-                s3_client.upload_fileobj(
-                    file_obj,
-                    self.s3_bucket,
-                    file_name,
-                )
-                # get the url presigned
-                url = s3_client.generate_presigned_url(
-                    "get_object",
-                    Params={"Bucket": self.s3_bucket, "Key": file_name},
-                    ExpiresIn=3600 * 24 * 30,
-                )
-
-            else:
-                raise Exception(str(response.json()))
-
-            logger.debug("Image generated successfully")
-
-            # Update the run response with the image URLs
-            agent.add_image(
-                Image(
-                    id=file_name,
-                    url=url,
-                    original_prompt=prompt,
-                    revised_prompt=prompt,
-                )
-            )
-            return "Image has been generated successfully and will be displayed below"
         except Exception as e:
             logger.error(f"Failed to generate image: {e}")
             return f"Error: {e}"
