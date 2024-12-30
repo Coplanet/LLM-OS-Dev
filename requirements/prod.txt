@@ -72,16 +72,16 @@ click==8.1.7
     #   streamlit
     #   typer
     #   uvicorn
-composio-core==0.5.50
+composio-core==0.6.7
     # via
     #   -r requirements/prod.in
     #   composio-openai
     #   composio-phidata
-composio-openai==0.5.50
+composio-openai==0.6.7
     # via
     #   -r requirements/prod.in
     #   composio-phidata
-composio-phidata==0.6.5
+composio-phidata==0.6.7
     # via -r requirements/prod.in
 cryptography==44.0.0
     # via paramiko

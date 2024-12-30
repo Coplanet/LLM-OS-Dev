@@ -2,6 +2,7 @@ import streamlit as st
 from audio_recorder_streamlit import audio_recorder
 from phi.agent.agent import Agent
 from phi.model.openai import OpenAIChat
+from phi.tools.wikipedia import WikipediaTools
 
 from ai.agents.voice_transcriptor import voice2prompt
 from helpers.utils import text2audio
@@ -13,6 +14,7 @@ agent = Agent(
         modalities=["text", "audio"],
         audio={"voice": "alloy", "format": "wav"},
     ),
+    tools=[WikipediaTools()],
     instructions=[
         "Always respond to the user in voice format.",
         "Your input is in text format. but your response should be in voice format.",
@@ -20,6 +22,8 @@ agent = Agent(
     ],
     description="You are a helpful assistant. You are able to understand and respond to the user's voice input.",
     markdown=True,
+    read_chat_history=True,
+    num_history_responses=6,
 )
 
 # Streamlit page configuration

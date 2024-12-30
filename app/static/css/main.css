@@ -41,3 +41,7 @@
     background-color: #f0f0f0;
     color: #aa0000;
 }
+.st-key-voice_input_recorder_disabled {
+    pointer-events: none;
+    opacity: 0.5;
+}

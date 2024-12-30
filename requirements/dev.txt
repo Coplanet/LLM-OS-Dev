@@ -85,16 +85,16 @@ click==8.1.7
     #   uvicorn
 colorama==0.4.6
     # via djlint
-composio-core==0.5.50
+composio-core==0.6.7
     # via
     #   -r requirements/prod.in
     #   composio-openai
     #   composio-phidata
-composio-openai==0.5.50
+composio-openai==0.6.7
     # via
     #   -r requirements/prod.in
     #   composio-phidata
-composio-phidata==0.6.5
+composio-phidata==0.6.7
     # via -r requirements/prod.in
 coverage==7.6.8
     # via -r requirements/dev.in

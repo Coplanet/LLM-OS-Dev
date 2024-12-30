@@ -24,11 +24,14 @@ from phi.document.reader.text import TextReader
 from phi.document.reader.website import WebsiteReader
 from phi.model.content import Image
 from phi.model.message import Message
+from phi.storage.agent.postgres import PgAgentStorage
 from phi.tools.streamlit.components import (
     check_password,
     get_openai_key_sidebar,
     get_username_sidebar,
 )
+from phi.utils.log import logger as phi_logger
+from phi.utils.log import logging
 from PIL import Image as PILImage
 
 from ai.agents import base, settings
@@ -40,12 +43,15 @@ from ai.document.reader.general import GenericReader
 from ai.document.reader.image import ImageReader
 from ai.document.reader.pptx import PPTXReader
 from app.components.available_agents import AGENTS
-from app.components.popup import show_popup
+from app.components.popup import AUDIO_SUPPORTED_MODELS, show_popup
 from app.components.sidebar import create_sidebar
 from db.session import get_db_context
+from db.settings import db_settings
 from db.tables import UserConfig
 from helpers.log import logger
 from helpers.utils import audio2text, audio_text2data, text2audio
+
+phi_logger.setLevel(logging.DEBUG)
 
 STATIC_DIR = "app/static"
 IMAGE_DIR = f"{STATIC_DIR}/images"
@@ -354,6 +360,10 @@ def main() -> None:
     AUDIO_ERROR = None
     with st.sidebar:
         with st.container(key="voice_input_container"):
+            AUDIO_RESPONSE_SUPPORT = (
+                COORDINATOR_CONFIG.provider == "OpenAI"
+                and COORDINATOR_CONFIG.model_id in AUDIO_SUPPORTED_MODELS["OpenAI"]
+            )
             # define sample rate
             AUDIO_SAMPLE_RATE = 44_100
             # Add an audio recorder for voice messages
@@ -362,7 +372,8 @@ def main() -> None:
                 icon_size="1x",
                 pause_threshold=5,
                 sample_rate=AUDIO_SAMPLE_RATE,
-                key="voice_input_recorder",
+                key="voice_input_recorder"
+                + ("" if AUDIO_RESPONSE_SUPPORT else "_disabled"),
             ):
                 # expecting the output should be byte
                 if not isinstance(audio_bytes, bytes):
@@ -383,6 +394,21 @@ def main() -> None:
                             len(audio_bytes) / (AUDIO_SAMPLE_RATE * 4)
                         )
                     )
+            response_in_voice = st.checkbox(
+                "Response in Voice", value=False, disabled=not AUDIO_RESPONSE_SUPPORT
+            )
+            if not AUDIO_RESPONSE_SUPPORT:
+                st.warning(
+                    "You need to user following models in OpenAI to receive audio response: {}".format(
+                        ", ".join(AUDIO_SUPPORTED_MODELS["OpenAI"])
+                    )
+                )
+            if response_in_voice:
+                generic_leader.storage = None
+            else:
+                generic_leader.storage = PgAgentStorage(
+                    table_name="agent_sessions", db_url=db_settings.get_db_url()
+                )
 
     # Process the text or audio input
     if audio_bytes:
@@ -507,14 +533,13 @@ def main() -> None:
                                     sleep(1)
                                     break
 
-            with st.spinner("Thinking..."):
-                response = ""
-                resp_container = st.empty()
-                voice_transcribe: bool = False
-                is_prompt: bool = False
-                prompt: str = ""
+            voice_transcribe: bool = False
+            is_prompt: bool = False
+            prompt: str = ""
+            audio_bytes_ = audio_bytes
 
-                if audio_bytes:
+            if audio_bytes:
+                with st.spinner("Listening..."):
                     start = time()
                     is_prompt, prompt, transcription = voice2prompt(audio_bytes)
                     end = time()
@@ -522,26 +547,24 @@ def main() -> None:
                         "Time to voice2prompt: {:.2f} seconds".format(end - start)
                     )
 
-                    audio_bytes = None
+                audio_bytes = None
 
-                    if is_prompt:
-                        question = prompt
+                if is_prompt:
+                    question = prompt
 
-                    else:
-                        generic_leader.memory.add_message(
-                            Message(role="assistant", content=prompt)
-                        )
-                        generic_leader.write_to_storage()
+                else:
+                    voice_transcribe = True
+                    question = (
+                        "Read the following text and respond to it: " + transcription
+                    )
+                question += "\n\n**RESPONSE WITH AUDIO.**"
 
-                        voice_transcribe = True
-                        for world in transcription.split(" "):
-                            response += world + " "
-                            resp_container.markdown(response)
-                            sleep(0.1)
+            with st.spinner("Thinking..."):
+                response = ""
+                resp_container = st.empty()
+                start = time()
 
-                if not voice_transcribe:
-                    start = time()
-
+                if not AUDIO_RESPONSE_SUPPORT or not response_in_voice:
                     for delta in generic_leader.run(
                         message=question,
                         images=uploaded_images,
@@ -554,26 +577,56 @@ def main() -> None:
                             r"[\n\s]*!\[[^\]]+?\]\([^\)]+?\)", "", response
                         )
                         resp_container.markdown(response)
-
-                    end = time()
-                    logger.debug(
-                        "Time to response from coordinator: {:.2f} seconds".format(
-                            end - start
-                        )
+                else:
+                    generic_leader.run(
+                        message="Answer the input audio.",
+                        images=uploaded_images,
+                        videos=uploaded_videos_,
+                        audio={"data": audio_text2data(audio_bytes_), "format": "wav"},
                     )
 
-                if not voice_transcribe and is_prompt and prompt:
-                    # remove the last role="user" message because since it's the generated prompt
-                    # we have already have the input voice in message history and we don't need to
-                    # store it the transcripted voice in the memory
-                    for i in range(len(generic_leader.memory.messages) - 1, -1, -1):
-                        if generic_leader.memory.messages[i].role == "user":
-                            del generic_leader.memory.messages[i]
-                            break
-                    generic_leader.write_to_storage()
+                end = time()
+                logger.debug(
+                    "Time to response from coordinator: {:.2f} seconds".format(
+                        end - start
+                    )
+                )
 
-                if audio_bytes:
-                    audio_bytes = None
+            if AUDIO_RESPONSE_SUPPORT:
+                if (
+                    generic_leader.run_response.response_audio is not None
+                    and "data" in generic_leader.run_response.response_audio
+                ):
+                    with st.container(key="response_audio"):
+                        # flake8: noqa: E501
+                        st.markdown(
+                            f"""
+                            <audio controls autoplay="true" style="display: none" id="audio-{generic_leader.run_response.response_audio["id"]}">
+                                <source src="data:audio/wav;base64,{generic_leader.run_response.response_audio["data"]}" type="audio/wav">
+                            </audio>
+                            <script>
+                                setTimeout(function() {{
+                                    document.getElementById("audio-{generic_leader.run_response.response_audio["id"]}").play()
+                                }}, 300)
+                            </script>
+                            """,
+                            unsafe_allow_html=True,
+                        )
+                else:
+                    st.error("No audio response!")
+
+            if not voice_transcribe and is_prompt and prompt:
+                # remove the last role="user" message because since it's the generated prompt
+                # we have already have the input voice in message history and we don't need to
+                # store it the transcripted voice in the memory
+                for i in range(len(generic_leader.memory.messages) - 1, -1, -1):
+                    if generic_leader.memory.messages[i].role == "user":
+                        del generic_leader.memory.messages[i]
+                        break
+                generic_leader.write_to_storage()
+
+            if audio_bytes:
+                audio_bytes = None
 
             # Get the images
             image_outputs: Optional[List[Image]] = generic_leader.get_images()

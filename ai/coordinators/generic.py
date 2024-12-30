@@ -194,7 +194,6 @@ for group, details in COMPOSIO_ACTIONS.items():
         agent_settings.composio_tools.get_tools(actions=details["actions"])
     ):
         name = details["name"]
-        instance.description = f"Use `{instance.name} Tool` to {name}"
         available_tools.append(
             {
                 "group": name,
@@ -202,7 +201,6 @@ for group, details in COMPOSIO_ACTIONS.items():
                 "instance": instance,
                 "name": instance.name,
                 "icon": details["icon"],
-                "extra_instructions": instance.description,
             }
         )
 
@@ -273,6 +271,108 @@ def get_coordinator(
         num_documents=5,
     )
 
+    instructions = [
+        dedent(
+            """\
+            WORKFLOW: When the user sends a message, first **think** and determine if:
+                - You need to search the knowledge base (limited to 3 attempts with specific refinements).
+                - You need to answer using the tools available to you.
+                - You need to search the internet if the knowledge base does not yield results.
+                - You need to delegate the task to a team member.
+                - You need to ask a clarifying question.
+
+            After you conclude your thought process, **respond** to the user with the appropriate action in the given order above.\
+            """
+        ).strip(),
+        (
+            "IMPORTANT: If the user asks about a topic, **FIRST** attempt to search your knowledge "
+            "base using the `search_knowledge_base` tool **up to 3 times**. Each attempt "
+            "should refine the query for better results. If no relevant results are found "
+            "after 3 attempts, proceed to follow your WORKFLOW and skip the knowledge base."
+        ),
+        (
+            "VERY IMPORTANT: When an agent/tool didn't return anything **when it supposed to return something**, retry and **enforce** the agent to return the result. "
+            "Make sure to **think** before retrying and enforce the agent to return the result if the empty result is accepted or not. "
+            "**NOTE** If the agent returns **error message**, don't retry and just return the error message."
+        ),
+        (
+            "VERY IMPORTANT: Remember, **as a leader**, your primary role is to delegate effectively and "
+            "empower your agent team. Before diving into any task yourself, consider whether it can be "
+            "assigned to your team members."
+        ),
+        (
+            "IMPORTANT: **Prioritize** using **your available tools** before considering delegation. "
+            "If no suitable tool is found, delegate the task to the appropriate team member."
+        ),
+        (
+            "IMPORTANT: If you do not find relevant information in the knowledge base after "
+            "3 attempts, use the `duckduckgo_search` tool to search the internet."
+        ),
+        (
+            "If the user asks to summarize the conversation, use the `get_chat_history` "
+            "tool with None as the argument."
+        ),
+        "If the user's message is unclear, ask clarifying questions to get more information.",
+        (
+            "When gathering information, limit redundant searches and avoid repeated attempts "
+            "on the same query or slight variations. Focus on concise, accurate queries."
+        ),
+        "Carefully read the information you have gathered and provide a clear and concise answer to the user.",
+        "Do not use phrases like 'based on my knowledge' or 'depending on the information'.",
+        dedent(
+            """\
+            TASK DECOMPOSITION: For complex tasks that require multiple steps:
+            1. Break down the task into clear, sequential sub-tasks
+            2. Execute each sub-task independently using the appropriate tool or team member
+            3. Use the output from each step as input for the next step
+            4. Maintain the specific role boundaries of each team member
+
+            For example:
+            - If a task requires gathering information first, complete that step before processing
+            - If multiple sources need to be analyzed, gather all sources before synthesis
+            - If content needs to be transformed (e.g., into an agent), gather all inputs before delegation
+
+            DELEGATION RULES:
+            1. Each team member has a specific role - do not ask them to perform tasks outside their expertise
+            2. Gather all necessary inputs before delegating a creative or synthesis task
+            3. When multiple team members are needed, coordinate their outputs in sequence
+            4. Always validate the output of each step before proceeding to the next\
+            """
+        ).strip(),
+        (
+            "VERY IMPORTANT: When handling multi-step tasks, explicitly state your step-by-step plan "
+            "before execution and ensure each team member focuses solely on their specialized role."
+        ),
+        (
+            "CRITICAL: Never ask a team member to perform tasks outside their designated function. "
+            "For example, research agents should only gather and analyze information, while creative "
+            "agents should only work with prepared inputs."
+        ),
+        (
+            "**IMPORTANT**: When sending emails, always use HTML format. if the input is not HTML "
+            "(e.g. markdown), convert it to HTML before sending it."
+        ),
+    ]
+
+    description = dedent(
+        """\
+        You are the most advanced AI system in the world called ` LLM OS`.
+        You have access to a set of tools and a team of AI Assistants at your disposal.
+        Your goal is to assist the user in the best way possible.
+        """
+    ).strip()
+
+    if config.provider == "OpenAI" and config.model_id == "gpt-4o-audio-preview":
+        instructions += [
+            "**RED-LINE CRITICAL:** Always respond to the user in voice format.",
+            "**RED-LINE CRITICAL:** Your input is in text format. but your response should be in voice format.",
+            "**RED-LINE CRITICAL:** Your response should be in voice format. Do not respond in text format.",
+        ]
+        description += (
+            "\nYou are a helpful assistant. "
+            "You are able to understand and respond to the user's voice input."
+        )
+
     logger.debug("Loading the knowledge base (recreate=False).")
 
     # flake8: noqa: E501
@@ -296,100 +396,19 @@ def get_coordinator(
         ),
         introduction=dedent(
             """\
-                Hi, I'm your LLM OS.
-                I have access to a set of tools and AI Assistants to assist you.
-                Lets get started!\
-                """
+            Hi, I'm your LLM OS.
+            I have access to a set of tools and AI Assistants to assist you.
+            Lets get started!\
+            """
         ),
         description=dedent(
             """\
-                You are the most advanced AI system in the world called ` LLM OS`.
-                You have access to a set of tools and a team of AI Assistants at your disposal.
-                Your goal is to assist the user in the best way possible.\
-                """
+            You are the most advanced AI system in the world called ` LLM OS`.
+            You have access to a set of tools and a team of AI Assistants at your disposal.
+            Your goal is to assist the user in the best way possible.\
+            """
         ),
-        instructions=[
-            dedent(
-                """\
-                WORKFLOW: When the user sends a message, first **think** and determine if:
-                    - You need to search the knowledge base (limited to 3 attempts with specific refinements).
-                    - You need to answer using the tools available to you.
-                    - You need to search the internet if the knowledge base does not yield results.
-                    - You need to delegate the task to a team member.
-                    - You need to ask a clarifying question.
-
-                After you conclude your thought process, **respond** to the user with the appropriate action in the given order above.\
-                """
-            ).strip(),
-            (
-                "IMPORTANT: If the user asks about a topic, **FIRST** attempt to search your knowledge "
-                "base using the `search_knowledge_base` tool **up to 3 times**. Each attempt "
-                "should refine the query for better results. If no relevant results are found "
-                "after 3 attempts, proceed to follow your WORKFLOW and skip the knowledge base."
-            ),
-            (
-                "VERY IMPORTANT: When an agent/tool didn't return anything **when it supposed to return something**, retry and **enforce** the agent to return the result. "
-                "Make sure to **think** before retrying and enforce the agent to return the result if the empty result is accepted or not. "
-                "**NOTE** If the agent returns **error message**, don't retry and just return the error message."
-            ),
-            (
-                "VERY IMPORTANT: Remember, **as a leader**, your primary role is to delegate effectively and "
-                "empower your agent team. Before diving into any task yourself, consider whether it can be "
-                "assigned to your team members."
-            ),
-            (
-                "IMPORTANT: **Prioritize** using **your available tools** before considering delegation. "
-                "If no suitable tool is found, delegate the task to the appropriate team member."
-            ),
-            (
-                "IMPORTANT: If you do not find relevant information in the knowledge base after "
-                "3 attempts, use the `duckduckgo_search` tool to search the internet."
-            ),
-            (
-                "If the user asks to summarize the conversation, use the `get_chat_history` "
-                "tool with None as the argument."
-            ),
-            "If the user's message is unclear, ask clarifying questions to get more information.",
-            (
-                "When gathering information, limit redundant searches and avoid repeated attempts "
-                "on the same query or slight variations. Focus on concise, accurate queries."
-            ),
-            "Carefully read the information you have gathered and provide a clear and concise answer to the user.",
-            "Do not use phrases like 'based on my knowledge' or 'depending on the information'.",
-            dedent(
-                """\
-                TASK DECOMPOSITION: For complex tasks that require multiple steps:
-                1. Break down the task into clear, sequential sub-tasks
-                2. Execute each sub-task independently using the appropriate tool or team member
-                3. Use the output from each step as input for the next step
-                4. Maintain the specific role boundaries of each team member
-
-                For example:
-                - If a task requires gathering information first, complete that step before processing
-                - If multiple sources need to be analyzed, gather all sources before synthesis
-                - If content needs to be transformed (e.g., into an agent), gather all inputs before delegation
-
-                DELEGATION RULES:
-                1. Each team member has a specific role - do not ask them to perform tasks outside their expertise
-                2. Gather all necessary inputs before delegating a creative or synthesis task
-                3. When multiple team members are needed, coordinate their outputs in sequence
-                4. Always validate the output of each step before proceeding to the next\
-                """
-            ).strip(),
-            (
-                "VERY IMPORTANT: When handling multi-step tasks, explicitly state your step-by-step plan "
-                "before execution and ensure each team member focuses solely on their specialized role."
-            ),
-            (
-                "CRITICAL: Never ask a team member to perform tasks outside their designated function. "
-                "For example, research agents should only gather and analyze information, while creative "
-                "agents should only work with prepared inputs."
-            ),
-            (
-                "**IMPORTANT**: When sending emails, always use HTML format. if the input is not HTML "
-                "(e.g. markdown), convert it to HTML before sending it."
-            ),
-        ],
+        instructions=instructions,
         # This setting adds a tool to search the knowledge base for information
         search_knowledge=True,
         # This setting adds a tool to get chat history

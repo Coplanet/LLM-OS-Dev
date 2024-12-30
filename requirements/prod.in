@@ -15,10 +15,10 @@ yfinance
 wikipedia
 sentry-sdk
 python-pptx
-composio_core
 beautifulsoup4
-composio_openai
-composio-phidata>=0.6.4
+composio_openai>=0.6.7
+composio-core>=0.6.7
+composio-phidata>=0.6.7
 duckduckgo-search
 google-generativeai
 youtube-transcript-api
