@@ -639,19 +639,25 @@ def main() -> None:
                     and isinstance(memory["messages"], list)
                     and len(memory["messages"]) > 1
                 ):
-                    previous_message = memory["messages"][-2]
-                    if (
-                        previous_message.get("role") == "user"
-                        and previous_message.get("images")
-                        and isinstance(previous_message["images"], list)
-                        and previous_message["images"]
-                    ):
-                        with last_user_message_container:
-                            for img in previous_message["images"]:
-                                st.image(img)
+                    for index in range(len(memory["messages"]) - 1, -1, -1):
+                        previous_message = memory["messages"][index]
+                        if (
+                            previous_message.get("role") == "user"
+                            and previous_message.get("images")
+                            and isinstance(previous_message["images"], list)
+                            and previous_message["images"]
+                        ):
+                            with last_user_message_container:
+                                for img in previous_message["images"]:
+                                    st.image(img)
+                            break
 
             # Render the images
             if image_outputs:
+                image_outputs_ = {}
+                for img in image_outputs:
+                    image_outputs_[img.id] = img
+                image_outputs = list(image_outputs_.values())
                 logger.debug("Rendering '{}' images...".format(len(image_outputs)))
                 contents = []
                 contents.append({"type": "text", "text": response})
