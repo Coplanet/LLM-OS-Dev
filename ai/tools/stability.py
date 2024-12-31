@@ -60,6 +60,8 @@ class Stability(Toolkit):
 
         self.register(self.create_image)
         self.register(self.search_and_replace)
+        self.register(self.outpaint)
+        self.register(self.remove_background)
 
     def _req(
         self,
@@ -151,24 +153,83 @@ class Stability(Toolkit):
 
     def _latest_user_image(self, agent: Agent) -> Optional[bytes]:
         for index in list(range(len(agent.run_response.messages) - 1, -1, -1)):
-            if (
-                agent.run_response.messages[index].role == "user"
-                and agent.run_response.messages[index].images
-            ):
+            if agent.run_response.messages[index].images:
                 return base64.b64decode(
                     agent.run_response.messages[index].images[-1].split("base64,")[1]
                 )
 
         return None
 
-    def search_and_replace(self, agent: Agent, prompt: str, search_prompt: str) -> str:
+    def outpaint(
+        self,
+        agent: Agent,
+        prompt: Optional[str] = None,
+        creativity: Optional[float] = 0.5,
+        top: Optional[int] = 0,
+        left: Optional[int] = 0,
+        bottom: Optional[int] = 0,
+        right: Optional[int] = 0,
+    ) -> str:
+        """
+        Use this function to outpaint an image.
+        This function Inserts additional content in an image to fill in the space in any direction.
+        Compared to other automated or manual attempts to expand the content in an image,
+        the Outpaint service should minimize artifacts and signs that the original image has been edited.
+
+        Args:
+            prompt (str): What you wish to see in the output image. A strong, descriptive prompt \
+                that clearly defines elements, colors, and subjects will lead to better results.
+            creativity (float): A value between 0 and 1 that controls the likelihood of creating \
+                additional details not heavily conditioned by the initial image.
+            top (int): The number of pixels to outpaint on the top side.
+            left (int): The number of pixels to outpaint on the left side.
+            bottom (int): The number of pixels to outpaint on the bottom side.
+            right (int): The number of pixels to outpaint on the right side.
+
+        Returns:
+            str: A message indicating the result.
+        """
+        image = self._latest_user_image(agent)
+
+        if not image:
+            return "No image found"
+
+        response = self._req(
+            "https://api.stability.ai/v2beta/stable-image/edit/outpaint",
+            files={"image": image},
+            data={
+                "left": left,
+                "down": bottom,
+                "right": right,
+                "up": top,
+                "prompt": prompt,
+                "creativity": creativity,
+            },
+        )
+
+        self._store_in_s3(agent, response, f"outpaint {left} {bottom}")
+
+        return "Image has been edited successfully and will be displayed below"
+
+    def search_and_replace(
+        self,
+        agent: Agent,
+        prompt: str,
+        search_prompt: str,
+        grow_mask: Optional[int] = 3,
+        negative_prompt: Optional[str] = None,
+    ) -> str:
         """Use this function to search for a prompt and replace it with the new prompt.
         for the same prompt don't send parallel requests. it will be handled by the toolkit.
-        it will parse the latest user images and edit them.
+        it will parse the latest user images and edit them. Don't use it to remove background.
 
         Args:
             prompt (str): The new image's prompt to replace.
             search_prompt (str): The prompt to search objects or areas in the image.
+            negative_prompt (str): A blurb of text describing what you do not wish to see in the output image.
+            grow_mask (int): Grows the edges of the mask outward in all directions by the specified number of pixels. \
+                The expanded area around the mask will be blurred, which can help smooth the transition between \
+                inpainted content and the original image.
 
         Returns:
             str: A message indicating if the image has been generated successfully or an error message.
@@ -184,10 +245,33 @@ class Stability(Toolkit):
             data={
                 "prompt": prompt,
                 "search_prompt": search_prompt,
+                "grow_mask": grow_mask,
+                "negative_prompt": negative_prompt,
             },
         )
 
         self._store_in_s3(agent, response, prompt, f"{prompt} -> {search_prompt}")
+
+        return "Image has been edited successfully and will be displayed below"
+
+    def remove_background(self, agent: Agent) -> str:
+        """Use this function to Remove Background accurately segments the foreground
+        from an image and implements and removes the background.
+
+        Returns:
+            str: A message indicating if the image has been generated successfully or an error message.
+        """
+        image = self._latest_user_image(agent)
+
+        if not image:
+            return "No image found"
+
+        response = self._req(
+            "https://api.stability.ai/v2beta/stable-image/edit/remove-background",
+            files={"image": image},
+        )
+
+        self._store_in_s3(agent, response, "remove background", "remove background")
 
         return "Image has been edited successfully and will be displayed below"
 
