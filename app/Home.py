@@ -147,10 +147,16 @@ def check_bypass_key():
         hash = st.query_params["h"]
         username = st.query_params["u"]
         if (
-            hash
-            == hashlib.sha256(
-                f"{timestamp}{extra_settings.secret_key}{bypass_key}{username}".encode()
-            ).hexdigest()
+            bypass_key
+            and timestamp
+            and hash
+            and username
+            and (
+                hash
+                == hashlib.sha256(
+                    f"{timestamp}{extra_settings.secret_key}{bypass_key}{username}".encode()
+                ).hexdigest()
+            )
         ):
             result = True
 
