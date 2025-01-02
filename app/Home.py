@@ -15,6 +15,7 @@ import sqlalchemy as sql
 import streamlit as st
 import streamlit.components.v1 as components
 from audio_recorder_streamlit import audio_recorder
+from bs4 import BeautifulSoup
 from phi.agent import Agent
 from phi.document import Document
 from phi.document.reader import Reader
@@ -142,8 +143,10 @@ def check_bypass_key():
             ).hexdigest()
         ):
             st.session_state["bypass_key"] = True
-            return True
-    return False
+    else:
+        st.session_state["bypass_key"] = False
+
+    return st.session_state["bypass_key"]
 
 
 def restart_agent():
@@ -266,6 +269,9 @@ def main() -> None:
         logger.error(e)
         st.warning("Could not create Agent session, is the database running?")
         return
+
+    if not st.session_state["bypass_key"]:
+        get_bypass_key(SID, add_to_query_params=True)
 
     # Initialize session state for popup control
     if "show_popup" not in st.session_state:
@@ -908,9 +914,21 @@ def main() -> None:
             if "summary" in session.memory and "topics" in session.memory["summary"]:
                 # Convert Unix timestamp to datetime
                 session_date = datetime.fromtimestamp(session.created_at).date()
+                topics = []
+                for topic in session.memory["summary"]["topics"]:
+                    if len(topics) >= 3:
+                        break
+                    # purge html from topic and only add if not empty do it with beautifulsoup
+                    topic = BeautifulSoup(topic, "html.parser").get_text().strip()
+                    if topic:
+                        topics.append(topic)
+
+                if not topics:
+                    topics.append("No topics found")
+
                 session_info = {
                     "id": session.session_id,
-                    "topics": ", ".join(session.memory["summary"]["topics"][:3]),
+                    "topics": ", ".join(topics),
                 }
                 if session_date == today:
                     session_options["Today"].append(session_info)
