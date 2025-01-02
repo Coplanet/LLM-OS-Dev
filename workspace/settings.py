@@ -60,6 +60,7 @@ class Settings:
     resend_email_address: Optional[str] = os.getenv(
         "RESEND_EMAIL_ADDRESS", "info@test.coplanet.com"
     )
+    secret_key: Optional[str] = os.getenv("SECRET_KEY", None)
 
     @property
     def scratch_dir(self):

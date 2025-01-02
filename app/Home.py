@@ -1,10 +1,8 @@
-import base64
 import hashlib
 import os
 import re
 import tempfile
 from datetime import datetime, timedelta
-from io import BytesIO
 from os import getenv
 from time import sleep, time
 from typing import Dict, List, Optional
@@ -32,7 +30,6 @@ from phi.storage.agent.postgres import PgAgentStorage
 from phi.tools.streamlit.components import check_password, get_username_sidebar
 from phi.utils.log import logger as phi_logger
 from phi.utils.log import logging
-from PIL import Image as PILImage
 
 from ai.agents import base, settings
 from ai.agents.settings import agent_settings
@@ -50,6 +47,7 @@ from db.settings import db_settings
 from db.tables import UserConfig
 from helpers.log import logger
 from helpers.utils import audio2text, audio_text2data, text2audio
+from workspace.settings import extra_settings
 
 phi_logger.setLevel(logging.DEBUG)
 
@@ -57,7 +55,7 @@ STATIC_DIR = "app/static"
 IMAGE_DIR = f"{STATIC_DIR}/images"
 CSS_DIR = f"{STATIC_DIR}/css"
 
-SESSION_KEY = "sid"
+SESSION_KEY = "s"
 
 nest_asyncio.apply()
 st.set_page_config(page_title="CoPlanet AI", page_icon=f"{IMAGE_DIR}/favicon.png")
@@ -110,25 +108,42 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# JavaScript to detect theme and attach color-scheme class to stApp
-# st_javascript("""
-# (function() {
-#     const appElement = window.parent.document.getElementsByClassName("stApp")[0];
-#     const currentTheme = window.getComputedStyle(appElement).getPropertyValue("color-scheme").trim();
 
-#     // Remove existing theme classes
-#     appElement.classList.remove('dark', 'light');
+def get_bypass_key(
+    session_id: Optional[str] = None, add_to_query_params: Optional[bool] = False
+):
+    if session_id is None:
+        session_id = st.session_state[SESSION_KEY]
+    bypass_key = str(uuid4())
+    now = time()
+    hash = hashlib.sha256(
+        f"{now}{extra_settings.secret_key}{bypass_key}".encode()
+    ).hexdigest()
+    obj = {
+        SESSION_KEY: session_id,
+        "bk": bypass_key,
+        "t": now,
+        "h": hash,
+    }
+    if add_to_query_params:
+        st.query_params.update(obj)
+    return obj
 
-#     // Add the current theme class
-#     if (currentTheme === 'dark') {
-#         appElement.classList.add('dark');
-#     } else if (currentTheme === 'light') {
-#         appElement.classList.add('light');
-#     }
-# })();
-# """, key="theme-detection-script")
 
-# ... existing code ...
+def check_bypass_key():
+    if "bk" in st.query_params and "t" in st.query_params and "h" in st.query_params:
+        bypass_key = st.query_params["bk"]
+        timestamp = st.query_params["t"]
+        hash = st.query_params["h"]
+        if (
+            hash
+            == hashlib.sha256(
+                f"{timestamp}{extra_settings.secret_key}{bypass_key}".encode()
+            ).hexdigest()
+        ):
+            st.session_state["bypass_key"] = True
+            return True
+    return False
 
 
 def restart_agent():
@@ -142,14 +157,6 @@ def restart_agent():
     if "image_uploader_key" in st.session_state:
         st.session_state["image_uploader_key"] += 1
     st.rerun()
-
-
-def encode_image(image_file):
-    image = PILImage.open(image_file)
-    buffer = BytesIO()
-    image.save(buffer, format="JPEG")
-    encoding = base64.b64encode(buffer.getvalue()).decode("utf-8")
-    return f"data:image/jpeg;base64,{encoding}"
 
 
 def get_selected_assistant_config(session_id, label, package):
@@ -929,8 +936,7 @@ def main() -> None:
             for session in sessions:
                 session_id = session["id"]
                 topics = session["topics"]
-                query_string = urlencode({SESSION_KEY: session_id})
-                link = f"?{query_string}"
+                link = "?{}".format(urlencode(get_bypass_key(session_id)))
                 st.sidebar.markdown(
                     f"""
                     <div class="sidebar-session-link">
@@ -956,9 +962,8 @@ def main() -> None:
             if options:
 
                 def on_older_session_change():
-                    st.query_params[SESSION_KEY] = st.session_state[
-                        "older_sessions_selectbox"
-                    ]
+                    session_id = st.session_state["older_sessions_selectbox"]
+                    get_bypass_key(session_id, add_to_query_params=True)
                     st.rerun()
 
                 st.sidebar.selectbox(
@@ -996,5 +1001,5 @@ def main() -> None:
             restart_agent()
 
 
-if check_password():
+if check_bypass_key() or check_password():
     main()
