@@ -111,20 +111,23 @@ st.markdown(
 
 
 def get_bypass_key(
-    session_id: Optional[str] = None, add_to_query_params: Optional[bool] = False
+    session_id: Optional[str] = None,
+    username: Optional[str] = None,
+    add_to_query_params: Optional[bool] = False,
 ):
     if session_id is None:
         session_id = st.session_state[SESSION_KEY]
     bypass_key = str(uuid4())
     now = time()
     hash = hashlib.sha256(
-        f"{now}{extra_settings.secret_key}{bypass_key}".encode()
+        f"{now}{extra_settings.secret_key}{bypass_key}{username}".encode()
     ).hexdigest()
     obj = {
         SESSION_KEY: session_id,
         "bk": bypass_key,
         "t": now,
         "h": hash,
+        "u": username,
     }
     if add_to_query_params:
         st.query_params.update(obj)
@@ -132,14 +135,20 @@ def get_bypass_key(
 
 
 def check_bypass_key():
-    if "bk" in st.query_params and "t" in st.query_params and "h" in st.query_params:
+    if (
+        "bk" in st.query_params
+        and "t" in st.query_params
+        and "h" in st.query_params
+        and "u" in st.query_params
+    ):
         bypass_key = st.query_params["bk"]
         timestamp = st.query_params["t"]
         hash = st.query_params["h"]
+        username = st.query_params["u"]
         if (
             hash
             == hashlib.sha256(
-                f"{timestamp}{extra_settings.secret_key}{bypass_key}".encode()
+                f"{timestamp}{extra_settings.secret_key}{bypass_key}{username}".encode()
             ).hexdigest()
         ):
             st.session_state["bypass_key"] = True
@@ -228,7 +237,13 @@ def main() -> None:
         return
 
     # Get username
-    username = "CoPlanet" if getenv("RUNTIME_ENV") == "dev" else get_username_sidebar()
+    username = "CoPlanet"
+    if getenv("RUNTIME_ENV") != "dev":
+        if st.session_state["bypass_key"]:
+            username = st.query_params["u"]
+        else:
+            username = get_username_sidebar()
+
     if username:
         with st.expander(":point_down: Examples:"):
             examples = [
