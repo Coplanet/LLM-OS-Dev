@@ -10,6 +10,7 @@ import boto3
 import requests
 from phi.agent import Agent
 from phi.model.content import Image
+from phi.model.message import Message
 from phi.tools import Toolkit
 from phi.utils.log import logger
 
@@ -124,15 +125,12 @@ class Stability(Toolkit):
             # Wrap the response content in a BytesIO object
             file_obj = io.BytesIO(response.content)
             s3_client.upload_fileobj(
-                file_obj,
-                self.s3_bucket,
-                file_name,
+                file_obj, self.s3_bucket, file_name, ExtraArgs={"ACL": "public-read"}
             )
-            # get the url presigned
-            url = s3_client.generate_presigned_url(
-                "get_object",
-                Params={"Bucket": self.s3_bucket, "Key": file_name},
-                ExpiresIn=3600 * 24 * 30,
+            url = "https://{}.s3.{}.amazonaws.com/{}".format(
+                self.s3_bucket,
+                s3_client.meta.region_name,
+                file_name,
             )
 
         else:
@@ -149,6 +147,19 @@ class Stability(Toolkit):
                 revised_prompt=revised_prompt,
             )
         )
+        agent.memory.add_message(
+            Message(
+                role="tool",
+                content=[
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": url},
+                        "image_caption": revised_prompt,
+                    }
+                ],
+            )
+        )
+        agent.write_to_storage()
         return "Image has been generated successfully and will be displayed below"
 
     def _latest_user_image(self, agent: Agent) -> Optional[bytes]:
@@ -157,6 +168,22 @@ class Stability(Toolkit):
                 return base64.b64decode(
                     agent.run_response.messages[index].images[-1].split("base64,")[1]
                 )
+
+        for index in list(range(len(agent.memory.messages) - 1, -1, -1)):
+            if isinstance(agent.memory.messages[index].content, list):
+                for content in agent.memory.messages[index].content:
+                    if (
+                        "type" in content
+                        and content["type"] == "image_url"
+                        and "image_url" in content
+                        and isinstance(content["image_url"], dict)
+                        and "url" in content["image_url"]
+                        and isinstance(content["image_url"]["url"], str)
+                    ):
+                        image = content["image_url"]["url"]
+                        resp = requests.get(image)
+                        if resp.status_code == 200:
+                            return resp.content
 
         return None
 

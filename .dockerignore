@@ -29,3 +29,6 @@ env
 
 requirements/*
 !requirements/prod.txt
+
+# this for development purposes
+app/pages/Voice_Chat.py

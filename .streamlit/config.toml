@@ -5,3 +5,8 @@ enableStaticServing = true
 [browser]
 serverAddress = "localhost"
 gatherUsageStats = false
+
+[theme]
+base="dark"
+backgroundColor="#252a36"
+secondaryBackgroundColor="#23252e"

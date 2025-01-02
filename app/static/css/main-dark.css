@@ -1,0 +1,9 @@
+.stApp.dark div:has(> [aria-label="Chat message from user"]) {
+    background-color: rgb(66, 66, 66) !important;
+    padding: 0.5rem !important;
+    border-radius: 0.5rem !important;
+    border: 1px solid rgb(168, 168, 168) !important;
+    text-align: right !important;
+    color: var(--text-color) !important;
+    padding: 1rem !important;
+}

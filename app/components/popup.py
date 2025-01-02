@@ -128,6 +128,25 @@ def show_popup(session_id, assistant_name, config: AgentConfig, package):
         disable_all = enabled_tools.get("disable_all", False)
         enable_all = enabled_tools.get("enable_all", not enabled_tools)
 
+        if not enabled_tools and enable_all:
+            for tool in package.available_tools:
+                if tool.get("default_status", "enabled").lower() != "enabled":
+                    enable_all = False
+                    break
+
+            if not enable_all:
+                for tool in package.available_tools:
+                    key = tool.get("name", None)
+
+                    if "group" in tool:
+                        key = f"group:{tool['group']}"
+
+                    if (
+                        key not in enabled_tools
+                        and tool.get("default_status", "enabled").lower() == "enabled"
+                    ):
+                        enabled_tools[key] = True
+
         if not isinstance(package.available_tools, list):
             raise ValueError(
                 f"Available tools for '{package.agent_name}' are not a list."
@@ -161,7 +180,11 @@ def show_popup(session_id, assistant_name, config: AgentConfig, package):
                 if disable_all or key not in enabled_tools:
                     continue
 
-            enabled_tools[key] = enable_all or key in enabled_tools
+            enabled_tools[key] = (
+                enable_all
+                or key in enabled_tools
+                or tool.get("default_status", "enabled").lower() == "enabled"
+            )
 
         col_index = 0
         super_cols = st.columns([0.33, 0.33, 0.33])
@@ -262,4 +285,5 @@ def show_popup(session_id, assistant_name, config: AgentConfig, package):
 
             logger.debug("User configuration stored for session: '%s'", session_id)
             st.success(f"Settings saved for {assistant_name} Assistant!")
+            st.session_state.CONFIG_CHANGED = True
             st.rerun()

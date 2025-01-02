@@ -8,7 +8,9 @@ from db.settings import db_settings
 
 # Create SQLAlchemy Engine using a database URL
 db_url: str = db_settings.get_db_url()
-db_engine: Engine = create_engine(db_url, pool_pre_ping=True)
+db_engine: Engine = create_engine(
+    db_url, pool_pre_ping=True, pool_size=20, max_overflow=10, pool_timeout=30
+)
 
 # Create a SessionLocal class
 # https://fastapi.tiangolo.com/tutorial/sql-databases/#create-a-sessionlocal-class
