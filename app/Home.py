@@ -898,7 +898,7 @@ def main() -> None:
         yesterday = today - timedelta(days=1)
 
         for session in sessions:
-            if "summary" in session.memory:
+            if "summary" in session.memory and "topics" in session.memory["summary"]:
                 # Convert Unix timestamp to datetime
                 session_date = datetime.fromtimestamp(session.created_at).date()
                 session_info = {
