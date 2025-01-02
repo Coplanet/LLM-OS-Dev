@@ -19,14 +19,8 @@ button[kind="secondary"]:active {
 [data-testid="stChatMessageAvatarUser"] {
     display: none !important;
 }
-[aria-label="Chat message from user"] * {
-    font-size: 1.2rem !important;
-}
 div:has(> [aria-label="Chat message from assistant"]) {
     padding: 1rem !important;
-}
-[aria-label="Chat message from assistant"] * {
-    font-size: 1.2rem !important;
 }
 .st-key-delete_knowledge_base button:hover,
 .st-key-delete_all_session_button button:hover {
