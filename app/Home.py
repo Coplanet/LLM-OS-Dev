@@ -1,4 +1,3 @@
-import hashlib
 import os
 import re
 import tempfile
@@ -28,7 +27,7 @@ from phi.document.reader.website import WebsiteReader
 from phi.model.content import Image
 from phi.model.message import Message
 from phi.storage.agent.postgres import PgAgentStorage
-from phi.tools.streamlit.components import check_password, get_username_sidebar
+from phi.tools.streamlit.components import check_password
 from phi.utils.log import logger as phi_logger
 from phi.utils.log import logging
 
@@ -40,6 +39,7 @@ from ai.document.reader.excel import ExcelReader
 from ai.document.reader.general import GenericReader
 from ai.document.reader.image import ImageReader
 from ai.document.reader.pptx import PPTXReader
+from app.auth import Auth, User
 from app.components.available_agents import AGENTS
 from app.components.popup import AUDIO_SUPPORTED_MODELS, show_popup
 from app.components.sidebar import create_sidebar
@@ -48,7 +48,6 @@ from db.settings import db_settings
 from db.tables import UserConfig
 from helpers.log import logger
 from helpers.utils import audio2text, audio_text2data, text2audio
-from workspace.settings import extra_settings
 
 phi_logger.setLevel(logging.DEBUG)
 
@@ -56,7 +55,7 @@ STATIC_DIR = "app/static"
 IMAGE_DIR = f"{STATIC_DIR}/images"
 CSS_DIR = f"{STATIC_DIR}/css"
 
-SESSION_KEY = "s"
+auth = Auth()
 
 nest_asyncio.apply()
 st.set_page_config(page_title="CoPlanet AI", page_icon=f"{IMAGE_DIR}/favicon.png")
@@ -109,72 +108,20 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-
-def get_bypass_key(
-    session_id: Optional[str] = None,
-    username: Optional[str] = None,
-    add_to_query_params: Optional[bool] = False,
-):
-    if session_id is None:
-        session_id = st.session_state[SESSION_KEY]
-    bypass_key = str(uuid4())
-    now = time()
-    hash = hashlib.sha256(
-        f"{now}{extra_settings.secret_key}{bypass_key}{username}".encode()
-    ).hexdigest()
-    obj = {
-        SESSION_KEY: session_id,
-        "bk": bypass_key,
-        "t": now,
-        "h": hash,
-        "u": username,
-    }
-    if add_to_query_params:
-        st.query_params.update(obj)
-    return obj
+user: User = auth.get_user()
 
 
-def check_bypass_key():
-    result = False
-    if (
-        "bk" in st.query_params
-        and "t" in st.query_params
-        and "h" in st.query_params
-        and "u" in st.query_params
-    ):
-        bypass_key = st.query_params["bk"]
-        timestamp = st.query_params["t"]
-        hash = st.query_params["h"]
-        username = st.query_params["u"]
-        if (
-            bypass_key
-            and timestamp
-            and hash
-            and username
-            and (
-                hash
-                == hashlib.sha256(
-                    f"{timestamp}{extra_settings.secret_key}{bypass_key}{username}".encode()
-                ).hexdigest()
-            )
-        ):
-            result = True
-
-    st.session_state["bypass_key"] = result
-
-    return st.session_state["bypass_key"]
-
-
-def restart_agent():
-    logger.debug(">>> Restarting Agent")
-    st.session_state["generic_leader"] = None
-    st.session_state["uploaded_image"] = None
-    if "url_scrape_key" in st.session_state:
-        st.session_state["url_scrape_key"] += 1
-    if "file_uploader_key" in st.session_state:
-        st.session_state["file_uploader_key"] += 1
-    if "image_uploader_key" in st.session_state:
-        st.session_state["image_uploader_key"] += 1
+def rerun(clean_session: bool = False):
+    if clean_session:
+        logger.debug(">>> Restarting Agent")
+        st.session_state["generic_leader"] = None
+        st.session_state["uploaded_image"] = None
+        if "url_scrape_key" in st.session_state:
+            st.session_state["url_scrape_key"] += 1
+        if "file_uploader_key" in st.session_state:
+            st.session_state["file_uploader_key"] += 1
+        if "image_uploader_key" in st.session_state:
+            st.session_state["image_uploader_key"] += 1
     st.rerun()
 
 
@@ -243,57 +190,40 @@ def main() -> None:
     if os.getenv("TESTING_ENV", False):
         return
 
-    # Get username
-    username = "CoPlanet"
-    if getenv("RUNTIME_ENV") != "dev":
-        if st.session_state["bypass_key"]:
-            username = st.query_params["u"]
-        else:
-            username = get_username_sidebar()
+    USERNAME: str = user.username
 
-    if username:
-        with st.expander(":point_down: Examples:"):
-            examples = [
-                "Report on the latest AI technology updates at your choice from YouTube channels.",
-                "Identify the best AI framework on GitHub and star it upon confirmation.",
-                "Summarize a Wikipedia page and YouTube video on quantum computers.",
-            ]
-            for example in examples:
-                st.markdown(
-                    f"- {example} <a href='?q={quote(example)}' target='_self'>[Try it!]</a>",
-                    unsafe_allow_html=True,
-                )
-            st.markdown(
-                "Feel free to unleash your creativity and explore the full potential of this platform."
-            )
+    if getenv("RUNTIME_ENV") == "dev":
+        USERNAME: str = "CoPlanet"
 
-        st.sidebar.info(f":technologist: User: {username}")
-    else:
-        st.markdown("---")
-        st.markdown("#### :technologist: Please enter a username")
-        return
-
-    SID = (
-        st.query_params[SESSION_KEY]
-        if (SESSION_KEY in st.query_params and st.query_params[SESSION_KEY])
-        else None
-    )
-
-    NEW_SESSION = not bool(SID)
-    # Create Agent session (i.e. log to database) and save session_id in session state
-    try:
-        if NEW_SESSION:
-            st.query_params[SESSION_KEY] = str(uuid4())
-            st.rerun()
+    if not USERNAME:
+        # Improved message for password acceptance
+        st.success("Welcome aboard! Your password has been successfully verified.")
+        USERNAME = user.get_username()
+        if not USERNAME:
             return
 
-    except Exception as e:
-        logger.error(e)
-        st.warning("Could not create Agent session, is the database running?")
-        return
+    if not user.is_authenticated:
+        user.username = USERNAME
+        user.session_id = str(uuid4())
+        user.to_auth_param(add_to_query_params=True)
+        rerun()
 
-    if not st.session_state["bypass_key"]:
-        get_bypass_key(SID, add_to_query_params=True)
+    with st.expander(":point_down: Examples:"):
+        examples = [
+            "Report on the latest AI technology updates at your choice from YouTube channels.",
+            "Identify the best AI framework on GitHub and star it upon confirmation.",
+            "Summarize a Wikipedia page and YouTube video on quantum computers.",
+        ]
+        for example in examples:
+            st.markdown(
+                f"- {example} <a href='?q={quote(example)}' target='_self'>[Try it!]</a>",
+                unsafe_allow_html=True,
+            )
+        st.markdown(
+            "Feel free to unleash your creativity and explore the full potential of this platform."
+        )
+
+    st.sidebar.info(f":label: User: {user.username}")
 
     # Initialize session state for popup control
     if "show_popup" not in st.session_state:
@@ -306,91 +236,86 @@ def main() -> None:
     COORDINATOR_CONFIG = settings.AgentConfig.empty()
     AGENTS_CONFIG: Dict[str, settings.AgentConfig] = {}
 
-    if SID:
-        logger.debug(">>> Identified Session ID: %s", SID)
+    logger.debug(">>> Identified Session ID: %s", user)
 
-        for agent, agent_config in AGENTS.items():
-            config = get_selected_assistant_config(
-                SID, agent_config.get("label", agent), agent_config.get("package")
-            )
-            if agent_config.get("is_leader", False):
-                COORDINATOR_CONFIG = config
-            else:
-                AGENTS_CONFIG[agent] = config
-
-        logger.debug("Agents Config: ")
-        for agent, config in AGENTS_CONFIG.items():
-            logger.debug(f"'{agent}' configed to: {config}")
-
-        if (
-            "CONFIG_CHANGED" in st.session_state
-            or "generic_leader" not in st.session_state
-            or st.session_state["generic_leader"] is None
-            or st.session_state["generic_leader"].session_id != SID
-        ):
-            logger.debug(
-                ">>> Creating leader agent with config: %s", COORDINATOR_CONFIG
-            )
-            coordinator.agent = generic_leader = coordinator.get_coordinator(
-                team_config=AGENTS_CONFIG,
-                config=COORDINATOR_CONFIG,
-                session_id=SID,
-                user_id=hashlib.md5(username.encode()).hexdigest(),
-            )
-            generic_leader.create_session()
-            st.session_state["generic_leader"] = generic_leader
-            if "CONFIG_CHANGED" in st.session_state:
-                del st.session_state["CONFIG_CHANGED"]
+    for agent, agent_config in AGENTS.items():
+        config = get_selected_assistant_config(
+            user.session_id,
+            agent_config.get("label", agent),
+            agent_config.get("package"),
+        )
+        if agent_config.get("is_leader", False):
+            COORDINATOR_CONFIG = config
         else:
-            generic_leader = st.session_state["generic_leader"]
+            AGENTS_CONFIG[agent] = config
 
-        for agent in [generic_leader] + generic_leader.team:
-            agent: base.Agent
+    logger.debug("Agents Config: ")
+    for agent, config in AGENTS_CONFIG.items():
+        logger.debug(f"'{agent}' configed to: {config}")
 
-            config: settings.AgentConfig = (
-                AGENTS_CONFIG.get(agent.name) or settings.AgentConfig.empty()
-            )
+    if (
+        "CONFIG_CHANGED" in st.session_state
+        or "generic_leader" not in st.session_state
+        or st.session_state["generic_leader"] is None
+        or st.session_state["generic_leader"].session_id != user.session_id
+    ):
+        logger.debug(">>> Creating leader agent with config: %s", COORDINATOR_CONFIG)
+        coordinator.agent = generic_leader = coordinator.get_coordinator(
+            team_config=AGENTS_CONFIG,
+            config=COORDINATOR_CONFIG,
+            session_id=user.session_id,
+            user_id=user.user_id,
+        )
+        generic_leader.create_session()
+        st.session_state["generic_leader"] = generic_leader
+        if "CONFIG_CHANGED" in st.session_state:
+            del st.session_state["CONFIG_CHANGED"]
+    else:
+        generic_leader = st.session_state["generic_leader"]
 
-            st.session_state[f"{agent.label}_model_id"] = (
-                config.model_id or agent.model.id
-            )
-            st.session_state[f"{agent.label}_model_type"] = (
-                config.provider or agent.model_type
-            )
-            st.session_state[f"{agent.label}_temperature"] = (
-                config.temperature or getattr(agent.model, "temperature", 0)
-            )
-            st.session_state[f"{agent.label}_max_tokens"] = (
-                config.max_tokens
-                or getattr(
-                    agent.model,
-                    "max_tokens",
-                    agent_settings.default_max_completion_tokens,
-                )
-            )
+    for agent in [generic_leader] + generic_leader.team:
+        agent: base.Agent
 
-        # Create sidebar
-        create_sidebar(SID, {generic_leader.name: AGENTS[generic_leader.name]})
-
-        # Sidebar checkboxes for selecting team members
-        st.sidebar.markdown("### Select Team Members")
-        create_sidebar(
-            SID, {k: v for k, v in AGENTS.items() if not v.get("is_leader", False)}
+        config: settings.AgentConfig = (
+            AGENTS_CONFIG.get(agent.name) or settings.AgentConfig.empty()
         )
 
-        # Show popup if triggered
-        if st.session_state.show_popup and st.session_state.selected_assistant:
-            selected_assistant = st.session_state.selected_assistant
-            agent = AGENTS[selected_assistant]
-            package = agent.get("package")
-            agent_config = (
-                AGENTS_CONFIG[package.agent_name]
-                if not agent.get("is_leader", False)
-                else COORDINATOR_CONFIG
-            )
-            show_popup(SID, selected_assistant, agent_config, package)
-            st.session_state.show_popup = False
-            st.session_state.selected_assistant = None
+        st.session_state[f"{agent.label}_model_id"] = config.model_id or agent.model.id
+        st.session_state[f"{agent.label}_model_type"] = (
+            config.provider or agent.model_type
+        )
+        st.session_state[f"{agent.label}_temperature"] = config.temperature or getattr(
+            agent.model, "temperature", 0
+        )
+        st.session_state[f"{agent.label}_max_tokens"] = config.max_tokens or getattr(
+            agent.model,
+            "max_tokens",
+            agent_settings.default_max_completion_tokens,
+        )
+
+    # Create sidebar
+    create_sidebar(user.session_id, {generic_leader.name: AGENTS[generic_leader.name]})
+
+    # Sidebar checkboxes for selecting team members
+    st.sidebar.markdown("### Select Team Members")
+    create_sidebar(
+        user.session_id,
+        {k: v for k, v in AGENTS.items() if not v.get("is_leader", False)},
+    )
+
+    # Show popup if triggered
+    if st.session_state.show_popup and st.session_state.selected_assistant:
+        selected_assistant = st.session_state.selected_assistant
+        agent = AGENTS[selected_assistant]
+        package = agent.get("package")
+        agent_config = (
+            AGENTS_CONFIG[package.agent_name]
+            if not agent.get("is_leader", False)
+            else COORDINATOR_CONFIG
+        )
+        show_popup(user.session_id, selected_assistant, agent_config, package)
+        st.session_state.show_popup = False
+        st.session_state.selected_assistant = None
 
     # Store uploaded image in session state
     if "uploaded_images" not in st.session_state:
@@ -974,9 +899,12 @@ def main() -> None:
             EMPTY_SESSIONS = False
             st.sidebar.markdown(f"### {period}")
             for session in sessions:
-                session_id = session["id"]
                 topics = session["topics"]
-                link = "?{}".format(urlencode(get_bypass_key(session_id)))
+                link = "?{}".format(
+                    urlencode(
+                        User(user.username, session_id=session["id"]).to_auth_param()
+                    )
+                )
                 st.sidebar.markdown(
                     f"""
                     <div class="sidebar-session-link">
@@ -995,16 +923,14 @@ def main() -> None:
                 session["topics"] for session in sessions
             ]
             selectbox_index = (
-                options.index(st.query_params[SESSION_KEY])
-                if st.query_params[SESSION_KEY] in options
-                else 0
+                options.index(user.session_id) if user.session_id in options else 0
             )
             if options:
 
                 def on_older_session_change():
-                    session_id = st.session_state["older_sessions_selectbox"]
-                    get_bypass_key(session_id, add_to_query_params=True)
-                    st.rerun()
+                    user.session_id = st.session_state["older_sessions_selectbox"]
+                    user.to_auth_param(add_to_query_params=True)
+                    rerun()
 
                 st.sidebar.selectbox(
                     "### Select a session",
@@ -1018,6 +944,7 @@ def main() -> None:
 
     if not EMPTY_SESSIONS:
         st.sidebar.markdown("---")
+        CLEAN_SESSION = False
         NEW_SESSION = st.sidebar.button("New Session")
 
         if generic_leader.storage:
@@ -1032,14 +959,13 @@ def main() -> None:
                         )
                         db.commit()
                 NEW_SESSION = True
+                CLEAN_SESSION = True
 
         if NEW_SESSION:
-            logger.debug(">>> Creating new session...")
-            KEYS = list(st.query_params.keys())
-            for key in KEYS:
-                del st.query_params[key]
-            restart_agent()
+            user.session_id = str(uuid4())
+            user.to_auth_param(add_to_query_params=True)
+            rerun(clean_session=CLEAN_SESSION)
 
 
-if check_bypass_key() or check_password():
+if user.is_authenticated or check_password():
     main()
