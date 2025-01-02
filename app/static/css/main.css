@@ -1,19 +1,38 @@
-
 /* Target the sidebar container */
 [data-testid="stSidebarContent"] {
     overflow-x: hidden;
 }
-.st-key-delete_knowledge_base button,
-.st-key-delete_all_session_button button {
-    color: #fff;
-    background-color: #dc3545;
-    border-color: #dc3545;
+button[kind="secondary"]:hover {
+    background-color: var(--secondary-background-color) !important;
+    color: var(--text-color) !important;
+    border-color: var(--text-color) !important;
+}
+button[kind="secondary"]:focus:not(:active),
+button[kind="secondary"]:active {
+    background-color: var(--text-color) !important;
+    border-color: var(--text-color) !important;
+    color: var(--secondary-background-color) !important;
+}
+[data-testid="stChatMessageAvatarAssistant"] {
+    display: none !important;
+}
+[data-testid="stChatMessageAvatarUser"] {
+    display: none !important;
+}
+[aria-label="Chat message from user"] * {
+    font-size: 1.2rem !important;
+}
+div:has(> [aria-label="Chat message from assistant"]) {
+    padding: 1rem !important;
+}
+[aria-label="Chat message from assistant"] * {
+    font-size: 1.2rem !important;
 }
 .st-key-delete_knowledge_base button:hover,
 .st-key-delete_all_session_button button:hover {
-    color: #fff;
-    background-color: #c82333;
-    border-color: #bd2130;
+    color: #fff !important;
+    background-color: #c82333 !important;
+    border-color: #bd2130 !important;
 }
 .row-widget.stCheckbox {
     min-height: unset !important;
@@ -32,16 +51,44 @@
     border-top: 1px solid #ccc;
     border-bottom: 1px solid #ccc;
 }
-.st-key-voice_input_container:hover {
-    background-color: #f0f0f0;
-}
 .st-key-unsupported_model_container {
     padding: 0.5rem;
     border: 1px solid #ffa0a0;
-    background-color: #f0f0f0;
     color: #aa0000;
 }
 .st-key-voice_input_recorder_disabled {
     pointer-events: none;
     opacity: 0.5;
+}
+.sidebar-session-link {
+    text-decoration: none;
+    padding: 0.25rem;
+    margin: 0.25rem;
+    background-color: var(--secondary-background-color);
+    transition: background-color 0.3s ease, transform 0.3s ease;
+}
+.sidebar-session-link:hover {
+    background-color: var(--background-color);
+    filter: brightness(0.95);
+    transform: translateY(-2px);
+    text-decoration: underline;
+}
+.sidebar-session-link.active-session {
+    color: var(--primary-color) !important;
+}
+.sidebar-session-link a {
+    color: var(--text-color);
+    text-decoration: none;
+}
+.sidebar-session-link a:hover {
+    color: var(--text-color);
+    filter: brightness(0.9);
+}
+
+.st-key-older_sessions_selectbox {
+    margin-top: 1rem;
+}
+.st-key-older_sessions_selectbox label {
+    font-size: 1.125rem;
+    font-weight: 600;
 }

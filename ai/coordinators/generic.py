@@ -1,9 +1,11 @@
 from textwrap import dedent
 from typing import Dict, Optional
 
+from phi.agent import AgentMemory
 from phi.embedder.openai import OpenAIEmbedder
 from phi.knowledge.combined import CombinedKnowledgeBase
 from phi.knowledge.pdf import PDFKnowledgeBase, PDFReader
+from phi.memory.db.postgres import PgMemoryDb
 from phi.storage.agent.postgres import PgAgentStorage
 from phi.tools.arxiv_toolkit import ArxivToolkit
 from phi.tools.calculator import Calculator
@@ -201,6 +203,7 @@ for group, details in COMPOSIO_ACTIONS.items():
                 "instance": instance,
                 "name": instance.name,
                 "icon": details["icon"],
+                "default_status": "disabled",
             }
         )
 
@@ -393,6 +396,12 @@ def get_coordinator(
         session_id=session_id,
         storage=PgAgentStorage(
             table_name="agent_sessions", db_url=db_settings.get_db_url()
+        ),
+        # Store the memories and summary in a database
+        memory=AgentMemory(
+            db=PgMemoryDb(table_name="agent_memory", db_url=db_settings.get_db_url()),
+            create_user_memories=True,
+            create_session_summary=True,
         ),
         introduction=dedent(
             """\

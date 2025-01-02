@@ -1,17 +1,21 @@
 import base64
+import hashlib
 import os
 import re
 import tempfile
+from datetime import datetime, timedelta
 from io import BytesIO
 from os import getenv
 from time import sleep, time
 from typing import Dict, List, Optional
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
+from uuid import uuid4
 
 import google.generativeai as genai
 import nest_asyncio
 import sqlalchemy as sql
 import streamlit as st
+import streamlit.components.v1 as components
 from audio_recorder_streamlit import audio_recorder
 from phi.agent import Agent
 from phi.document import Document
@@ -25,11 +29,7 @@ from phi.document.reader.website import WebsiteReader
 from phi.model.content import Image
 from phi.model.message import Message
 from phi.storage.agent.postgres import PgAgentStorage
-from phi.tools.streamlit.components import (
-    check_password,
-    get_openai_key_sidebar,
-    get_username_sidebar,
-)
+from phi.tools.streamlit.components import check_password, get_username_sidebar
 from phi.utils.log import logger as phi_logger
 from phi.utils.log import logging
 from PIL import Image as PILImage
@@ -62,11 +62,46 @@ SESSION_KEY = "sid"
 nest_asyncio.apply()
 st.set_page_config(page_title="CoPlanet AI", page_icon=f"{IMAGE_DIR}/favicon.png")
 
+# load css
+with open(f"{CSS_DIR}/main.css", "r") as file:
+    st.markdown(f"<style>{file.read()}</style>", unsafe_allow_html=True)
+
+
+for theme in ["dark", "light"]:
+    if os.path.exists(f"{CSS_DIR}/main-{theme}.css"):
+        with open(f"{CSS_DIR}/main-{theme}.css", "r") as file:
+            st.markdown(f"<style>{file.read()}</style>", unsafe_allow_html=True)
+
+components.html(
+    """
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    setInterval(() => {
+        const appElement = window.parent.document.getElementsByClassName("stApp")[0];
+        const currentTheme = window.getComputedStyle(appElement).getPropertyValue("color-scheme");
+
+        // Remove existing theme classes
+        appElement.classList.remove('dark', 'light');
+
+        // Add the current theme class
+        if (currentTheme === 'dark') {
+            appElement.classList.add('dark');
+        } else if (currentTheme === 'light') {
+            appElement.classList.add('light');
+        }
+    }, 300);
+});
+</script>
+""",
+    height=0,
+    width=0,
+)
+
 st.title("CoPlanet AI")
 st.markdown(
     f"""\
-    ##### <img src="{IMAGE_DIR}/coplanet.png" alt="Logo" style="width: 30px; margin-right: 10px;"> \
-    Unleashing Infinite Possibilities: Where Technology Meets Community\
+    ##### <img src="{IMAGE_DIR}/coplanet.png" alt="Logo" style="display: none; width: 30px; margin-right: 10px;"> \
+    CoPlanet LLM OS\
     """,
     unsafe_allow_html=True,
 )
@@ -75,15 +110,30 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# load css
-with open(f"{CSS_DIR}/main.css", "r") as file:
-    st.markdown(f"<style>{file.read()}</style>", unsafe_allow_html=True)
+# JavaScript to detect theme and attach color-scheme class to stApp
+# st_javascript("""
+# (function() {
+#     const appElement = window.parent.document.getElementsByClassName("stApp")[0];
+#     const currentTheme = window.getComputedStyle(appElement).getPropertyValue("color-scheme").trim();
+
+#     // Remove existing theme classes
+#     appElement.classList.remove('dark', 'light');
+
+#     // Add the current theme class
+#     if (currentTheme === 'dark') {
+#         appElement.classList.add('dark');
+#     } else if (currentTheme === 'light') {
+#         appElement.classList.add('light');
+#     }
+# })();
+# """, key="theme-detection-script")
+
+# ... existing code ...
 
 
 def restart_agent():
     logger.debug(">>> Restarting Agent")
     st.session_state["generic_leader"] = None
-    st.session_state["generic_leader_session_id"] = None
     st.session_state["uploaded_image"] = None
     if "url_scrape_key" in st.session_state:
         st.session_state["url_scrape_key"] += 1
@@ -146,7 +196,8 @@ def get_selected_assistant_config(session_id, label, package):
         for key, subtools in available_tools_manifest.items():
             if key in default_configs["tools"]:
                 for tool in subtools:
-                    tools[tool.get("name")] = tool
+                    if tool.get("default_status", "enabled").lower() == "enabled":
+                        tools[tool.get("name")] = tool
 
         return settings.AgentConfig(
             provider=default_configs["model_type"],
@@ -165,8 +216,6 @@ def get_selected_assistant_config(session_id, label, package):
 def main() -> None:
     if os.getenv("TESTING_ENV", False):
         return
-    # Get OpenAI key
-    get_openai_key_sidebar()
 
     # Get username
     username = "CoPlanet" if getenv("RUNTIME_ENV") == "dev" else get_username_sidebar()
@@ -192,6 +241,25 @@ def main() -> None:
         st.markdown("#### :technologist: Please enter a username")
         return
 
+    SID = (
+        st.query_params[SESSION_KEY]
+        if (SESSION_KEY in st.query_params and st.query_params[SESSION_KEY])
+        else None
+    )
+
+    NEW_SESSION = not bool(SID)
+    # Create Agent session (i.e. log to database) and save session_id in session state
+    try:
+        if NEW_SESSION:
+            st.query_params[SESSION_KEY] = str(uuid4())
+            st.rerun()
+            return
+
+    except Exception as e:
+        logger.error(e)
+        st.warning("Could not create Agent session, is the database running?")
+        return
+
     # Initialize session state for popup control
     if "show_popup" not in st.session_state:
         st.session_state.show_popup = False
@@ -199,17 +267,12 @@ def main() -> None:
 
     # Get the Agent
     generic_leader: Agent
-    SID = (
-        st.query_params[SESSION_KEY]
-        if (SESSION_KEY in st.query_params and st.query_params[SESSION_KEY])
-        else None
-    )
 
     COORDINATOR_CONFIG = settings.AgentConfig.empty()
     AGENTS_CONFIG: Dict[str, settings.AgentConfig] = {}
 
     if SID:
-        logger.debug(f">>> Using Session ID: {SID}")
+        logger.debug(">>> Identified Session ID: %s", SID)
 
         for agent, agent_config in AGENTS.items():
             config = get_selected_assistant_config(
@@ -224,77 +287,75 @@ def main() -> None:
         for agent, config in AGENTS_CONFIG.items():
             logger.debug(f"'{agent}' configed to: {config}")
 
-    if (
-        "generic_leader" not in st.session_state
-        or st.session_state["generic_leader"] is None
-        or (SID and st.session_state["generic_leader"].session_id != SID)
-    ):
-        logger.debug(">>> Creating leader agent with config: %s", COORDINATOR_CONFIG)
-        coordinator.agent = generic_leader = coordinator.get_coordinator(
-            team_config=AGENTS_CONFIG,
-            config=COORDINATOR_CONFIG,
-            session_id=SID,
-        )
-        st.session_state["generic_leader"] = generic_leader
-    else:
-        generic_leader = st.session_state["generic_leader"]
-
-    NEW_SESSION = not bool(SID)
-    # Create Agent session (i.e. log to database) and save session_id in session state
-    try:
-        if SID:
-            st.session_state["generic_leader_session_id"] = st.query_params[SESSION_KEY]
-            logger.debug(">>> Identified Session ID: %s", SID)
+        if (
+            "CONFIG_CHANGED" in st.session_state
+            or "generic_leader" not in st.session_state
+            or st.session_state["generic_leader"] is None
+            or st.session_state["generic_leader"].session_id != SID
+        ):
+            logger.debug(
+                ">>> Creating leader agent with config: %s", COORDINATOR_CONFIG
+            )
+            coordinator.agent = generic_leader = coordinator.get_coordinator(
+                team_config=AGENTS_CONFIG,
+                config=COORDINATOR_CONFIG,
+                session_id=SID,
+                user_id=hashlib.md5(username.encode()).hexdigest(),
+            )
+            generic_leader.create_session()
+            st.session_state["generic_leader"] = generic_leader
+            if "CONFIG_CHANGED" in st.session_state:
+                del st.session_state["CONFIG_CHANGED"]
         else:
-            st.query_params[SESSION_KEY] = generic_leader.create_session()
-            st.rerun()
-            return
+            generic_leader = st.session_state["generic_leader"]
 
-    except Exception as e:
-        logger.error(e)
-        st.warning("Could not create Agent session, is the database running?")
-        return
+        for agent in [generic_leader] + generic_leader.team:
+            agent: base.Agent
 
-    for agent in [generic_leader] + generic_leader.team:
-        agent: base.Agent
+            config: settings.AgentConfig = (
+                AGENTS_CONFIG.get(agent.name) or settings.AgentConfig.empty()
+            )
 
-        config: settings.AgentConfig = (
-            AGENTS_CONFIG.get(agent.name) or settings.AgentConfig.empty()
+            st.session_state[f"{agent.label}_model_id"] = (
+                config.model_id or agent.model.id
+            )
+            st.session_state[f"{agent.label}_model_type"] = (
+                config.provider or agent.model_type
+            )
+            st.session_state[f"{agent.label}_temperature"] = (
+                config.temperature or getattr(agent.model, "temperature", 0)
+            )
+            st.session_state[f"{agent.label}_max_tokens"] = (
+                config.max_tokens
+                or getattr(
+                    agent.model,
+                    "max_tokens",
+                    agent_settings.default_max_completion_tokens,
+                )
+            )
+
+        # Create sidebar
+        create_sidebar(SID, {generic_leader.name: AGENTS[generic_leader.name]})
+
+        # Sidebar checkboxes for selecting team members
+        st.sidebar.markdown("### Select Team Members")
+        create_sidebar(
+            SID, {k: v for k, v in AGENTS.items() if not v.get("is_leader", False)}
         )
 
-        st.session_state[f"{agent.label}_model_id"] = config.model_id or agent.model.id
-        st.session_state[f"{agent.label}_model_type"] = (
-            config.provider or agent.model_type
-        )
-        st.session_state[f"{agent.label}_temperature"] = config.temperature or getattr(
-            agent.model, "temperature", 0
-        )
-        st.session_state[f"{agent.label}_max_tokens"] = config.max_tokens or getattr(
-            agent.model, "max_tokens", agent_settings.default_max_completion_tokens
-        )
-
-    # Create sidebar
-    create_sidebar(SID, {generic_leader.name: AGENTS[generic_leader.name]})
-
-    # Sidebar checkboxes for selecting team members
-    st.sidebar.markdown("### Select Team Members")
-    create_sidebar(
-        SID, {k: v for k, v in AGENTS.items() if not v.get("is_leader", False)}
-    )
-
-    # Show popup if triggered
-    if st.session_state.show_popup and st.session_state.selected_assistant:
-        selected_assistant = st.session_state.selected_assistant
-        agent = AGENTS[selected_assistant]
-        package = agent.get("package")
-        agent_config = (
-            AGENTS_CONFIG[package.agent_name]
-            if not agent.get("is_leader", False)
-            else COORDINATOR_CONFIG
-        )
-        show_popup(SID, selected_assistant, agent_config, package)
-        st.session_state.show_popup = False
-        st.session_state.selected_assistant = None
+        # Show popup if triggered
+        if st.session_state.show_popup and st.session_state.selected_assistant:
+            selected_assistant = st.session_state.selected_assistant
+            agent = AGENTS[selected_assistant]
+            package = agent.get("package")
+            agent_config = (
+                AGENTS_CONFIG[package.agent_name]
+                if not agent.get("is_leader", False)
+                else COORDINATOR_CONFIG
+            )
+            show_popup(SID, selected_assistant, agent_config, package)
+            st.session_state.show_popup = False
+            st.session_state.selected_assistant = None
 
     # Store uploaded image in session state
     if "uploaded_images" not in st.session_state:
@@ -821,52 +882,116 @@ def main() -> None:
                 generic_leader.knowledge.vector_db.delete()
                 st.sidebar.success("Knowledge base deleted")
 
-    if generic_leader.storage:
-        selectbox_index = 0
-        generic_leader_session_ids: List[str] = (
-            generic_leader.storage.get_all_session_ids()
-        )
-        for index, id in enumerate(generic_leader_session_ids):
-            if id == SID:
-                selectbox_index = index
-                break
-
-        new_generic_leader_session_id = st.sidebar.selectbox(
-            "Session ID", options=generic_leader_session_ids, index=selectbox_index
-        )
-        if SID != new_generic_leader_session_id:
-            logger.debug(
-                f">>> Loading {generic_leader.model.id} session: {new_generic_leader_session_id}"
-            )
-            st.query_params[SESSION_KEY] = new_generic_leader_session_id
-            st.rerun()
-            return
-        else:
-            logger.debug(
-                f">>> Continuing {generic_leader.model.id} session: {new_generic_leader_session_id}"
-            )
-
-    NEW_SESSION = st.sidebar.button("New Session")
+    EMPTY_SESSIONS = True
 
     if generic_leader.storage:
-        if st.sidebar.button("Delete All Session", key="delete_all_session_button"):
-            ids = generic_leader.storage.get_all_session_ids()
-            for id in ids:
-                generic_leader.storage.delete_session(id)
-            if ids:
-                with get_db_context() as db:
-                    db.execute(
-                        sql.delete(UserConfig).where(UserConfig.session_id.in_(ids))
-                    )
-                    db.commit()
-            NEW_SESSION = True
+        sessions = generic_leader.storage.get_all_sessions()
+        session_options = {
+            "Today": [],
+            "Yesterday": [],
+            "Previous 7 Days": [],
+            "Older": [],
+        }
+        today = datetime.now().date()
+        yesterday = today - timedelta(days=1)
 
-    if NEW_SESSION:
-        logger.debug(">>> Creating new session...")
-        KEYS = list(st.query_params.keys())
-        for key in KEYS:
-            del st.query_params[key]
-        restart_agent()
+        for session in sessions:
+            if "summary" in session.memory:
+                # Convert Unix timestamp to datetime
+                session_date = datetime.fromtimestamp(session.created_at).date()
+                session_info = {
+                    "id": session.session_id,
+                    "topics": ", ".join(session.memory["summary"]["topics"][:3]),
+                }
+                if session_date == today:
+                    session_options["Today"].append(session_info)
+                elif session_date == yesterday:
+                    session_options["Yesterday"].append(session_info)
+                elif session_date >= today - timedelta(days=7):
+                    session_options["Previous 7 Days"].append(session_info)
+                else:
+                    session_options["Older"].append(session_info)
+
+        # Display sessions
+        rendered_hr = False
+        for period in ["Today", "Yesterday", "Previous 7 Days"]:
+            sessions = session_options[period]
+            if not sessions:
+                continue
+            if not rendered_hr:
+                st.sidebar.markdown("---")
+                rendered_hr = True
+
+            EMPTY_SESSIONS = False
+            st.sidebar.markdown(f"### {period}")
+            for session in sessions:
+                session_id = session["id"]
+                topics = session["topics"]
+                query_string = urlencode({SESSION_KEY: session_id})
+                link = f"?{query_string}"
+                st.sidebar.markdown(
+                    f"""
+                    <div class="sidebar-session-link">
+                        <a href="{link}" target="_self">
+                            {topics}
+                        </a>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
+        if session_options["Older"]:
+            sessions = session_options["Older"]
+            options = [None] + [session["id"] for session in sessions]
+            display = ["Pick an older session"] + [
+                session["topics"] for session in sessions
+            ]
+            selectbox_index = (
+                options.index(st.query_params[SESSION_KEY])
+                if st.query_params[SESSION_KEY] in options
+                else 0
+            )
+            if options:
+
+                def on_older_session_change():
+                    st.query_params[SESSION_KEY] = st.session_state[
+                        "older_sessions_selectbox"
+                    ]
+                    st.rerun()
+
+                st.sidebar.selectbox(
+                    "### Select a session",
+                    options=options,
+                    format_func=lambda idx: display[options.index(idx)],
+                    index=selectbox_index,
+                    key="older_sessions_selectbox",
+                    placeholder="Select an older session",
+                    on_change=on_older_session_change,
+                )
+
+    if not EMPTY_SESSIONS:
+        st.sidebar.markdown("---")
+        NEW_SESSION = st.sidebar.button("New Session")
+
+        if generic_leader.storage:
+            if st.sidebar.button("Delete All Session", key="delete_all_session_button"):
+                ids = generic_leader.storage.get_all_session_ids()
+                for id in ids:
+                    generic_leader.storage.delete_session(id)
+                if ids:
+                    with get_db_context() as db:
+                        db.execute(
+                            sql.delete(UserConfig).where(UserConfig.session_id.in_(ids))
+                        )
+                        db.commit()
+                NEW_SESSION = True
+
+        if NEW_SESSION:
+            logger.debug(">>> Creating new session...")
+            KEYS = list(st.query_params.keys())
+            for key in KEYS:
+                del st.query_params[key]
+            restart_agent()
 
 
 if check_password():
