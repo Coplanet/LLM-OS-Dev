@@ -135,6 +135,7 @@ def get_bypass_key(
 
 
 def check_bypass_key():
+    result = False
     if (
         "bk" in st.query_params
         and "t" in st.query_params
@@ -151,9 +152,9 @@ def check_bypass_key():
                 f"{timestamp}{extra_settings.secret_key}{bypass_key}{username}".encode()
             ).hexdigest()
         ):
-            st.session_state["bypass_key"] = True
-    else:
-        st.session_state["bypass_key"] = False
+            result = True
+
+    st.session_state["bypass_key"] = result
 
     return st.session_state["bypass_key"]
 
