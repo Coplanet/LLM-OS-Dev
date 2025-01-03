@@ -8,5 +8,6 @@ gatherUsageStats = false
 
 [theme]
 base="dark"
+primaryColor="#4879f3"
 backgroundColor="#252a36"
 secondaryBackgroundColor="#23252e"
