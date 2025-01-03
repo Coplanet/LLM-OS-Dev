@@ -16,6 +16,93 @@ from phi.utils.log import logger
 
 
 class Stability(Toolkit):
+    DEFAULT_NEGATIVE_PROMPT = ", ".join(
+        [
+            "bad anatomy",
+            "bad hands",
+            "three hands",
+            "three legs",
+            "bad arms",
+            "missing legs",
+            "missing arms",
+            "poorly drawn face",
+            "poorly rendered hands",
+            "bad face",
+            "fused face",
+            "cloned face",
+            "worst face",
+            "three crus",
+            "extra crus",
+            "fused crus",
+            "worst feet",
+            "three feet",
+            "fused feet",
+            "fused thigh",
+            "three thigh",
+            "extra thigh",
+            "worst thigh",
+            "missing fingers",
+            "extra fingers",
+            "ugly fingers",
+            "long fingers",
+            "bad composition",
+            "horn",
+            "extra eyes",
+            "huge eyes",
+            "2girl",
+            "amputation",
+            "disconnected limbs",
+            "cartoon",
+            "cg",
+            "3d",
+            "unreal",
+            "animate",
+            "cgi",
+            "render",
+            "artwork",
+            "illustration",
+            "3d render",
+            "cinema 4d",
+            "artstation",
+            "octane render",
+            "mutated body parts",
+            "painting",
+            "oil painting",
+            "2d",
+            "sketch",
+            "bad photography",
+            "bad photo",
+            "deviant art",
+            "aberrations",
+            "abstract",
+            "anime",
+            "black and white",
+            "collapsed",
+            "conjoined",
+            "creative",
+            "drawing",
+            "extra windows",
+            "harsh lighting",
+            "jpeg artifacts",
+            "low saturation",
+            "monochrome",
+            "multiple levels",
+            "overexposed",
+            "oversaturated",
+            "photoshop",
+            "rotten",
+            "surreal",
+            "twisted",
+            "UI",
+            "underexposed",
+            "unnatural",
+            "unreal engine",
+            "unrealistic",
+            "video game",
+            "deformed body features",
+        ]
+    )
+
     def __init__(
         self,
         model: Optional[Literal["ultra", "core", "sd3"]] = "ultra",
@@ -63,6 +150,7 @@ class Stability(Toolkit):
         self.register(self.search_and_replace)
         self.register(self.outpaint)
         self.register(self.remove_background)
+        self.register(self.add_feature)
 
     def _req(
         self,
@@ -245,6 +333,7 @@ class Stability(Toolkit):
         search_prompt: str,
         grow_mask: Optional[int] = 3,
         negative_prompt: Optional[str] = None,
+        seed: Optional[int] = 0,
     ) -> str:
         """Use this function to search for a prompt and replace it with the new prompt.
         for the same prompt don't send parallel requests. it will be handled by the toolkit.
@@ -257,6 +346,7 @@ class Stability(Toolkit):
             grow_mask (int): Grows the edges of the mask outward in all directions by the specified number of pixels. \
                 The expanded area around the mask will be blurred, which can help smooth the transition between \
                 inpainted content and the original image.
+            seed (int): A specific value to guide the randomness of the generation.
 
         Returns:
             str: A message indicating if the image has been generated successfully or an error message.
@@ -274,12 +364,57 @@ class Stability(Toolkit):
                 "search_prompt": search_prompt,
                 "grow_mask": grow_mask,
                 "negative_prompt": negative_prompt,
+                "seed": seed,
             },
         )
 
         self._store_in_s3(agent, response, prompt, f"{prompt} -> {search_prompt}")
 
         return "Image has been edited successfully and will be displayed below"
+
+    def add_feature(
+        self,
+        agent: Agent,
+        decriptive_prompt: str,
+        area_that_change_is_about: list[str],
+        areas_that_change_will_be_added_to: list[str],
+        features_to_add: list[str],
+        changes_to_avoid: list[str],
+    ) -> str:
+        """Add features to an image while preserving its original content.
+        **NOTE**:
+        - **IMPORTANT:** Be very specific and detailed about `areas_that_change_will_be_added_to` and `inner_area`.
+
+        Args:
+            decriptive_prompt (str): Descriptive prompt for the agent that is going to change the image.
+            area_that_change_is_about (list[str]): Descriptions of inner areas for feature addition \
+                (The area that **SHOULDN'T BE CHANGED**).
+            areas_that_change_will_be_added_to (list[str]): Descriptions of outer areas for feature addition \
+                (The area that **CAN BE CHANGED**).
+            features_to_add (list[str]): Features to add, described in detail.
+            changes_to_avoid (list[str]): Descriptions of changes to avoid.
+
+        Returns:
+            str: Success or error message.
+        """
+
+        prompt = (
+            "{}\nAdd the following features: {}.\n"
+            "Ensure the inner area(s): {} "
+            "remain unchanged and same as original image.".format(
+                decriptive_prompt,
+                ", ".join(features_to_add),
+                ", ".join(area_that_change_is_about),
+            )
+        )
+
+        return self.search_and_replace(
+            agent,
+            prompt=prompt,
+            search_prompt="\n".join(areas_that_change_will_be_added_to),
+            negative_prompt="\n".join(changes_to_avoid),
+            grow_mask=0,
+        )
 
     def remove_background(self, agent: Agent) -> str:
         """Use this function to Remove Background accurately segments the foreground
