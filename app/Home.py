@@ -586,25 +586,38 @@ def main() -> None:
                 start = time()
 
                 if not AUDIO_RESPONSE_SUPPORT or not response_in_voice:
-                    for delta in generic_leader.run(
-                        message=question,
-                        images=uploaded_images,
-                        videos=uploaded_videos_,
-                        audio=audio_bytes,
-                        stream=True,
-                    ):
-                        response += delta.content  # type: ignore
-                        response = re.sub(
-                            r"[\n\s]*!\[[^\]]+?\]\([^\)]+?\)", "", response
-                        )
-                        resp_container.markdown(response)
+                    try:
+                        for delta in generic_leader.run(
+                            message=question,
+                            images=uploaded_images,
+                            videos=uploaded_videos_,
+                            audio=audio_bytes,
+                            stream=True,
+                        ):
+                            response += delta.content  # type: ignore
+                            response = re.sub(
+                                r"[\n\s]*!\[[^\]]+?\]\([^\)]+?\)", "", response
+                            )
+                            resp_container.markdown(response)
+
+                    except Exception as e:
+                        logger.exception(e)
+                        st.exception(e)
                 else:
-                    generic_leader.run(
-                        message="Answer the input audio.",
-                        images=uploaded_images,
-                        videos=uploaded_videos_,
-                        audio={"data": audio_text2data(audio_bytes_), "format": "wav"},
-                    )
+                    try:
+                        generic_leader.run(
+                            message="Answer the input audio.",
+                            images=uploaded_images,
+                            videos=uploaded_videos_,
+                            audio={
+                                "data": audio_text2data(audio_bytes_),
+                                "format": "wav",
+                            },
+                        )
+
+                    except Exception as e:
+                        logger.exception(e)
+                        st.exception(e)
 
                 end = time()
                 logger.debug(
