@@ -9,7 +9,7 @@ from phi.model.google import Gemini
 from phi.workflow import RunResponse
 from pydantic import BaseModel, Field
 
-from helpers.utils import text2audio
+from helpers.utils import text2binary
 
 
 class Transcription(BaseModel):
@@ -101,7 +101,7 @@ def voice2prompt(audio_data: Union[str, bytes]) -> Tuple[bool, str, str]:
     """
 
     if isinstance(audio_data, str):
-        audio_data = text2audio(audio_data)
+        audio_data = text2binary(audio_data)
 
     audio_file: Optional[File] = None
 

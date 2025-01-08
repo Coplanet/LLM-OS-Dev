@@ -5,7 +5,7 @@ from phi.model.openai import OpenAIChat
 from phi.tools.wikipedia import WikipediaTools
 
 from ai.agents.voice_transcriptor import voice2prompt
-from helpers.utils import text2audio
+from helpers.utils import text2binary
 
 # Initialize the agent
 agent = Agent(
@@ -76,7 +76,7 @@ if audio_bytes:
         ):
             with st.container(key="response_audio"):
                 st.audio(
-                    text2audio(agent.run_response.response_audio["data"]),
+                    text2binary(agent.run_response.response_audio["data"]),
                     format="audio/wav",
                     autoplay=True,
                 )

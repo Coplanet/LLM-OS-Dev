@@ -1,5 +1,5 @@
 from db.tables.base import Base
 
-from .user_config import UserConfig
+from .user_config import UserBinaryData, UserConfig, UserNextOp
 
-__all__ = ["Base", "UserConfig"]
+__all__ = ["Base", "UserConfig", "UserNextOp", "UserBinaryData"]

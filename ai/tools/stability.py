@@ -1,10 +1,11 @@
-import base64
+import hashlib
 import io
+import json
 import os
 from hashlib import sha256
 from os import getenv
 from time import time
-from typing import Literal, Optional
+from typing import Literal, Optional, Tuple
 
 import boto3
 import requests
@@ -13,6 +14,10 @@ from phi.model.content import Image
 from phi.model.message import Message
 from phi.tools import Toolkit
 from phi.utils.log import logger
+
+from db.session import get_db_context
+from db.tables import UserBinaryData, UserNextOp
+from helpers.utils import binary2text, text2binary
 
 
 class Stability(Toolkit):
@@ -250,13 +255,10 @@ class Stability(Toolkit):
         agent.write_to_storage()
         return "Image has been generated successfully and will be displayed below"
 
-    def _latest_user_image(self, agent: Agent) -> Optional[bytes]:
-        for index in list(range(len(agent.run_response.messages) - 1, -1, -1)):
-            if agent.run_response.messages[index].images:
-                return base64.b64decode(
-                    agent.run_response.messages[index].images[-1].split("base64,")[1]
-                )
-
+    @classmethod
+    def add_mask_to_latest_image(
+        cls, agent: Agent, image: bytes, mask: bytes
+    ) -> Optional[Tuple[bytes, Optional[bytes]]]:
         for index in list(range(len(agent.memory.messages) - 1, -1, -1)):
             if isinstance(agent.memory.messages[index].content, list):
                 for content in agent.memory.messages[index].content:
@@ -269,9 +271,56 @@ class Stability(Toolkit):
                         and isinstance(content["image_url"]["url"], str)
                     ):
                         image = content["image_url"]["url"]
-                        resp = requests.get(image)
-                        if resp.status_code == 200:
-                            return resp.content
+                        if image.startswith("data:"):
+                            image_content = text2binary(image)
+                        else:
+                            resp = requests.get(image)
+                            if resp.status_code == 200:
+                                image_content = resp.content
+                        if (
+                            image_content
+                            and hashlib.sha256(
+                                binary2text(image_content, "image/webp").encode()
+                            ).hexdigest()
+                            == hashlib.sha256(image.encode()).hexdigest()
+                        ):
+                            mask = binary2text(mask, "image/webp")
+                            agent.memory.add_message(
+                                Message(role="tool", content=json.dumps({"mask": mask}))
+                            )
+                            agent.write_to_storage()
+                            return image_content, mask
+
+    @classmethod
+    def latest_user_image_with_mask(
+        cls, agent: Agent
+    ) -> Optional[Tuple[UserBinaryData, Optional[UserBinaryData]]]:
+        with get_db_context() as db:
+            image = UserBinaryData.get_data(
+                db,
+                agent.session_id,
+                UserBinaryData.IMAGE,
+                UserBinaryData.DOWNSTREAM,
+            ).first()
+            mask = UserBinaryData.get_data(
+                db,
+                agent.session_id,
+                UserBinaryData.IMAGE_MASK,
+                UserBinaryData.DOWNSTREAM,
+            ).first()
+            return image, mask
+
+    @classmethod
+    def latest_user_image(cls, agent: Agent) -> Optional[bytes]:
+        with get_db_context() as db:
+            image = UserBinaryData.get_data(
+                db,
+                agent.session_id,
+                UserBinaryData.IMAGE,
+                UserBinaryData.DOWNSTREAM,
+            ).first()
+            if image:
+                return image.data
 
         return None
 
@@ -304,7 +353,7 @@ class Stability(Toolkit):
         Returns:
             str: A message indicating the result.
         """
-        image = self._latest_user_image(agent)
+        image = self.latest_user_image(agent)
 
         if not image:
             return "No image found"
@@ -351,7 +400,7 @@ class Stability(Toolkit):
         Returns:
             str: A message indicating if the image has been generated successfully or an error message.
         """
-        image = self._latest_user_image(agent)
+        image = self.latest_user_image(agent)
 
         if not image:
             return "No image found"
@@ -375,46 +424,60 @@ class Stability(Toolkit):
     def add_feature(
         self,
         agent: Agent,
-        decriptive_prompt: str,
-        area_that_change_is_about: list[str],
-        areas_that_change_will_be_added_to: list[str],
-        features_to_add: list[str],
-        changes_to_avoid: list[str],
+        prompt: str,
+        negative_prompt: Optional[str] = None,
+        seed: Optional[int] = 0,
     ) -> str:
         """Add features to an image while preserving its original content.
-        **NOTE**:
-        - **IMPORTANT:** Be very specific and detailed about `areas_that_change_will_be_added_to` and `inner_area`.
 
         Args:
-            decriptive_prompt (str): Descriptive prompt for the agent that is going to change the image.
-            area_that_change_is_about (list[str]): Descriptions of inner areas for feature addition \
-                (The area that **SHOULDN'T BE CHANGED**).
-            areas_that_change_will_be_added_to (list[str]): Descriptions of outer areas for feature addition \
-                (The area that **CAN BE CHANGED**).
-            features_to_add (list[str]): Features to add, described in detail.
-            changes_to_avoid (list[str]): Descriptions of changes to avoid.
+            prompt (str): Descriptive text for the desired image outcome. \
+                Use (word:weight) to control word emphasis, e.g., (blue:0.3).
+            negative_prompt (str): Text describing elements to exclude from the image.
+            seed (int): Value to influence the randomness of the generation.
 
         Returns:
-            str: Success or error message.
+            str: Message indicating success or error.
         """
+        image, mask = self.latest_user_image_with_mask(agent)
 
-        prompt = (
-            "{}\nAdd the following features: {}.\n"
-            "Ensure the inner area(s): {} "
-            "remain unchanged and same as original image.".format(
-                decriptive_prompt,
-                ", ".join(features_to_add),
-                ", ".join(area_that_change_is_about),
+        if not image:
+            return "No image found"
+
+        if not mask:
+            with get_db_context() as db:
+                nextop = UserNextOp.save_op(
+                    db,
+                    agent.session_id,
+                    UserNextOp.GET_IMAGE_MASK,
+                    {"image_id": image.id},
+                )
+
+            return json.dumps(
+                {
+                    "message": {"mask": "required"},
+                    "next_step": True,
+                    "user_additional_output": "Please provide a mask for the image",
+                    "stop_calling_other_tools": True,
+                    "method": "add_feature",
+                    "class": "stability",
+                    "nextop_id": nextop.id,
+                }
             )
+
+        response = self._req(
+            "https://api.stability.ai/v2beta/stable-image/edit/inpaint",
+            files={"image": image, "mask": mask},
+            data={
+                "prompt": prompt,
+                "negative_prompt": negative_prompt,
+                "seed": seed,
+            },
         )
 
-        return self.search_and_replace(
-            agent,
-            prompt=prompt,
-            search_prompt="\n".join(areas_that_change_will_be_added_to),
-            negative_prompt="\n".join(changes_to_avoid),
-            grow_mask=0,
-        )
+        self._store_in_s3(agent, response, prompt, f"{prompt}")
+
+        return "Image has been edited successfully and will be displayed below"
 
     def remove_background(self, agent: Agent) -> str:
         """Use this function to Remove Background accurately segments the foreground
@@ -423,7 +486,7 @@ class Stability(Toolkit):
         Returns:
             str: A message indicating if the image has been generated successfully or an error message.
         """
-        image = self._latest_user_image(agent)
+        image = self.latest_user_image(agent)
 
         if not image:
             return "No image found"
