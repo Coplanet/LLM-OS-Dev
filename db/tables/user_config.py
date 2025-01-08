@@ -1,3 +1,4 @@
+import hashlib
 import json
 import uuid
 from io import BytesIO
@@ -102,21 +103,34 @@ class UserBinaryData(Base):
     direction = Column(String(20), nullable=False, index=True)
 
     data = Column(LargeBinary, nullable=False)
+    data_compressed = Column(LargeBinary, nullable=True)
+
+    data_hashsum = Column(String(255), nullable=True, index=True)
+    data_compressed_hashsum = Column(String(255), nullable=True, index=True)
+
     mimetype = Column(String(50), nullable=True, index=True)
     extension = Column(String(10), nullable=True, index=True)
 
     def data_as_image_thumbnail(
-        self, width: int = 256, height: Optional[int] = None
+        self,
+        height: int = 100,
+        width: Optional[int] = None,
+        store_compressed: bool = True,
     ) -> bytes:
         output = BytesIO()
         image = Image.open(BytesIO(self.data))
-        width = min(width, image.size[0])
-        if height is None:
-            # compute height based on width and aspect ratio
-            height = int(width * image.size[1] / image.size[0])
-        height = min(height, image.size[1])
-        image.resize((width, height)).save(output, format="webp")
-        return output.getvalue()
+        # compute width based on height and aspect ratio
+        if width is None:
+            width = int(height * image.size[0] / image.size[1])
+        height = min(height, image.size[0])
+        width = min(width, image.size[1])
+        image.resize((height, width)).save(output, format="webp")
+        compressed_data = output.getvalue()
+        if store_compressed:
+            compressed_data_hashsum = hashlib.sha256(compressed_data).hexdigest()
+            self.data_compressed = compressed_data
+            self.data_compressed_hashsum = compressed_data_hashsum
+        return compressed_data
 
     @classmethod
     def get_data(
@@ -124,12 +138,14 @@ class UserBinaryData(Base):
         db: orm.Session,
         session_id: str,
         type: Literal["image", "image_mask", "audio", "video"],
-        direction: Literal["upstream", "downstream"],
+        direction: Optional[Literal["upstream", "downstream"]] = None,
         **kwargs,
     ) -> orm.query.Query["UserBinaryData"]:
+        if direction is not None:
+            kwargs["direction"] = direction
         return (
             db.query(cls)
-            .filter_by(session_id=session_id, type=type, direction=direction, **kwargs)
+            .filter_by(session_id=session_id, type=type, **kwargs)
             .order_by(cls.id.desc())
         )
 
@@ -145,11 +161,13 @@ class UserBinaryData(Base):
         extension: str = None,
         auto_commit: bool = True,
     ) -> "UserBinaryData":
+        data_hashsum = hashlib.sha256(data).hexdigest()
         instance = cls(
             session_id=session_id,
             type=type,
             direction=direction,
             data=data,
+            data_hashsum=data_hashsum,
             mimetype=mimetype,
             extension=extension,
         )
@@ -187,6 +205,8 @@ class UserBinaryData(Base):
                 extension=extension,
                 group_id=group_id,
             )
+            if type == cls.IMAGE:
+                instance.data_as_image_thumbnail()
             db.add(instance)
             instances.append(instance)
 
@@ -249,17 +269,13 @@ class UserBinaryData(Base):
         db: orm.Session,
         session_id: str,
         type: Literal["image", "image_mask", "audio", "video"],
-        direction: Literal["upstream", "downstream"],
+        direction: Optional[Literal["upstream", "downstream"]] = None,
     ) -> orm.query.Query["UserBinaryData"]:
+        query = [cls.session_id == session_id, cls.type == type]
+        if direction is not None:
+            query.append(cls.direction == direction)
         latest_entry = (
-            db.query(cls.group_id)
-            .filter(
-                cls.session_id == session_id,
-                cls.type == type,
-                cls.direction == direction,
-            )
-            .order_by(cls.id.desc())
-            .first()
+            db.query(cls.group_id).filter(*query).order_by(cls.id.desc()).first()
         )
         return cls.get_data(
             db, session_id, type, direction=direction, group_id=latest_entry.group_id
@@ -268,6 +284,7 @@ class UserBinaryData(Base):
 
 class UserNextOp(Base):
     GET_IMAGE_MASK = "get_image_mask"
+    EDIT_IMAGE_USING_MASK = "edit_image_using_mask"
 
     __tablename__ = "user_next_ops"
     value_json = None

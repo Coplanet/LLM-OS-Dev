@@ -16,9 +16,7 @@ from db.tables.user_config import UserBinaryData, UserNextOp
 def render_mask_image(agent: Agent) -> Union[None, bool]:
     with get_db_context() as db:
         image: bytes = (
-            UserBinaryData.get_data(
-                db, agent.session_id, UserBinaryData.IMAGE, UserBinaryData.DOWNSTREAM
-            )
+            UserBinaryData.get_data(db, agent.session_id, UserBinaryData.IMAGE)
             .first()
             .data
         )
@@ -27,8 +25,9 @@ def render_mask_image(agent: Agent) -> Union[None, bool]:
     image_cv2 = cv2.imdecode(file_bytes, 1)
     h, w = image_cv2.shape[:2]
 
-    if w > 800:
-        h_, w_ = int(h * 800 / w), 800
+    WIDTH_LIMIT = 700
+    if w > WIDTH_LIMIT:
+        h_, w_ = int(h * WIDTH_LIMIT / w), WIDTH_LIMIT
     else:
         h_, w_ = h, w
 
@@ -55,11 +54,17 @@ def render_mask_image(agent: Agent) -> Union[None, bool]:
             mask = cv2.resize(mask, (w, h))
             img_byte_arr = BytesIO()
             mask = PILImage.fromarray(mask)
-            mask.save(img_byte_arr, format="webp")
+            mask.save(img_byte_arr, format="png")
 
             with get_db_context() as db:
                 UserNextOp.delete_all_by_key(
                     db, agent.session_id, UserNextOp.GET_IMAGE_MASK, auto_commit=False
+                )
+                UserNextOp.save_op(
+                    db,
+                    agent.session_id,
+                    UserNextOp.EDIT_IMAGE_USING_MASK,
+                    auto_commit=False,
                 )
                 UserBinaryData.save_data(
                     db,

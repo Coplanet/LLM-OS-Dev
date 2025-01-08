@@ -1,3 +1,4 @@
+import hashlib
 import os
 import re
 import tempfile
@@ -428,7 +429,7 @@ def main() -> None:
 
     # Process the text or audio input
     if audio_bytes:
-        audio_bytes = binary2text(audio_bytes)
+        audio_bytes = binary2text(audio_bytes, "audio/wav")
         # Here you can add logic to process the audio message
         st.session_state["messages"].append(
             {"role": "user", "content": [{"type": "audio", "audio": audio_bytes}]}
@@ -436,6 +437,24 @@ def main() -> None:
 
     if prompt := st.chat_input():
         st.session_state["messages"].append(Message(role="user", content=prompt))
+
+    if (
+        "uploaded_images" not in st.session_state
+        or "hash2uploaded_images" not in st.session_state
+    ):
+        st.session_state["uploaded_images"] = []
+        st.session_state["hash2uploaded_images"] = {}
+        with get_db_context() as db:
+            for d in UserBinaryData.get_data(
+                db,
+                user.session_id,
+                UserBinaryData.IMAGE,
+                UserBinaryData.DOWNSTREAM,
+            ):
+                st.session_state["hash2uploaded_images"][d.data_compressed_hashsum] = d
+                st.session_state["uploaded_images"].append(d)
+
+    hash2images = st.session_state.get("hash2uploaded_images", {})
 
     last_prompt = None
     last_user_message_index = None
@@ -476,8 +495,16 @@ def main() -> None:
                             last_prompt = item["text"]
                             st.write(last_prompt)
                         elif item["type"] == "image_url":
+                            data_ = item["image_url"]["url"]
+                            if not data_.startswith("http"):
+                                hash = hashlib.sha256(text2binary(data_)).hexdigest()
+                                data_ = hash2images.get(hash, item["image_url"]["url"])
                             st.image(
-                                item["image_url"]["url"],
+                                (
+                                    data_.data
+                                    if isinstance(data_, UserBinaryData)
+                                    else data_
+                                ),
                                 caption=item.get("image_caption"),
                                 use_column_width=True,
                             )
@@ -500,9 +527,10 @@ def main() -> None:
     )
 
     with get_db_context() as db:
-        if UserNextOp.get_op(
-            db, user.session_id, UserNextOp.GET_IMAGE_MASK
-        ) and render_mask_image(generic_leader):
+        if (
+            UserNextOp.get_op(db, user.session_id, UserNextOp.GET_IMAGE_MASK)
+            and render_mask_image(generic_leader)
+        ) or UserNextOp.get_op(db, user.session_id, UserNextOp.EDIT_IMAGE_USING_MASK):
             last_message = st.session_state["messages"][last_user_message_index]
 
     if last_message and last_message.role == "user":
@@ -596,26 +624,16 @@ def main() -> None:
                     )
                 question += "\n\n**RESPONSE WITH AUDIO.**"
 
-            if "uploaded_images" not in st.session_state:
-                with get_db_context() as db:
-                    st.session_state["uploaded_images"] = [
-                        # resize data image to 256x256
-                        d.data_as_image_thumbnail()
-                        for d in UserBinaryData.get_data(
-                            db,
-                            user.session_id,
-                            UserBinaryData.IMAGE,
-                            UserBinaryData.DOWNSTREAM,
-                        )
-                    ]
-
             uploaded_images = st.session_state["uploaded_images"]
 
             with st.spinner("Thinking..."):
                 response = run(
                     generic_leader,
                     question,
-                    uploaded_images,
+                    [
+                        binary2text(d.data_compressed, "image/webp")
+                        for d in uploaded_images
+                    ],
                     uploaded_videos_,
                     audio_bytes,
                     response_in_voice,
@@ -874,17 +892,23 @@ def main() -> None:
             ):
                 st.session_state["uploaded_images"] = []
 
-            images_ = UserBinaryData.save_bulk(
-                db,
-                user.session_id,
-                UserBinaryData.IMAGE,
-                UserBinaryData.DOWNSTREAM,
-                uploaded_images,
-            )
-            for image in images_:
-                st.session_state["uploaded_images"].append(
-                    image.data_as_image_thumbnail()
+            if "hash2uploaded_images" not in st.session_state:
+                st.session_state["hash2uploaded_images"] = {}
+
+            with get_db_context() as db:
+                images = UserBinaryData.save_bulk(
+                    db,
+                    user.session_id,
+                    UserBinaryData.IMAGE,
+                    UserBinaryData.DOWNSTREAM,
+                    uploaded_images,
                 )
+                for image in images:
+                    st.session_state["hash2uploaded_images"][
+                        image.data_compressed_hashsum
+                    ] = image
+
+                st.session_state["uploaded_images"].extend(images)
 
             alert.empty()
 

@@ -1,11 +1,10 @@
-import hashlib
 import io
 import json
 import os
 from hashlib import sha256
 from os import getenv
 from time import time
-from typing import Literal, Optional, Tuple
+from typing import Literal, Optional, Tuple, Union
 
 import boto3
 import requests
@@ -14,10 +13,10 @@ from phi.model.content import Image
 from phi.model.message import Message
 from phi.tools import Toolkit
 from phi.utils.log import logger
+from sqlalchemy import orm
 
 from db.session import get_db_context
 from db.tables import UserBinaryData, UserNextOp
-from helpers.utils import binary2text, text2binary
 
 
 class Stability(Toolkit):
@@ -226,6 +225,15 @@ class Stability(Toolkit):
                 file_name,
             )
 
+            with get_db_context() as db:
+                UserBinaryData.save_data(
+                    db,
+                    agent.session_id,
+                    UserBinaryData.IMAGE,
+                    UserBinaryData.UPSTREAM,
+                    response.content,
+                )
+
         else:
             raise Exception(str(response.json()))
 
@@ -256,73 +264,41 @@ class Stability(Toolkit):
         return "Image has been generated successfully and will be displayed below"
 
     @classmethod
-    def add_mask_to_latest_image(
-        cls, agent: Agent, image: bytes, mask: bytes
-    ) -> Optional[Tuple[bytes, Optional[bytes]]]:
-        for index in list(range(len(agent.memory.messages) - 1, -1, -1)):
-            if isinstance(agent.memory.messages[index].content, list):
-                for content in agent.memory.messages[index].content:
-                    if (
-                        "type" in content
-                        and content["type"] == "image_url"
-                        and "image_url" in content
-                        and isinstance(content["image_url"], dict)
-                        and "url" in content["image_url"]
-                        and isinstance(content["image_url"]["url"], str)
-                    ):
-                        image = content["image_url"]["url"]
-                        if image.startswith("data:"):
-                            image_content = text2binary(image)
-                        else:
-                            resp = requests.get(image)
-                            if resp.status_code == 200:
-                                image_content = resp.content
-                        if (
-                            image_content
-                            and hashlib.sha256(
-                                binary2text(image_content, "image/webp").encode()
-                            ).hexdigest()
-                            == hashlib.sha256(image.encode()).hexdigest()
-                        ):
-                            mask = binary2text(mask, "image/webp")
-                            agent.memory.add_message(
-                                Message(role="tool", content=json.dumps({"mask": mask}))
-                            )
-                            agent.write_to_storage()
-                            return image_content, mask
-
-    @classmethod
     def latest_user_image_with_mask(
         cls, agent: Agent
     ) -> Optional[Tuple[UserBinaryData, Optional[UserBinaryData]]]:
         with get_db_context() as db:
-            image = UserBinaryData.get_data(
-                db,
-                agent.session_id,
-                UserBinaryData.IMAGE,
-                UserBinaryData.DOWNSTREAM,
-            ).first()
-            mask = UserBinaryData.get_data(
-                db,
-                agent.session_id,
-                UserBinaryData.IMAGE_MASK,
-                UserBinaryData.DOWNSTREAM,
-            ).first()
+            image = cls.latest_user_image(
+                agent, type=UserBinaryData.IMAGE, return_data=False, db=db
+            )
+            mask = cls.latest_user_image(
+                agent, type=UserBinaryData.IMAGE_MASK, return_data=False, db=db
+            )
             return image, mask
 
     @classmethod
-    def latest_user_image(cls, agent: Agent) -> Optional[bytes]:
-        with get_db_context() as db:
+    def latest_user_image(
+        cls,
+        agent: Agent,
+        type: Optional[Literal["image", "image_mask"]] = UserBinaryData.IMAGE,
+        return_data: Optional[bool] = True,
+        db: Optional[orm.Session] = None,
+    ) -> Optional[Union[bytes, UserBinaryData]]:
+        def fetch_image(dbi: orm.Session):
             image = UserBinaryData.get_data(
-                db,
+                dbi,
                 agent.session_id,
-                UserBinaryData.IMAGE,
-                UserBinaryData.DOWNSTREAM,
+                type,
             ).first()
             if image:
-                return image.data
+                return image.data if return_data else image
+            return None
 
-        return None
+        if db:
+            return fetch_image(db)
+
+        with get_db_context() as db:
+            return fetch_image(db)
 
     def outpaint(
         self,
@@ -425,16 +401,21 @@ class Stability(Toolkit):
         self,
         agent: Agent,
         prompt: str,
-        negative_prompt: Optional[str] = None,
-        seed: Optional[int] = 0,
+        thing_to_avoid_when_editing: Optional[str] = None,
     ) -> str:
         """Add features to an image while preserving its original content.
+        **CRITICAL NOTE**: Be very descriptive for the `prompt` and \
+            `thing_to_avoid_when_editing` parameters.
+        **CRITICAL NOTE**: The `prompt` should be a very descriptive text for the \
+            desired image outcome; **BUT DON'T MAKE UP THING BY YOURSELF**.
+        **CRITICAL NOTE**: The `thing_to_avoid_when_editing` should be a very descriptive \
+            text for the undesired image outcome, the negative prompt should be send as \
+            possitive words, e.g. instead of "no crippled face", send "crippled face".
 
         Args:
-            prompt (str): Descriptive text for the desired image outcome. \
+            prompt (str): Descriptive (but not too much) text for the desired image outcome. \
                 Use (word:weight) to control word emphasis, e.g., (blue:0.3).
-            negative_prompt (str): Text describing elements to exclude from the image.
-            seed (int): Value to influence the randomness of the generation.
+            thing_to_avoid_when_editing (str): Text describing the elements to avoid when editing the image.
 
         Returns:
             str: Message indicating success or error.
@@ -459,6 +440,7 @@ class Stability(Toolkit):
                     "next_step": True,
                     "user_additional_output": "Please provide a mask for the image",
                     "stop_calling_other_tools": True,
+                    "add_to_memory": True,
                     "method": "add_feature",
                     "class": "stability",
                     "nextop_id": nextop.id,
@@ -467,13 +449,30 @@ class Stability(Toolkit):
 
         response = self._req(
             "https://api.stability.ai/v2beta/stable-image/edit/inpaint",
-            files={"image": image, "mask": mask},
+            files={"image": image.data, "mask": mask.data},
             data={
                 "prompt": prompt,
-                "negative_prompt": negative_prompt,
-                "seed": seed,
+                "negative_prompt": thing_to_avoid_when_editing,
             },
         )
+
+        if response.status_code == 200:
+            with get_db_context() as db:
+                UserNextOp.delete_all_by_key(
+                    db,
+                    agent.session_id,
+                    UserNextOp.EDIT_IMAGE_USING_MASK,
+                    auto_commit=False,
+                )
+                UserNextOp.delete_all_by_key(
+                    db,
+                    agent.session_id,
+                    UserNextOp.GET_IMAGE_MASK,
+                    auto_commit=False,
+                )
+                UserBinaryData.delete_all_by_type(
+                    db, agent.session_id, UserBinaryData.IMAGE_MASK
+                )
 
         self._store_in_s3(agent, response, prompt, f"{prompt}")
 
