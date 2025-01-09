@@ -468,7 +468,7 @@ sqlalchemy==2.0.36
     # via
     #   -r requirements/prod.in
     #   alembic
-st-clickable-images @ git+https://github.com/alphamarket/st-clickable-images.git
+st-clickable-images==0.0.3
     # via -r requirements/prod.in
 stack-data==0.6.3
     # via ipython
