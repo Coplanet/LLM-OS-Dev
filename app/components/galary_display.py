@@ -37,7 +37,7 @@ def render_galary_display(agent: Agent) -> Union[None, bool]:
                 "justify-content": "center",
                 "flex-wrap": "wrap",
             },
-            img_style={"margin": "5px", "height": "200px"},
+            img_style={"margin": "5px", "height": "100px"},
         )
         if not isinstance(new_selected_image, int) or (
             isinstance(new_selected_image, int) and new_selected_image < 0

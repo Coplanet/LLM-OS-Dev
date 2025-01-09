@@ -122,9 +122,9 @@ class UserBinaryData(Base):
         # compute width based on height and aspect ratio
         if width is None:
             width = int(height * image.size[0] / image.size[1])
-        height = min(height, image.size[0])
-        width = min(width, image.size[1])
-        image.resize((height, width)).save(output, format="webp")
+        height = min(height, image.size[1])
+        width = min(width, image.size[0])
+        image.resize((width, height)).save(output, format="webp")
         compressed_data = output.getvalue()
         if store_compressed:
             compressed_data_hashsum = hashlib.sha256(compressed_data).hexdigest()
