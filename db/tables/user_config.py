@@ -177,6 +177,8 @@ class UserBinaryData(Base):
             mimetype=mimetype,
             extension=extension,
         )
+        if type == cls.IMAGE:
+            instance.data_as_image_thumbnail()
         db.add(instance)
         if auto_commit:
             db.commit()
