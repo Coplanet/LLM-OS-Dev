@@ -559,6 +559,8 @@ sqlalchemy==2.0.36
     # via
     #   -r requirements/prod.in
     #   alembic
+st-clickable-images @ git+https://github.com/alphamarket/st-clickable-images.git
+    # via -r requirements/prod.in
 stack-data==0.6.3
     # via ipython
 starlette==0.40.0
@@ -567,6 +569,7 @@ streamlit==1.39.0
     # via
     #   -r requirements/prod.in
     #   audio-recorder-streamlit
+    #   st-clickable-images
     #   streamlit-drawable-canvas
 streamlit-drawable-canvas==0.9.3
     # via -r requirements/prod.in

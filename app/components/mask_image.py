@@ -8,18 +8,16 @@ from phi.agent import Agent
 from PIL import Image as PILImage
 from streamlit_drawable_canvas import st_canvas
 
+from ai.tools.stability import Stability
 from db.session import get_db_context
 from db.tables.user_config import UserBinaryData, UserNextOp
 
 
 @st.dialog("Draw a mask over the image", width="large")
 def render_mask_image(agent: Agent) -> Union[None, bool]:
-    with get_db_context() as db:
-        image: bytes = (
-            UserBinaryData.get_data(db, agent.session_id, UserBinaryData.IMAGE)
-            .first()
-            .data
-        )
+    image: bytes = Stability.latest_user_image(
+        agent, type=UserBinaryData.IMAGE, return_data=True
+    )
 
     file_bytes = np.asarray(bytearray(image), dtype=np.uint8)
     image_cv2 = cv2.imdecode(file_bytes, 1)
@@ -81,7 +79,9 @@ def render_mask_image(agent: Agent) -> Union[None, bool]:
 
     with col2:
         if st.button("Cancel"):
-            stroke_width.empty()
-            canvas.empty()
+            with get_db_context() as db:
+                UserNextOp.delete_all_by_key(
+                    db, agent.session_id, UserNextOp.GET_IMAGE_MASK
+                )
             st.warning("Image editing has been cancelled!")
             st.rerun()

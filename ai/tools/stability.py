@@ -8,6 +8,7 @@ from typing import Literal, Optional, Tuple, Union
 
 import boto3
 import requests
+import streamlit as st
 from phi.agent import Agent
 from phi.model.content import Image
 from phi.model.message import Message
@@ -226,13 +227,14 @@ class Stability(Toolkit):
             )
 
             with get_db_context() as db:
-                UserBinaryData.save_data(
+                image = UserBinaryData.save_data(
                     db,
                     agent.session_id,
                     UserBinaryData.IMAGE,
                     UserBinaryData.UPSTREAM,
                     response.content,
                 )
+                st.session_state["selected_image"] = image.id
 
         else:
             raise Exception(str(response.json()))
@@ -284,6 +286,21 @@ class Stability(Toolkit):
         return_data: Optional[bool] = True,
         db: Optional[orm.Session] = None,
     ) -> Optional[Union[bytes, UserBinaryData]]:
+        if (
+            type == UserBinaryData.IMAGE
+            and "selected_image" in st.session_state
+            and isinstance(st.session_state["selected_image"], int)
+        ):
+            image_id = st.session_state["selected_image"]
+            with get_db_context() as db:
+                image = UserBinaryData.get_by_id(
+                    db,
+                    agent.session_id,
+                    image_id,
+                )
+                if image:
+                    return image.data if return_data else image
+
         def fetch_image(dbi: orm.Session):
             image = UserBinaryData.get_data(
                 dbi,

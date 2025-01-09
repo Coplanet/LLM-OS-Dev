@@ -49,3 +49,6 @@ tiktoken
 typer
 types-beautifulsoup4
 types-Pillow
+
+
+git+https://github.com/alphamarket/st-clickable-images.git

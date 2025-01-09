@@ -42,6 +42,7 @@ from ai.document.reader.image import ImageReader
 from ai.document.reader.pptx import PPTXReader
 from app.auth import Auth, User
 from app.components.available_agents import AGENTS
+from app.components.galary_display import render_galary_display
 from app.components.mask_image import render_mask_image
 from app.components.popup import AUDIO_SUPPORTED_MODELS, show_popup
 from app.components.sidebar import create_sidebar
@@ -459,7 +460,7 @@ def main() -> None:
     last_prompt = None
     last_user_message_index = None
     last_user_message_container = None
-    user_last_message_image_render = False
+    st.session_state["rendered_images_hashes"] = set()
     # Display existing chat messages
     for index, message in enumerate(generic_leader.memory.messages):
         if isinstance(message.content, str):
@@ -485,8 +486,6 @@ def main() -> None:
             if message_role == "user":
                 last_user_message_index = index
                 last_user_message_container = chat_message_container
-            else:
-                last_user_message_container = None
             with chat_message_container:
                 content = message.content
                 if isinstance(content, list):
@@ -498,7 +497,11 @@ def main() -> None:
                             data_ = item["image_url"]["url"]
                             if not data_.startswith("http"):
                                 hash = hashlib.sha256(text2binary(data_)).hexdigest()
+                                if hash in st.session_state["rendered_images_hashes"]:
+                                    continue
                                 data_ = hash2images.get(hash, item["image_url"]["url"])
+                                if message_role == "user":
+                                    st.session_state["rendered_images_hashes"].add(hash)
                             st.image(
                                 (
                                     data_.data
@@ -508,10 +511,6 @@ def main() -> None:
                                 caption=item.get("image_caption"),
                                 use_column_width=True,
                             )
-                            if message_role == "user":
-                                user_last_message_image_render = True
-                            else:
-                                user_last_message_image_render = False
                         # We disable audio rendering for now
                         elif item["type"] == "audio" and False:
                             st.audio(
@@ -699,7 +698,7 @@ def main() -> None:
                                 audio_bytes_,
                             )
 
-            if uploaded_images and not user_last_message_image_render:
+            if uploaded_images:
                 if not memory:
                     memory = generic_leader.read_from_storage().memory
 
@@ -719,7 +718,15 @@ def main() -> None:
 
                     with last_user_message_container:
                         for image in images:
+                            if (
+                                image.data_compressed_hashsum
+                                in st.session_state["rendered_images_hashes"]
+                            ):
+                                continue
                             st.image(image.data)
+                            st.session_state["rendered_images_hashes"].add(
+                                image.data_compressed_hashsum
+                            )
 
             # Render the images
             if image_outputs:
@@ -803,6 +810,15 @@ def main() -> None:
         # -*- Add documents to knowledge base
         if "file_uploader_key" not in st.session_state:
             st.session_state["file_uploader_key"] = 100
+
+        if "uploaded_images" not in st.session_state or not isinstance(
+            st.session_state["uploaded_images"], list
+        ):
+            st.session_state["uploaded_images"] = []
+
+        if st.session_state["uploaded_images"] and st.button("Display Gallery"):
+            render_galary_display(generic_leader)
+
         uploaded_files_ = st.sidebar.file_uploader(
             "Add a Document (video & image files, .pdf, .csv, .pptx, .txt, .md, .docx, .json, .xlsx, .xls and etc)",
             key=st.session_state["file_uploader_key"],
@@ -886,11 +902,6 @@ def main() -> None:
                         )
                         continue
             st.session_state["file_uploader_key"] += 1
-
-            if "uploaded_images" not in st.session_state or not isinstance(
-                st.session_state["uploaded_images"], list
-            ):
-                st.session_state["uploaded_images"] = []
 
             if "hash2uploaded_images" not in st.session_state:
                 st.session_state["hash2uploaded_images"] = {}

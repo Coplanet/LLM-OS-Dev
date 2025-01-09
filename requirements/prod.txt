@@ -72,16 +72,16 @@ click==8.1.7
     #   streamlit
     #   typer
     #   uvicorn
-composio-core==0.6.7
+composio-core==0.6.13
     # via
     #   -r requirements/prod.in
     #   composio-openai
     #   composio-phidata
-composio-openai==0.6.7
+composio-openai==0.6.13
     # via
     #   -r requirements/prod.in
     #   composio-phidata
-composio-phidata==0.6.7
+composio-phidata==0.6.13
     # via -r requirements/prod.in
 cryptography==44.0.0
     # via paramiko
@@ -251,11 +251,14 @@ nest-asyncio==1.6.0
     # via -r requirements/prod.in
 numpy==2.1.2
     # via
+    #   -r requirements/prod.in
+    #   opencv-python-headless
     #   pandas
     #   pgvector
     #   pyarrow
     #   pydeck
     #   streamlit
+    #   streamlit-drawable-canvas
     #   yfinance
 ollama==0.4.2
     # via -r requirements/prod.in
@@ -264,6 +267,8 @@ openai==1.58.1
     #   -r requirements/prod.in
     #   composio-openai
     #   exa-py
+opencv-python-headless==4.10.0.84
+    # via -r requirements/prod.in
 openpyxl==3.1.5
     # via -r requirements/prod.in
 packaging==24.1
@@ -295,6 +300,7 @@ pillow==10.4.0
     #   -r requirements/prod.in
     #   python-pptx
     #   streamlit
+    #   streamlit-drawable-canvas
 platformdirs==4.3.6
     # via yfinance
 pluggy==1.5.0
@@ -462,6 +468,8 @@ sqlalchemy==2.0.36
     # via
     #   -r requirements/prod.in
     #   alembic
+st-clickable-images @ git+https://github.com/alphamarket/st-clickable-images.git
+    # via -r requirements/prod.in
 stack-data==0.6.3
     # via ipython
 starlette==0.40.0
@@ -470,6 +478,10 @@ streamlit==1.39.0
     # via
     #   -r requirements/prod.in
     #   audio-recorder-streamlit
+    #   st-clickable-images
+    #   streamlit-drawable-canvas
+streamlit-drawable-canvas==0.9.3
+    # via -r requirements/prod.in
 tenacity==9.0.0
     # via streamlit
 tiktoken==0.8.0

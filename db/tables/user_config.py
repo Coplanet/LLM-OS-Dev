@@ -133,6 +133,12 @@ class UserBinaryData(Base):
         return compressed_data
 
     @classmethod
+    def get_by_id(
+        cls, db: orm.Session, session_id: str, id: int
+    ) -> Optional["UserBinaryData"]:
+        return db.query(cls).filter_by(session_id=session_id, id=id).first()
+
+    @classmethod
     def get_data(
         cls,
         db: orm.Session,
