@@ -935,7 +935,7 @@ def main() -> None:
     NEW_SESSION = st.sidebar.button("New Session")
 
     if generic_leader.storage:
-        sessions = generic_leader.storage.get_all_sessions()
+        sessions = generic_leader.storage.get_all_session_ids(user_id=user.user_id)
         session_options = {
             "Today": [],
             "Yesterday": [],
