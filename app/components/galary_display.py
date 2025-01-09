@@ -20,7 +20,10 @@ def render_galary_display(agent: Agent) -> Union[None, bool]:
         image_list = []
         for index in range(IMAGE_COUNT - 1, -1, -1):
             image_list.append(
-                binary2text(images[index].data, images[index].mimetype or "image/webp")
+                binary2text(
+                    images[index].data_compressed,
+                    images[index].mimetype or "image/webp",
+                )
             )
             if not index_extracted and images[index].id == selected_image:
                 selected_image = index
