@@ -1,18 +1,23 @@
-import base64
 import io
+import json
 import os
 from hashlib import sha256
 from os import getenv
 from time import time
-from typing import Literal, Optional
+from typing import Literal, Optional, Tuple, Union
 
 import boto3
 import requests
+import streamlit as st
 from phi.agent import Agent
 from phi.model.content import Image
 from phi.model.message import Message
 from phi.tools import Toolkit
 from phi.utils.log import logger
+from sqlalchemy import orm
+
+from db.session import get_db_context
+from db.tables import UserBinaryData, UserNextOp
 
 
 class Stability(Toolkit):
@@ -221,6 +226,16 @@ class Stability(Toolkit):
                 file_name,
             )
 
+            with get_db_context() as db:
+                image = UserBinaryData.save_data(
+                    db,
+                    agent.session_id,
+                    UserBinaryData.IMAGE,
+                    UserBinaryData.UPSTREAM,
+                    response.content,
+                )
+                st.session_state["selected_image"] = image.id
+
         else:
             raise Exception(str(response.json()))
 
@@ -250,30 +265,57 @@ class Stability(Toolkit):
         agent.write_to_storage()
         return "Image has been generated successfully and will be displayed below"
 
-    def _latest_user_image(self, agent: Agent) -> Optional[bytes]:
-        for index in list(range(len(agent.run_response.messages) - 1, -1, -1)):
-            if agent.run_response.messages[index].images:
-                return base64.b64decode(
-                    agent.run_response.messages[index].images[-1].split("base64,")[1]
+    @classmethod
+    def latest_user_image_with_mask(
+        cls, agent: Agent
+    ) -> Optional[Tuple[UserBinaryData, Optional[UserBinaryData]]]:
+        with get_db_context() as db:
+            image = cls.latest_user_image(
+                agent, type=UserBinaryData.IMAGE, return_data=False, db=db
+            )
+            mask = cls.latest_user_image(
+                agent, type=UserBinaryData.IMAGE_MASK, return_data=False, db=db
+            )
+            return image, mask
+
+    @classmethod
+    def latest_user_image(
+        cls,
+        agent: Agent,
+        type: Optional[Literal["image", "image_mask"]] = UserBinaryData.IMAGE,
+        return_data: Optional[bool] = True,
+        db: Optional[orm.Session] = None,
+    ) -> Optional[Union[bytes, UserBinaryData]]:
+        if (
+            type == UserBinaryData.IMAGE
+            and "selected_image" in st.session_state
+            and isinstance(st.session_state["selected_image"], int)
+        ):
+            image_id = st.session_state["selected_image"]
+            with get_db_context() as db:
+                image = UserBinaryData.get_by_id(
+                    db,
+                    agent.session_id,
+                    image_id,
                 )
+                if image:
+                    return image.data if return_data else image
 
-        for index in list(range(len(agent.memory.messages) - 1, -1, -1)):
-            if isinstance(agent.memory.messages[index].content, list):
-                for content in agent.memory.messages[index].content:
-                    if (
-                        "type" in content
-                        and content["type"] == "image_url"
-                        and "image_url" in content
-                        and isinstance(content["image_url"], dict)
-                        and "url" in content["image_url"]
-                        and isinstance(content["image_url"]["url"], str)
-                    ):
-                        image = content["image_url"]["url"]
-                        resp = requests.get(image)
-                        if resp.status_code == 200:
-                            return resp.content
+        def fetch_image(dbi: orm.Session):
+            image = UserBinaryData.get_data(
+                dbi,
+                agent.session_id,
+                type,
+            ).first()
+            if image:
+                return image.data if return_data else image
+            return None
 
-        return None
+        if db:
+            return fetch_image(db)
+
+        with get_db_context() as db:
+            return fetch_image(db)
 
     def outpaint(
         self,
@@ -304,7 +346,7 @@ class Stability(Toolkit):
         Returns:
             str: A message indicating the result.
         """
-        image = self._latest_user_image(agent)
+        image = self.latest_user_image(agent)
 
         if not image:
             return "No image found"
@@ -351,7 +393,7 @@ class Stability(Toolkit):
         Returns:
             str: A message indicating if the image has been generated successfully or an error message.
         """
-        image = self._latest_user_image(agent)
+        image = self.latest_user_image(agent)
 
         if not image:
             return "No image found"
@@ -375,46 +417,83 @@ class Stability(Toolkit):
     def add_feature(
         self,
         agent: Agent,
-        decriptive_prompt: str,
-        area_that_change_is_about: list[str],
-        areas_that_change_will_be_added_to: list[str],
-        features_to_add: list[str],
-        changes_to_avoid: list[str],
+        prompt: str,
+        thing_to_avoid_when_editing: Optional[str] = None,
     ) -> str:
         """Add features to an image while preserving its original content.
-        **NOTE**:
-        - **IMPORTANT:** Be very specific and detailed about `areas_that_change_will_be_added_to` and `inner_area`.
+        **CRITICAL NOTE**: Be very descriptive for the `prompt` and \
+            `thing_to_avoid_when_editing` parameters.
+        **CRITICAL NOTE**: The `prompt` should be a very descriptive text for the \
+            desired image outcome; **BUT DON'T MAKE UP THING BY YOURSELF**.
+        **CRITICAL NOTE**: The `thing_to_avoid_when_editing` should be a very descriptive \
+            text for the undesired image outcome, the negative prompt should be send as \
+            possitive words, e.g. instead of "no crippled face", send "crippled face".
 
         Args:
-            decriptive_prompt (str): Descriptive prompt for the agent that is going to change the image.
-            area_that_change_is_about (list[str]): Descriptions of inner areas for feature addition \
-                (The area that **SHOULDN'T BE CHANGED**).
-            areas_that_change_will_be_added_to (list[str]): Descriptions of outer areas for feature addition \
-                (The area that **CAN BE CHANGED**).
-            features_to_add (list[str]): Features to add, described in detail.
-            changes_to_avoid (list[str]): Descriptions of changes to avoid.
+            prompt (str): Descriptive (but not too much) text for the desired image outcome. \
+                Use (word:weight) to control word emphasis, e.g., (blue:0.3).
+            thing_to_avoid_when_editing (str): Text describing the elements to avoid when editing the image.
 
         Returns:
-            str: Success or error message.
+            str: Message indicating success or error.
         """
+        image, mask = self.latest_user_image_with_mask(agent)
 
-        prompt = (
-            "{}\nAdd the following features: {}.\n"
-            "Ensure the inner area(s): {} "
-            "remain unchanged and same as original image.".format(
-                decriptive_prompt,
-                ", ".join(features_to_add),
-                ", ".join(area_that_change_is_about),
+        if not image:
+            return "No image found"
+
+        if not mask:
+            with get_db_context() as db:
+                nextop = UserNextOp.save_op(
+                    db,
+                    agent.session_id,
+                    UserNextOp.GET_IMAGE_MASK,
+                    {"image_id": image.id},
+                )
+
+            return json.dumps(
+                {
+                    "message": {"mask": "required"},
+                    "next_step": True,
+                    "user_additional_output": "Please provide a mask for the image",
+                    "stop_calling_other_tools": True,
+                    "add_to_memory": True,
+                    "method": "add_feature",
+                    "class": "stability",
+                    "nextop_id": nextop.id,
+                }
             )
+
+        response = self._req(
+            "https://api.stability.ai/v2beta/stable-image/edit/inpaint",
+            files={"image": image.data, "mask": mask.data},
+            data={
+                "prompt": prompt,
+                "negative_prompt": thing_to_avoid_when_editing,
+            },
         )
 
-        return self.search_and_replace(
-            agent,
-            prompt=prompt,
-            search_prompt="\n".join(areas_that_change_will_be_added_to),
-            negative_prompt="\n".join(changes_to_avoid),
-            grow_mask=0,
-        )
+        if response.status_code == 200:
+            with get_db_context() as db:
+                UserNextOp.delete_all_by_key(
+                    db,
+                    agent.session_id,
+                    UserNextOp.EDIT_IMAGE_USING_MASK,
+                    auto_commit=False,
+                )
+                UserNextOp.delete_all_by_key(
+                    db,
+                    agent.session_id,
+                    UserNextOp.GET_IMAGE_MASK,
+                    auto_commit=False,
+                )
+                UserBinaryData.delete_all_by_type(
+                    db, agent.session_id, UserBinaryData.IMAGE_MASK
+                )
+
+        self._store_in_s3(agent, response, prompt, f"{prompt}")
+
+        return "Image has been edited successfully and will be displayed below"
 
     def remove_background(self, agent: Agent) -> str:
         """Use this function to Remove Background accurately segments the foreground
@@ -423,7 +502,7 @@ class Stability(Toolkit):
         Returns:
             str: A message indicating if the image has been generated successfully or an error message.
         """
-        image = self._latest_user_image(agent)
+        image = self.latest_user_image(agent)
 
         if not image:
             return "No image found"

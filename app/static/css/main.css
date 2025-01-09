@@ -22,6 +22,13 @@ button[kind="secondary"]:active {
 div:has(> [aria-label="Chat message from assistant"]) {
     padding: 1rem !important;
 }
+div:has(> .stHeading) {
+    display: none !important;
+}
+.st-key-subtitle_container * {
+    font-size: 1.5rem !important;
+    font-weight: 600 !important;
+}
 .st-key-delete_knowledge_base button:hover,
 .st-key-delete_all_session_button button:hover {
     color: #fff !important;

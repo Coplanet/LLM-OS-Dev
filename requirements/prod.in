@@ -17,13 +17,18 @@ wikipedia
 sentry-sdk
 python-pptx
 beautifulsoup4
-composio_openai>=0.6.7
-composio-core>=0.6.7
-composio-phidata>=0.6.7
+composio_openai>=0.6.11
+composio-core>=0.6.11
+composio-phidata>=0.6.11
 duckduckgo-search
 google-generativeai
 youtube-transcript-api
 audio-recorder-streamlit
+
+numpy
+opencv-python-headless
+pillow
+streamlit-drawable-canvas
 
 alembic
 beautifulsoup4
@@ -44,3 +49,6 @@ tiktoken
 typer
 types-beautifulsoup4
 types-Pillow
+
+
+git+https://github.com/alphamarket/st-clickable-images.git

@@ -1,3 +1,4 @@
+import hashlib
 import os
 import re
 import tempfile
@@ -5,7 +6,7 @@ from datetime import datetime, timedelta
 from os import getenv
 from time import sleep, time
 from typing import Dict, List, Optional
-from urllib.parse import quote, urlencode
+from urllib.parse import urlencode
 from uuid import uuid4
 
 import google.generativeai as genai
@@ -41,13 +42,15 @@ from ai.document.reader.image import ImageReader
 from ai.document.reader.pptx import PPTXReader
 from app.auth import Auth, User
 from app.components.available_agents import AGENTS
+from app.components.galary_display import render_galary_display
+from app.components.mask_image import render_mask_image
 from app.components.popup import AUDIO_SUPPORTED_MODELS, show_popup
 from app.components.sidebar import create_sidebar
 from db.session import get_db_context
 from db.settings import db_settings
-from db.tables import UserConfig
+from db.tables import UserBinaryData, UserConfig, UserNextOp
 from helpers.log import logger
-from helpers.utils import audio2text, audio_text2data, text2audio
+from helpers.utils import binary2text, binary_text2data, text2binary
 
 phi_logger.setLevel(logging.DEBUG)
 
@@ -96,19 +99,73 @@ document.addEventListener("DOMContentLoaded", function() {
 )
 
 st.title("CoPlanet AI")
-st.markdown(
-    f"""\
-    ##### <img src="{IMAGE_DIR}/coplanet.png" alt="Logo" style="display: none; width: 30px; margin-right: 10px;"> \
-    CoPlanet LLM OS\
-    """,
-    unsafe_allow_html=True,
-)
+with st.container(key="subtitle_container"):
+    st.markdown(
+        """\
+        LLM OS: Where Agents Meet Creativity\
+        """,
+        unsafe_allow_html=True,
+    )
 st.markdown(
     """<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.0/css/all.min.css">""",
     unsafe_allow_html=True,
 )
 
 user: User = auth.get_user()
+
+
+def run(
+    generic_leader: Agent,
+    question: str,
+    uploaded_images: List[Image],
+    uploaded_videos_: List[Image],
+    audio_bytes: bytes,
+    response_in_voice: bool,
+    AUDIO_RESPONSE_SUPPORT: bool,
+    audio_bytes_: bytes,
+):
+
+    response = ""
+    resp_container = st.empty()
+    start = time()
+
+    if not AUDIO_RESPONSE_SUPPORT or not response_in_voice:
+        try:
+            for delta in generic_leader.run(
+                message=question,
+                images=uploaded_images,
+                videos=uploaded_videos_,
+                audio=audio_bytes,
+                stream=True,
+            ):
+                response += delta.content  # type: ignore
+                response = re.sub(r"[\n\s]*!\[[^\]]+?\]\([^\)]+?\)", "", response)
+                resp_container.markdown(response)
+
+        except Exception as e:
+            logger.exception(e)
+            st.exception(e)
+    else:
+        try:
+            generic_leader.run(
+                message="Answer the input audio.",
+                images=uploaded_images,
+                videos=uploaded_videos_,
+                audio={
+                    "data": binary_text2data(audio_bytes_),
+                    "format": "wav",
+                },
+            )
+
+        except Exception as e:
+            logger.exception(e)
+            st.exception(e)
+
+    end = time()
+    logger.debug(
+        "Time to response from coordinator: {:.2f} seconds".format(end - start)
+    )
+    return response
 
 
 def rerun(clean_session: bool = False):
@@ -208,21 +265,6 @@ def main() -> None:
         user.to_auth_param(add_to_query_params=True)
         rerun()
 
-    with st.expander(":point_down: Examples:"):
-        examples = [
-            "Report on the latest AI technology updates at your choice from YouTube channels.",
-            "Identify the best AI framework on GitHub and star it upon confirmation.",
-            "Summarize a Wikipedia page and YouTube video on quantum computers.",
-        ]
-        for example in examples:
-            st.markdown(
-                f"- {example} <a href='?q={quote(example)}' target='_self'>[Try it!]</a>",
-                unsafe_allow_html=True,
-            )
-        st.markdown(
-            "Feel free to unleash your creativity and explore the full potential of this platform."
-        )
-
     st.sidebar.info(f":label: User: {user.username}")
 
     # Initialize session state for popup control
@@ -317,66 +359,21 @@ def main() -> None:
         st.session_state.show_popup = False
         st.session_state.selected_assistant = None
 
-    # Store uploaded image in session state
-    if "uploaded_images" not in st.session_state:
-        st.session_state["uploaded_images"] = []
-
-    uploaded_images = st.session_state["uploaded_images"]
-
     if "uploaded_files" not in st.session_state:
         st.session_state["uploaded_files"] = []
 
     # Load existing messages
-    agent_chat_history = generic_leader.memory.get_messages()
-    if not agent_chat_history:
-        history = generic_leader.read_from_storage()
-        if (
-            history
-            and history.memory
-            and "chats" in history.memory
-            and isinstance(history.memory["chats"], list)
-        ):
-            for chat in history.memory["chats"]:
-                if "messages" in chat:
-                    if "role" in chat["message"] and chat["message"]["role"] == "user":
-                        agent_chat_history.append(
-                            {"role": "user", "content": chat["messages"]["content"]}
-                        )
-                        if "response" in chat:
-                            agent_chat_history.append(
-                                {
-                                    "role": "assistant",
-                                    "content": chat["response"]["content"],
-                                }
-                            )
+    st.session_state["messages"] = generic_leader.memory.messages
 
-    if agent_chat_history:
-        logger.debug("Loading chat history")
-        null_content = []
-        for i in range(len(agent_chat_history)):
-            if agent_chat_history[i].get("content") is None:
-                null_content.append(i)
-            elif isinstance(agent_chat_history[i]["content"], str):
-                agent_chat_history[i]["content"] = re.sub(
-                    r"[\n\s]*!\[[^\]]+?\]\([^\)]+?\)",
-                    "",
-                    agent_chat_history[i]["content"],
-                )
-        # remove null content using the indices:
-        for i in reversed(null_content):
-            agent_chat_history.pop(i)
-        st.session_state["messages"] = agent_chat_history
-
-    else:
+    if not st.session_state["messages"]:
         if "q" in st.query_params:
-            st.session_state["messages"] = [
-                {"role": "user", "content": st.query_params["q"]}
-            ]
+            with st.chat_message("user"):
+                st.markdown(st.query_params["q"])
+                question = st.query_params["q"]
+
         else:
-            logger.debug("No chat history found")
-            st.session_state["messages"] = [
-                {"role": "assistant", "content": "Ask me anything..."}
-            ]
+            with st.chat_message("assistant"):
+                st.markdown("How can I assist you?")
 
     AUDIO_ERROR = None
     with st.sidebar:
@@ -433,71 +430,117 @@ def main() -> None:
 
     # Process the text or audio input
     if audio_bytes:
-        audio_bytes = audio2text(audio_bytes)
+        audio_bytes = binary2text(audio_bytes, "audio/wav")
         # Here you can add logic to process the audio message
         st.session_state["messages"].append(
             {"role": "user", "content": [{"type": "audio", "audio": audio_bytes}]}
         )
 
     if prompt := st.chat_input():
-        st.session_state["messages"].append({"role": "user", "content": prompt})
+        st.session_state["messages"].append(Message(role="user", content=prompt))
 
+    if (
+        "uploaded_images" not in st.session_state
+        or "hash2uploaded_images" not in st.session_state
+    ):
+        st.session_state["uploaded_images"] = []
+        st.session_state["hash2uploaded_images"] = {}
+        with get_db_context() as db:
+            for d in UserBinaryData.get_data(
+                db,
+                user.session_id,
+                UserBinaryData.IMAGE,
+                UserBinaryData.DOWNSTREAM,
+            ):
+                st.session_state["hash2uploaded_images"][d.data_compressed_hashsum] = d
+                st.session_state["uploaded_images"].append(d)
+
+    hash2images = st.session_state.get("hash2uploaded_images", {})
+
+    last_prompt = None
+    last_user_message_index = None
     last_user_message_container = None
-    user_last_message_image_render = False
+    st.session_state["rendered_images_hashes"] = set()
     # Display existing chat messages
-    for message in st.session_state["messages"]:
+    for index, message in enumerate(generic_leader.memory.messages):
+        if isinstance(message.content, str):
+            message.content = re.sub(
+                r"[\n\s]*!\[[^\]]+?\]\([^\)]+?\)", "", message.content
+            )
+
+        if not message.content:
+            continue
+
         # Skip system and tool messages
-        if message.get("role") in ["system", "tool"]:
+        if message.role in ["system", "tool"]:
             continue
         # Display the message
-        message_role = message.get("role")
+        message_role = message.role
+
         if message_role is not None:
             # Skip audio messages for now
-            if message_role == "user" and isinstance(message.get("content"), list):
-                if message.get("content")[0].get("type") == "audio":
+            if message_role == "user" and isinstance(message.content, list):
+                if message.content[0].get("type") == "audio":
                     continue
             chat_message_container = st.chat_message(message_role)
             if message_role == "user":
+                last_user_message_index = index
                 last_user_message_container = chat_message_container
-            else:
-                last_user_message_container = None
             with chat_message_container:
-                content = message.get("content")
+                content = message.content
                 if isinstance(content, list):
                     for item in content:
                         if item["type"] == "text":
-                            st.write(item["text"])
+                            last_prompt = item["text"]
+                            st.write(last_prompt)
                         elif item["type"] == "image_url":
+                            data_ = item["image_url"]["url"]
+                            if not data_.startswith("http"):
+                                hash = hashlib.sha256(text2binary(data_)).hexdigest()
+                                if hash in st.session_state["rendered_images_hashes"]:
+                                    continue
+                                data_ = hash2images.get(hash, item["image_url"]["url"])
+                                if message_role == "user":
+                                    st.session_state["rendered_images_hashes"].add(hash)
                             st.image(
-                                item["image_url"]["url"],
+                                (
+                                    data_.data
+                                    if isinstance(data_, UserBinaryData)
+                                    else data_
+                                ),
                                 caption=item.get("image_caption"),
                                 use_column_width=True,
                             )
-                            if message_role == "user":
-                                user_last_message_image_render = True
-                            else:
-                                user_last_message_image_render = False
                         # We disable audio rendering for now
                         elif item["type"] == "audio" and False:
                             st.audio(
-                                text2audio(item["audio"]),
+                                text2binary(item["audio"]),
                                 format="audio/wav",
                             )
                 else:
                     st.write(content)
 
     # If last message is from a user, generate a new response
-    last_message = st.session_state["messages"][-1]
+    last_message = (
+        st.session_state["messages"][-1] if st.session_state["messages"] else None
+    )
 
-    if last_message.get("role") == "user":
-        question = last_message["content"]
+    with get_db_context() as db:
+        if (
+            UserNextOp.get_op(db, user.session_id, UserNextOp.GET_IMAGE_MASK)
+            and render_mask_image(generic_leader)
+        ) or UserNextOp.get_op(db, user.session_id, UserNextOp.EDIT_IMAGE_USING_MASK):
+            last_message = st.session_state["messages"][last_user_message_index]
+
+    if last_message and last_message.role == "user":
+        question = last_message.content
         if isinstance(question, list):
             if question[0].get("type") == "audio":
                 current_audio_uploaded = bool(audio_bytes)
-                audio_bytes = audio_text2data(question[0]["audio"])
+                audio_bytes = binary_text2data(question[0]["audio"])
                 if current_audio_uploaded:
                     generic_leader.memory.add_message(
-                        Message(role="user", content=last_message["content"])
+                        Message(role="user", content=last_message.content)
                     )
                     generic_leader.write_to_storage()
 
@@ -580,50 +623,21 @@ def main() -> None:
                     )
                 question += "\n\n**RESPONSE WITH AUDIO.**"
 
+            uploaded_images = st.session_state["uploaded_images"]
+
             with st.spinner("Thinking..."):
-                response = ""
-                resp_container = st.empty()
-                start = time()
-
-                if not AUDIO_RESPONSE_SUPPORT or not response_in_voice:
-                    try:
-                        for delta in generic_leader.run(
-                            message=question,
-                            images=uploaded_images,
-                            videos=uploaded_videos_,
-                            audio=audio_bytes,
-                            stream=True,
-                        ):
-                            response += delta.content  # type: ignore
-                            response = re.sub(
-                                r"[\n\s]*!\[[^\]]+?\]\([^\)]+?\)", "", response
-                            )
-                            resp_container.markdown(response)
-
-                    except Exception as e:
-                        logger.exception(e)
-                        st.exception(e)
-                else:
-                    try:
-                        generic_leader.run(
-                            message="Answer the input audio.",
-                            images=uploaded_images,
-                            videos=uploaded_videos_,
-                            audio={
-                                "data": audio_text2data(audio_bytes_),
-                                "format": "wav",
-                            },
-                        )
-
-                    except Exception as e:
-                        logger.exception(e)
-                        st.exception(e)
-
-                end = time()
-                logger.debug(
-                    "Time to response from coordinator: {:.2f} seconds".format(
-                        end - start
-                    )
+                response = run(
+                    generic_leader,
+                    question,
+                    [
+                        binary2text(d.data_compressed, "image/webp")
+                        for d in uploaded_images
+                    ],
+                    uploaded_videos_,
+                    audio_bytes,
+                    response_in_voice,
+                    AUDIO_RESPONSE_SUPPORT,
+                    audio_bytes_,
                 )
 
             if AUDIO_RESPONSE_SUPPORT:
@@ -662,29 +676,57 @@ def main() -> None:
             if audio_bytes:
                 audio_bytes = None
 
+            memory = generic_leader.read_from_storage().memory
+            requires_update = False
             # Get the images
             image_outputs: Optional[List[Image]] = generic_leader.get_images()
 
-            if uploaded_images and not user_last_message_image_render:
-                memory = generic_leader.read_from_storage().memory
+            if uploaded_images:
+                with get_db_context() as db:
+                    if UserNextOp.get_op(
+                        db, user.session_id, UserNextOp.GET_IMAGE_MASK
+                    ):
+                        if render_mask_image(generic_leader):
+                            run(
+                                generic_leader,
+                                question,
+                                uploaded_images,
+                                uploaded_videos_,
+                                audio_bytes,
+                                response_in_voice,
+                                AUDIO_RESPONSE_SUPPORT,
+                                audio_bytes_,
+                            )
+
+            if uploaded_images:
+                if not memory:
+                    memory = generic_leader.read_from_storage().memory
+
                 if (
                     memory
                     and "messages" in memory
                     and isinstance(memory["messages"], list)
                     and len(memory["messages"]) > 1
                 ):
-                    for index in range(len(memory["messages"]) - 1, -1, -1):
-                        previous_message = memory["messages"][index]
-                        if (
-                            previous_message.get("role") == "user"
-                            and previous_message.get("images")
-                            and isinstance(previous_message["images"], list)
-                            and previous_message["images"]
-                        ):
-                            with last_user_message_container:
-                                for img in previous_message["images"]:
-                                    st.image(img)
-                            break
+                    with get_db_context() as db:
+                        images = UserBinaryData.get_latest_group(
+                            db,
+                            user.session_id,
+                            UserBinaryData.IMAGE,
+                            UserBinaryData.DOWNSTREAM,
+                        )
+
+                    with last_user_message_container:
+                        for image in images:
+                            if (
+                                image.data_compressed_hashsum
+                                in st.session_state["rendered_images_hashes"]
+                            ):
+                                continue
+                            st.image(image.data)
+                            st.session_state["rendered_images_hashes"].add(
+                                image.data_compressed_hashsum
+                            )
 
             # Render the images
             if image_outputs:
@@ -725,12 +767,15 @@ def main() -> None:
                 generic_leader.memory.add_message(
                     Message(role="assistant", content=contents[1:])
                 )
-                generic_leader.write_to_storage()
+                requires_update = True
 
             else:
                 st.session_state["messages"].append(
                     {"role": "assistant", "content": response}
                 )
+
+            if requires_update:
+                generic_leader.write_to_storage()
 
     # Load knowledge base
     if generic_leader.knowledge:
@@ -765,6 +810,15 @@ def main() -> None:
         # -*- Add documents to knowledge base
         if "file_uploader_key" not in st.session_state:
             st.session_state["file_uploader_key"] = 100
+
+        if "uploaded_images" not in st.session_state or not isinstance(
+            st.session_state["uploaded_images"], list
+        ):
+            st.session_state["uploaded_images"] = []
+
+        if st.session_state["uploaded_images"] and st.button("Display Gallery"):
+            render_galary_display(generic_leader)
+
         uploaded_files_ = st.sidebar.file_uploader(
             "Add a Document (video & image files, .pdf, .csv, .pptx, .txt, .md, .docx, .json, .xlsx, .xls and etc)",
             key=st.session_state["file_uploader_key"],
@@ -829,7 +883,7 @@ def main() -> None:
                                 st.session_state["uploaded_files"].append(document_name)
                             else:
                                 for image in auto_rag_documents:
-                                    uploaded_images.append(image.content)
+                                    uploaded_images.append(text2binary(image.content))
                         else:
                             st.sidebar.error(
                                 "Could not read document: {}".format(document_name)
@@ -847,9 +901,26 @@ def main() -> None:
                             "Could not read document: {}".format(document_name)
                         )
                         continue
-            if uploaded_images:
-                st.session_state["uploaded_images"] = uploaded_images
             st.session_state["file_uploader_key"] += 1
+
+            if "hash2uploaded_images" not in st.session_state:
+                st.session_state["hash2uploaded_images"] = {}
+
+            with get_db_context() as db:
+                images = UserBinaryData.save_bulk(
+                    db,
+                    user.session_id,
+                    UserBinaryData.IMAGE,
+                    UserBinaryData.DOWNSTREAM,
+                    uploaded_images,
+                )
+                for image in images:
+                    st.session_state["hash2uploaded_images"][
+                        image.data_compressed_hashsum
+                    ] = image
+
+                st.session_state["uploaded_images"].extend(images)
+
             alert.empty()
 
         if generic_leader.knowledge.vector_db:
@@ -858,6 +929,10 @@ def main() -> None:
                 st.sidebar.success("Knowledge base deleted")
 
     EMPTY_SESSIONS = True
+
+    st.sidebar.markdown("---")
+
+    NEW_SESSION = st.sidebar.button("New Session")
 
     if generic_leader.storage:
         sessions = generic_leader.storage.get_all_sessions()
@@ -900,14 +975,10 @@ def main() -> None:
                     session_options["Older"].append(session_info)
 
         # Display sessions
-        rendered_hr = False
         for period in ["Today", "Yesterday", "Previous 7 Days"]:
             sessions = session_options[period]
             if not sessions:
                 continue
-            if not rendered_hr:
-                st.sidebar.markdown("---")
-                rendered_hr = True
 
             EMPTY_SESSIONS = False
             st.sidebar.markdown(f"### {period}")
@@ -958,7 +1029,6 @@ def main() -> None:
     if not EMPTY_SESSIONS:
         st.sidebar.markdown("---")
         CLEAN_SESSION = False
-        NEW_SESSION = st.sidebar.button("New Session")
 
         if generic_leader.storage:
             if st.sidebar.button("Delete All Session", key="delete_all_session_button"):
@@ -980,5 +1050,5 @@ def main() -> None:
             rerun(clean_session=CLEAN_SESSION)
 
 
-if user.is_authenticated or check_password():
+if os.getenv("RUNTIME_ENV") != "prd" or user.is_authenticated or check_password():
     main()

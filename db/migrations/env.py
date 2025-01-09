@@ -53,6 +53,8 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         include_name=include_name,
         literal_binds=True,
+        compare_type=True,
+        compare_server_default=True,
         dialect_opts={"paramstyle": "named"},
         version_table_schema=target_metadata.schema,
     )
@@ -79,6 +81,8 @@ def run_migrations_online() -> None:
             connection=connection,
             target_metadata=target_metadata,
             include_name=include_name,
+            compare_type=True,
+            compare_server_default=True,
             version_table_schema=target_metadata.schema,
         )
 
