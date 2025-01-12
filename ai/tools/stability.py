@@ -156,6 +156,7 @@ class Stability(Toolkit):
         self.register(self.outpaint)
         self.register(self.remove_background)
         self.register(self.add_feature)
+        self.register(self.search_and_recolor)
 
     def _req(
         self,
@@ -583,3 +584,48 @@ class Stability(Toolkit):
         except Exception as e:
             logger.error(f"Failed to generate image: {e}")
             return f"Error: {e}"
+
+    def search_and_recolor(
+        self,
+        agent: Agent,
+        prompt: str,
+        select_prompt: str,
+        thing_to_avoid_when_editing: Optional[str] = None,
+        seed: Optional[int] = 0,
+    ) -> str:
+        """
+        Use this function to The Search and Recolor service provides the ability to change the color
+        of a specific object in an image using a prompt. This service is a specific version of inpainting
+        that does not require a mask. The Search and Recolor service will automatically segment the object
+        and recolor it using the colors requested in the prompt.
+
+        Args:
+            prompt (str): What you wish to see in the output image. A strong, descriptive prompt that \
+                clearly defines elements, colors, and subjects will lead to better results.
+            select_prompt (str): Short description of what to search for in the image.
+            thing_to_avoid_when_editing (str): A blurb of text describing what you do not wish to see \
+                in the output image.
+            seed (int): A specific value to guide the randomness of the generation.
+
+        Returns:
+            str: A message indicating if the image has been edited successfully or an error message.
+        """
+        image = self.latest_user_image(agent)
+
+        if not image:
+            return "No image found"
+
+        response = self._req(
+            "https://api.stability.ai/v2beta/stable-image/edit/search-and-recolor",
+            files={"image": image},
+            data={
+                "prompt": prompt,
+                "select_prompt": select_prompt,
+                "negative_prompt": thing_to_avoid_when_editing,
+                "seed": seed,
+            },
+        )
+
+        self._store_in_s3(agent, response, prompt, f"{prompt} -> {select_prompt}")
+
+        return "Image has been edited successfully and will be displayed below"
