@@ -213,6 +213,7 @@ class UserBinaryData(Base):
                 mimetype=mimetype,
                 extension=extension,
                 group_id=group_id,
+                data_hashsum=hashlib.sha256(data).hexdigest(),
             )
             if type == cls.IMAGE:
                 instance.data_as_image_thumbnail()

@@ -243,7 +243,8 @@ class Stability(Toolkit):
                     file_name,
                 )
                 # we need to wait for the image to be ready in the S3 bucket
-                sleep(1)
+                while requests.head(url).status_code != 200:
+                    sleep(0.3)
 
                 with get_db_context() as db:
                     image = UserBinaryData.save_data(
@@ -414,9 +415,9 @@ class Stability(Toolkit):
         agent: Agent,
         prompt: str,
         search_prompt: str,
+        seed: int,
         grow_mask: Optional[int] = 3,
         negative_prompt: Optional[str] = None,
-        seed: Optional[int] = 0,
     ) -> str:
         """Use this function to search for a prompt and replace it with the new prompt.
         for the same prompt don't send parallel requests. it will be handled by the toolkit.
@@ -459,8 +460,8 @@ class Stability(Toolkit):
         self,
         agent: Agent,
         prompt: str,
+        seed: int,
         thing_to_avoid_when_editing: Optional[str] = None,
-        seed: Optional[int] = 0,
     ) -> str:
         """Add features to an image while preserving its original content.
         **CRITICAL NOTE**: **BUT DON'T MAKE UP THING BY YOURSELF ON BEHALF OF THE USER**.
@@ -590,8 +591,8 @@ class Stability(Toolkit):
         agent: Agent,
         prompt: str,
         select_prompt: str,
+        seed: int,
         thing_to_avoid_when_editing: Optional[str] = None,
-        seed: Optional[int] = 0,
     ) -> str:
         """
         Use this function to The Search and Recolor service provides the ability to change the color

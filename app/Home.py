@@ -171,14 +171,15 @@ def run(
 def rerun(clean_session: bool = False):
     if clean_session:
         logger.debug(">>> Restarting Agent")
-        st.session_state["generic_leader"] = None
-        st.session_state["uploaded_image"] = None
-        if "url_scrape_key" in st.session_state:
-            st.session_state["url_scrape_key"] += 1
-        if "file_uploader_key" in st.session_state:
-            st.session_state["file_uploader_key"] += 1
-        if "image_uploader_key" in st.session_state:
-            st.session_state["image_uploader_key"] += 1
+        keys2delete = []
+        for key in st.session_state:
+            keys2delete.append(key)
+
+        for key in keys2delete:
+            try:
+                del st.session_state[key]
+            except Exception:
+                pass
     st.rerun()
 
 
@@ -455,12 +456,13 @@ def main() -> None:
                 st.session_state["hash2uploaded_images"][d.data_compressed_hashsum] = d
                 st.session_state["uploaded_images"].append(d)
 
+    st.session_state["rendered_images_hashes"] = set()
     hash2images = st.session_state.get("hash2uploaded_images", {})
 
     last_prompt = None
     last_user_message_index = None
     last_user_message_container = None
-    st.session_state["rendered_images_hashes"] = set()
+
     # Display existing chat messages
     for index, message in enumerate(generic_leader.memory.messages):
         if isinstance(message.content, str):
@@ -916,8 +918,9 @@ def main() -> None:
                         image.data_compressed_hashsum
                     ] = image
 
-                st.session_state["uploaded_images"].extend(images)
-                st.session_state["selected_image"] = images[-1].id
+                if images:
+                    st.session_state["uploaded_images"].extend(images)
+                    st.session_state["selected_image"] = images[-1].id
 
             alert.empty()
 
@@ -930,7 +933,7 @@ def main() -> None:
 
     st.sidebar.markdown("---")
 
-    NEW_SESSION = st.sidebar.button("New Session")
+    NEW_SESSION = st.sidebar.button("New Session", key="new_session_button")
 
     if generic_leader.storage:
         sessions = generic_leader.storage.get_all_sessions(user_id=user.user_id)
@@ -1046,7 +1049,6 @@ def main() -> None:
             user.session_id = str(uuid4())
             user.to_auth_param(add_to_query_params=True)
             rerun(clean_session=CLEAN_SESSION)
-            return
 
     with get_db_context() as db:
         if UserBinaryData.get_data(

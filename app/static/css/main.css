@@ -93,3 +93,13 @@ div:has(> .stHeading) {
     font-size: 1.125rem;
     font-weight: 600;
 }
+
+[data-test-script-state="running"] button,
+[data-test-script-state="running"] a,
+[data-test-script-state="running"] input,
+[data-test-script-state="running"] section[role=button],
+[data-test-script-state="running"] textarea {
+    pointer-events: none;
+    opacity: 0.5;
+    text-decoration: none;
+}
