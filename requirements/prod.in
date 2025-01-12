@@ -1,5 +1,5 @@
 ipython
-phidata[aws]>=2.7.5
+phidata[aws]==2.7.5
 pyjwt
 
 groq
@@ -13,6 +13,7 @@ pandas
 openpyxl
 requests
 yfinance
+anthropic
 wikipedia
 sentry-sdk
 python-pptx

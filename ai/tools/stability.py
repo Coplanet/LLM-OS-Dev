@@ -3,7 +3,7 @@ import json
 import os
 from hashlib import sha256
 from os import getenv
-from time import time
+from time import sleep, time
 from typing import Literal, Optional, Tuple, Union
 
 import boto3
@@ -163,18 +163,29 @@ class Stability(Toolkit):
         data: dict = {},
         files: dict = {"none": ""},
     ) -> requests.Response:
-        if "output_format" not in data:
-            data["output_format"] = self.output_format
+        start = time()
+        try:
+            if "output_format" not in data:
+                data["output_format"] = self.output_format
 
-        if "aspect_ratio" not in data:
-            data["aspect_ratio"] = self.aspect_ratio
+            if "aspect_ratio" not in data:
+                data["aspect_ratio"] = self.aspect_ratio
 
-        return requests.post(
-            url,
-            headers={"authorization": f"Bearer {self.api_key}", "accept": "image/*"},
-            files=files,
-            data=data,
-        )
+            return requests.post(
+                url,
+                headers={
+                    "authorization": f"Bearer {self.api_key}",
+                    "accept": "image/*",
+                },
+                files=files,
+                data=data,
+            )
+
+        finally:
+            end = time()
+            logger.debug(
+                f"Time taken for '{self.__class__.__name__}.{self._req.__name__}': {end - start} seconds."
+            )
 
     def _store_in_s3(
         self,
@@ -184,99 +195,120 @@ class Stability(Toolkit):
         revised_prompt: str = "",
         **include_in_name,
     ) -> str:
-        if "original_prompt" not in include_in_name:
-            include_in_name["original_prompt"] = original_prompt
+        start = time()
+        try:
+            if "original_prompt" not in include_in_name:
+                include_in_name["original_prompt"] = original_prompt
 
-        if "revised_prompt" not in include_in_name:
-            include_in_name["revised_prompt"] = revised_prompt
+            if "revised_prompt" not in include_in_name:
+                include_in_name["revised_prompt"] = revised_prompt
 
-        if not original_prompt:
-            original_prompt = include_in_name["original_prompt"]
+            if not original_prompt:
+                original_prompt = include_in_name["original_prompt"]
 
-        if not revised_prompt:
-            revised_prompt = include_in_name["revised_prompt"]
+            if not revised_prompt:
+                revised_prompt = include_in_name["revised_prompt"]
 
-        if not revised_prompt:
-            revised_prompt = original_prompt
+            if not revised_prompt:
+                revised_prompt = original_prompt
 
-        file_name = "{}/{}-{}-{}.{}".format(
-            self.s3_path,
-            self.model,
-            sha256(str(include_in_name).encode()).hexdigest(),
-            time(),
-            self.output_format,
-        )
-        if response.status_code == 200:
-            # upload to AWS S3
-            session = boto3.Session(
-                aws_access_key_id=self.s3_access_key,
-                aws_secret_access_key=self.s3_secret_key,
-                region_name=self.s3_region,
+            file_name = "{}/{}-{}-{}.{}".format(
+                self.s3_path,
+                self.model,
+                sha256(str(include_in_name).encode()).hexdigest(),
+                time(),
+                self.output_format,
             )
-
-            s3_client = session.client("s3")
-            # Wrap the response content in a BytesIO object
-            file_obj = io.BytesIO(response.content)
-            s3_client.upload_fileobj(
-                file_obj, self.s3_bucket, file_name, ExtraArgs={"ACL": "public-read"}
-            )
-            url = "https://{}.s3.{}.amazonaws.com/{}".format(
-                self.s3_bucket,
-                s3_client.meta.region_name,
-                file_name,
-            )
-
-            with get_db_context() as db:
-                image = UserBinaryData.save_data(
-                    db,
-                    agent.session_id,
-                    UserBinaryData.IMAGE,
-                    UserBinaryData.UPSTREAM,
-                    response.content,
+            if response.status_code == 200:
+                # upload to AWS S3
+                session = boto3.Session(
+                    aws_access_key_id=self.s3_access_key,
+                    aws_secret_access_key=self.s3_secret_key,
+                    region_name=self.s3_region,
                 )
-                st.session_state["selected_image"] = image.id
 
-        else:
-            raise Exception(str(response.json()))
+                s3_client = session.client("s3")
+                # Wrap the response content in a BytesIO object
+                file_obj = io.BytesIO(response.content)
+                s3_client.upload_fileobj(
+                    file_obj,
+                    self.s3_bucket,
+                    file_name,
+                    ExtraArgs={"ACL": "public-read"},
+                )
+                url = "https://{}.s3.{}.amazonaws.com/{}".format(
+                    self.s3_bucket,
+                    s3_client.meta.region_name,
+                    file_name,
+                )
+                # we need to wait for the image to be ready in the S3 bucket
+                sleep(1)
 
-        logger.debug("Image generated successfully")
+                with get_db_context() as db:
+                    image = UserBinaryData.save_data(
+                        db,
+                        agent.session_id,
+                        UserBinaryData.IMAGE,
+                        UserBinaryData.UPSTREAM,
+                        response.content,
+                    )
+                    st.session_state["selected_image"] = image.id
 
-        # Update the run response with the image URLs
-        agent.add_image(
-            Image(
-                id=file_name,
-                url=url,
-                original_prompt=original_prompt,
-                revised_prompt=revised_prompt,
+            else:
+                raise Exception(str(response.json()))
+
+            logger.debug("Image generated successfully")
+
+            # Update the run response with the image URLs
+            agent.add_image(
+                Image(
+                    id=file_name,
+                    url=url,
+                    original_prompt=original_prompt,
+                    revised_prompt=revised_prompt,
+                )
             )
-        )
-        agent.memory.add_message(
-            Message(
-                role="tool",
-                content=[
-                    {
-                        "type": "image_url",
-                        "image_url": {"url": url},
-                        "image_caption": revised_prompt,
-                    }
-                ],
+            agent.memory.add_message(
+                Message(
+                    role="tool",
+                    content=[
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": url},
+                            "image_caption": revised_prompt,
+                        }
+                    ],
+                )
             )
-        )
-        agent.write_to_storage()
-        return "Image has been generated successfully and will be displayed below"
+            agent.write_to_storage()
+            return "Image has been generated successfully and will be displayed below"
+
+        finally:
+            end = time()
+            logger.debug(
+                f"Time taken for '{self.__class__.__name__}.{self._store_in_s3.__name__}': {end - start} seconds"
+            )
 
     @classmethod
     def latest_user_image_with_mask(
         cls, agent: Agent
     ) -> Optional[Tuple[UserBinaryData, Optional[UserBinaryData]]]:
-        with get_db_context() as db:
-            image = cls.latest_user_image(
-                agent, type=UserBinaryData.IMAGE, return_data=False, db=db
+        start = time()
+        try:
+            with get_db_context() as db:
+                image = cls.latest_user_image(
+                    agent, type=UserBinaryData.IMAGE, return_data=False, db=db
+                )
+                mask = cls.latest_user_image(
+                    agent, type=UserBinaryData.IMAGE_MASK, return_data=False, db=db
+                )
+                return image, mask
+
+        finally:
+            end = time()
+            logger.debug(
+                f"Time taken for '{cls.__name__}.{cls.latest_user_image_with_mask.__name__}': {end - start} seconds"
             )
-            mask = cls.latest_user_image(
-                agent, type=UserBinaryData.IMAGE_MASK, return_data=False, db=db
-            )
-            return image, mask
 
     @classmethod
     def latest_user_image(
@@ -286,36 +318,44 @@ class Stability(Toolkit):
         return_data: Optional[bool] = True,
         db: Optional[orm.Session] = None,
     ) -> Optional[Union[bytes, UserBinaryData]]:
-        if (
-            type == UserBinaryData.IMAGE
-            and "selected_image" in st.session_state
-            and isinstance(st.session_state["selected_image"], int)
-        ):
-            image_id = st.session_state["selected_image"]
-            with get_db_context() as db:
-                image = UserBinaryData.get_by_id(
-                    db,
+        start = time()
+        try:
+            if (
+                type == UserBinaryData.IMAGE
+                and "selected_image" in st.session_state
+                and isinstance(st.session_state["selected_image"], int)
+            ):
+                image_id = st.session_state["selected_image"]
+                with get_db_context() as db:
+                    image = UserBinaryData.get_by_id(
+                        db,
+                        agent.session_id,
+                        image_id,
+                    )
+                    if image:
+                        return image.data if return_data else image
+
+            def fetch_image(dbi: orm.Session):
+                image = UserBinaryData.get_data(
+                    dbi,
                     agent.session_id,
-                    image_id,
-                )
+                    type,
+                ).first()
                 if image:
                     return image.data if return_data else image
+                return None
 
-        def fetch_image(dbi: orm.Session):
-            image = UserBinaryData.get_data(
-                dbi,
-                agent.session_id,
-                type,
-            ).first()
-            if image:
-                return image.data if return_data else image
-            return None
+            if db:
+                return fetch_image(db)
 
-        if db:
-            return fetch_image(db)
+            with get_db_context() as db:
+                return fetch_image(db)
 
-        with get_db_context() as db:
-            return fetch_image(db)
+        finally:
+            end = time()
+            logger.debug(
+                f"Time taken for '{cls.__name__}.{cls.latest_user_image.__name__}': {end - start} seconds."
+            )
 
     def outpaint(
         self,
@@ -419,20 +459,19 @@ class Stability(Toolkit):
         agent: Agent,
         prompt: str,
         thing_to_avoid_when_editing: Optional[str] = None,
+        seed: Optional[int] = 0,
     ) -> str:
         """Add features to an image while preserving its original content.
-        **CRITICAL NOTE**: Be very descriptive for the `prompt` and \
-            `thing_to_avoid_when_editing` parameters.
-        **CRITICAL NOTE**: The `prompt` should be a very descriptive text for the \
-            desired image outcome; **BUT DON'T MAKE UP THING BY YOURSELF**.
+        **CRITICAL NOTE**: **BUT DON'T MAKE UP THING BY YOURSELF ON BEHALF OF THE USER**.
         **CRITICAL NOTE**: The `thing_to_avoid_when_editing` should be a very descriptive \
             text for the undesired image outcome, the negative prompt should be send as \
             possitive words, e.g. instead of "no crippled face", send "crippled face".
 
         Args:
-            prompt (str): Descriptive (but not too much) text for the desired image outcome. \
-                Use (word:weight) to control word emphasis, e.g., (blue:0.3).
+            prompt (str): User's exact input prompt.
             thing_to_avoid_when_editing (str): Text describing the elements to avoid when editing the image.
+            seed (int): A specific value that is used to guide the 'randomness' of the generation. \
+                (Omit this parameter or pass 0 to use a random seed.)
 
         Returns:
             str: Message indicating success or error.
@@ -470,6 +509,7 @@ class Stability(Toolkit):
             data={
                 "prompt": prompt,
                 "negative_prompt": thing_to_avoid_when_editing,
+                "seed": seed,
             },
         )
 

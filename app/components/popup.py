@@ -8,14 +8,14 @@ from helpers.log import logger
 
 MODELS = {
     "OpenAI": {
-        "gpt-4o-audio-preview": {
-            "max_temperature": 2,
-            "max_token_size": agent_settings.default_max_completion_tokens,
-            "kwargs": {
-                "modalities": ["text", "audio"],
-                "audio": {"voice": "alloy", "format": "wav"},
-            },
-        },
+        # "gpt-4o-audio-preview": {
+        #     "max_temperature": 2,
+        #     "max_token_size": agent_settings.default_max_completion_tokens,
+        #     "kwargs": {
+        #         "modalities": ["text", "audio"],
+        #         "audio": {"voice": "alloy", "format": "wav"},
+        #     },
+        # },
         "gpt-4o": {
             "max_temperature": 2,
             "max_token_size": agent_settings.default_max_completion_tokens,
@@ -40,19 +40,18 @@ MODELS = {
         },
     },
     "Groq": {
-        "llama3-groq-70b-8192-tool-use-preview": {
-            "max_temperature": 2,
-            "max_token_size": 8_192,
-        },
-        "llama3-groq-8b-8192-tool-use-preview": {
-            "max_temperature": 2,
-            "max_token_size": 8_192,
-        },
+        "llama-3.3-70b-versatile": {"max_temperature": 2, "max_token_size": 32_000},
         "mixtral-8x7b-32768": {
             "max_temperature": 2,
             "max_token_size": 32_000,
         },
-        "llama-3.3-70b-versatile": {"max_temperature": 2, "max_token_size": 32_000},
+    },
+    "Anthropic": {
+        "claude-3-5-sonnet-20241022": {"max_temperature": 2, "max_token_size": 8_192},
+        "claude-3-5-haiku-20241022": {"max_temperature": 2, "max_token_size": 8_192},
+        "claude-3-opus-20240229": {"max_temperature": 2, "max_token_size": 4_096},
+        "claude-3-sonnet-20240229": {"max_temperature": 2, "max_token_size": 4_096},
+        "claude-3-haiku-20240307": {"max_temperature": 2, "max_token_size": 4_096},
     },
 }
 
@@ -63,11 +62,7 @@ AUDIO_SUPPORTED_MODELS = {
     },
 }
 
-PROVIDERS_ORDER = [
-    "OpenAI",
-    "Groq",
-    "Google",
-]
+PROVIDERS_ORDER = ["OpenAI", "Groq", "Google", "Anthropic"]
 
 
 @st.dialog("Configure Agent", width="large")

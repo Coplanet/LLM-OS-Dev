@@ -14,6 +14,7 @@ from sqlalchemy import (
     delete,
     exc,
     orm,
+    sql,
 )
 
 from .base import Base
@@ -285,8 +286,16 @@ class UserBinaryData(Base):
         latest_entry = (
             db.query(cls.group_id).filter(*query).order_by(cls.id.desc()).first()
         )
-        return cls.get_data(
-            db, session_id, type, direction=direction, group_id=latest_entry.group_id
+        return (
+            cls.get_data(
+                db,
+                session_id,
+                type,
+                direction=direction,
+                group_id=latest_entry.group_id,
+            )
+            if latest_entry
+            else db.query(UserBinaryData).filter(sql.false())
         )
 
 

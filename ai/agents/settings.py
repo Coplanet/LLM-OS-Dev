@@ -4,6 +4,7 @@ from typing import Dict, Optional
 
 from composio_phidata import Action as ComposioAction
 from composio_phidata import ComposioToolSet
+from phi.model.anthropic import Claude
 from phi.model.google import Gemini
 from phi.model.groq import Groq
 from phi.model.openai import OpenAIChat
@@ -126,7 +127,7 @@ class AgentConfig:
 
     @property
     def get_model(self):
-        models = {"OpenAI", "Groq", "Google"}
+        models = {"OpenAI", "Groq", "Google", "Anthropic"}
         if self.is_empty or self.provider is None:
             return self.default_model()
 
@@ -155,6 +156,11 @@ class AgentConfig:
                 model_class = Gemini
                 model_id = self.model_id or "gemini-1.5-flash"
                 configs["api_key"] = extra_settings.gemini_api_key
+
+            case "Anthropic":
+                model_class = Claude
+                model_id = self.model_id or "claude-3-5-sonnet-20241022"
+                configs["api_key"] = extra_settings.anthropic_api_key
 
             case _:
                 logger.warning("Model '%s' didn't match!", self.provider)

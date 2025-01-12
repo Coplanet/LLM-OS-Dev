@@ -204,6 +204,9 @@ for group, details in COMPOSIO_ACTIONS.items():
                 "name": instance.name,
                 "icon": details["icon"],
                 "default_status": "disabled",
+                # "extra_instructions": "Use `{}` tool for {}".format(
+                #     instance.name, to_title(instance.name),
+                # ),
             }
         )
 
@@ -355,6 +358,7 @@ def get_coordinator(
             "**IMPORTANT**: When sending emails, always use HTML format. if the input is not HTML "
             "(e.g. markdown), convert it to HTML before sending it."
         ),
+        "If no image is provided, and user asks for an image related task, ask the user to provide one.",
     ]
 
     description = dedent(

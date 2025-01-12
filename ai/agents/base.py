@@ -2,6 +2,7 @@ from textwrap import dedent
 from typing import Generic, List, Optional, TypeVar
 
 from phi.agent import Agent as PhiAgent
+from phi.model.anthropic import Claude
 from phi.model.base import Model
 from phi.model.google import Gemini
 from phi.model.groq import Groq
@@ -55,6 +56,8 @@ class Agent(PhiAgent):
             return "Groq"
         if isinstance(self.model, Gemini):
             return "Google"
+        if isinstance(self.model, Claude):
+            return "Anthropic"
         logger.warning(f"Model type '{self.model}' is not defined!")
         return None
 

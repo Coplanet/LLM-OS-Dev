@@ -472,7 +472,7 @@ def main() -> None:
             continue
 
         # Skip system and tool messages
-        if message.role in ["system", "tool"]:
+        if message.role in ["system", "tool", "developer"]:
             continue
         # Display the message
         message_role = message.role
@@ -816,9 +816,6 @@ def main() -> None:
         ):
             st.session_state["uploaded_images"] = []
 
-        if st.session_state["uploaded_images"] and st.button("Display Gallery"):
-            render_galary_display(generic_leader)
-
         uploaded_files_ = st.sidebar.file_uploader(
             "Add a Document (video & image files, .pdf, .csv, .pptx, .txt, .md, .docx, .json, .xlsx, .xls and etc)",
             key=st.session_state["file_uploader_key"],
@@ -920,6 +917,7 @@ def main() -> None:
                     ] = image
 
                 st.session_state["uploaded_images"].extend(images)
+                st.session_state["selected_image"] = images[-1].id
 
             alert.empty()
 
@@ -1048,6 +1046,13 @@ def main() -> None:
             user.session_id = str(uuid4())
             user.to_auth_param(add_to_query_params=True)
             rerun(clean_session=CLEAN_SESSION)
+            return
+
+    with get_db_context() as db:
+        if UserBinaryData.get_data(
+            db, user.session_id, UserBinaryData.IMAGE
+        ).count() > 0 and st.button("Display Gallery"):
+            render_galary_display(generic_leader)
 
 
 if os.getenv("RUNTIME_ENV") != "prd" or user.is_authenticated or check_password():
