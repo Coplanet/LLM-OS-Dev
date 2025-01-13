@@ -205,7 +205,7 @@ for group, details in COMPOSIO_ACTIONS.items():
                 "icon": details["icon"],
                 "default_status": "disabled",
                 # "extra_instructions": "Use `{}` tool for {}".format(
-                #     instance.name, to_title(instance.name),
+                #     instance.name, instance.functions["function_template"].description,
                 # ),
             }
         )

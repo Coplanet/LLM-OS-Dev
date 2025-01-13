@@ -1,6 +1,51 @@
-/* Target the sidebar container */
+[data-testid="stMainBlockContainer"] {
+    padding-top: 70px !important;
+}
 [data-testid="stSidebarContent"] {
     overflow-x: hidden;
+}
+[data-testid="stChatMessage"] {
+    background-color: transparent !important;
+}
+[data-testid="stChatMessage"]:has(> [data-testid="stChatMessageContent"][aria-label="Chat message from user"]) {
+    display: unset !important;
+}
+[data-testid="stChatMessage"] > [data-testid="stChatMessageContent"] {
+    float: right !important;
+}
+[data-testid="stChatMessage"] > [data-testid="stChatMessageContent"][aria-label="Chat message from user"] {
+    padding: 0.5rem !important;
+    border-radius: 1.5rem !important;
+    text-align: right !important;
+    color: var(--text-color) !important;
+    padding: 0.5rem 1rem 0.5rem 1rem !important;
+    max-width: 500px !important;
+    margin: unset !important;
+    width: fit-content !important;
+}
+
+@media (max-width: 640px) {
+    [data-testid="stChatMessage"] > [data-testid="stChatMessageContent"][aria-label="Chat message from user"] {
+        padding: 0.5rem !important;
+        max-width: 100% !important;
+        text-align: left !important;
+    }
+}
+
+[data-testid="stChatMessage"] > [data-testid="stChatMessageContent"][aria-label="Chat message from user"] *:not(img) {
+    width: auto;
+}
+[aria-label="Chat message from user"]:has(img) {
+    min-width: 50% !important;
+}
+[aria-label="Chat message from user"]:has(img) img {
+    width: 100% !important;
+    max-height: 200px;
+    object-fit: cover;
+    object-position: center;
+    margin: auto !important;
+    padding: auto !important;
+    text-align: center !important;
 }
 button[kind="secondary"]:hover {
     background-color: var(--secondary-background-color) !important;
@@ -102,4 +147,42 @@ div:has(> .stHeading) {
     pointer-events: none;
     opacity: 0.5;
     text-decoration: none;
+}
+
+
+@media (max-width: 640px) {
+    .st-key-footer_container .stHorizontalBlock .stColumn {
+        min-width: unset !important;
+        width: unset !important;
+        flex: unset !important;
+    }
+}
+
+.st-key-footer_container {
+    padding-top: 10px !important;
+    border-radius: 30px !important;
+}
+
+.st-key-footer_container div.stHorizontalBlock:has(.st-key-cloud_upload) {
+    width: 100% !important;
+    gap:0 !important;
+    padding: 10px !important;
+}
+.st-key-footer_container div.stHorizontalBlock:has(.st-key-cloud_upload) * {
+    display: inline-block !important;
+}
+.st-key-footer_container div.stHorizontalBlock:has(.st-key-cloud_upload) button {
+    border: unset !important;
+    background-color: unset !important;
+    color: unset !important;
+    padding: 0 10px 0 10px !important;
+}
+.st-key-chat_file_uploader_container {
+    display: none !important;
+}
+.stElementContainer .stFileUploader {
+    display: none !important;
+}
+.st-key-css_and_theme_container {
+    display: none !important;
 }

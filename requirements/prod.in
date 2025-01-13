@@ -18,7 +18,9 @@ wikipedia
 sentry-sdk
 python-pptx
 beautifulsoup4
-st-clickable-images
+streamlit-float
+streamlit-extras
+streamlit-image-select
 composio_openai>=0.6.11
 composio-core>=0.6.11
 composio-phidata>=0.6.11

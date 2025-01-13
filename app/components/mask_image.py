@@ -29,7 +29,23 @@ def render_mask_image(agent: Agent) -> Union[None, bool]:
     else:
         h_, w_ = h, w
 
-    stroke_width = st.slider("Stroke width: ", 1, 50, 25)
+    thicker_cols = st.columns(2)
+    with thicker_cols[0]:
+        option = st.selectbox(
+            "Select the thicker size:",
+            ("Thin", "Medium", "Thick"),
+            index=1,
+        )
+
+    stroke_width = 10
+
+    if option == "Thin":
+        stroke_width = 10
+    elif option == "Medium":
+        stroke_width = 25
+    else:
+        stroke_width = 50
+
     canvas = st_canvas(
         fill_color="black",
         stroke_width=stroke_width,
