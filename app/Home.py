@@ -9,8 +9,10 @@ from typing import Dict, List, Optional
 from urllib.parse import urlencode
 from uuid import uuid4
 
+import backoff
 import google.generativeai as genai
 import nest_asyncio
+import openai
 import sqlalchemy as sql
 import streamlit as st
 import streamlit.components.v1 as components
@@ -31,6 +33,8 @@ from phi.storage.agent.postgres import PgAgentStorage
 from phi.tools.streamlit.components import check_password
 from phi.utils.log import logger as phi_logger
 from phi.utils.log import logging
+from streamlit.components.v1 import html
+from streamlit_float import float_init
 
 from ai.agents import base, settings
 from ai.agents.settings import agent_settings
@@ -63,40 +67,44 @@ auth = Auth()
 nest_asyncio.apply()
 st.set_page_config(page_title="CoPlanet AI", page_icon=f"{IMAGE_DIR}/favicon.png")
 
-# load css
-with open(f"{CSS_DIR}/main.css", "r") as file:
-    st.markdown(f"<style>{file.read()}</style>", unsafe_allow_html=True)
+with st.container(key="css_and_theme_container"):
+    st.markdown(
+        """<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.0/css/all.min.css">""",
+        unsafe_allow_html=True,
+    )
+    # load css
+    with open(f"{CSS_DIR}/main.css", "r") as file:
+        st.markdown(f"<style>{file.read()}</style>", unsafe_allow_html=True)
 
+    for theme in ["dark", "light"]:
+        if os.path.exists(f"{CSS_DIR}/main-{theme}.css"):
+            with open(f"{CSS_DIR}/main-{theme}.css", "r") as file:
+                st.markdown(f"<style>{file.read()}</style>", unsafe_allow_html=True)
 
-for theme in ["dark", "light"]:
-    if os.path.exists(f"{CSS_DIR}/main-{theme}.css"):
-        with open(f"{CSS_DIR}/main-{theme}.css", "r") as file:
-            st.markdown(f"<style>{file.read()}</style>", unsafe_allow_html=True)
+    components.html(
+        """
+    <script>
+    document.addEventListener("DOMContentLoaded", function() {
+        setInterval(() => {
+            const appElement = window.parent.document.getElementsByClassName("stApp")[0];
+            const currentTheme = window.getComputedStyle(appElement).getPropertyValue("color-scheme");
 
-components.html(
-    """
-<script>
-document.addEventListener("DOMContentLoaded", function() {
-    setInterval(() => {
-        const appElement = window.parent.document.getElementsByClassName("stApp")[0];
-        const currentTheme = window.getComputedStyle(appElement).getPropertyValue("color-scheme");
+            // Remove existing theme classes
+            appElement.classList.remove('dark', 'light');
 
-        // Remove existing theme classes
-        appElement.classList.remove('dark', 'light');
-
-        // Add the current theme class
-        if (currentTheme === 'dark') {
-            appElement.classList.add('dark');
-        } else if (currentTheme === 'light') {
-            appElement.classList.add('light');
-        }
-    }, 300);
-});
-</script>
-""",
-    height=0,
-    width=0,
-)
+            // Add the current theme class
+            if (currentTheme === 'dark') {
+                appElement.classList.add('dark');
+            } else if (currentTheme === 'light') {
+                appElement.classList.add('light');
+            }
+        }, 300);
+    });
+    </script>
+    """,
+        height=0,
+        width=0,
+    )
 
 st.title("CoPlanet AI")
 with st.container(key="subtitle_container"):
@@ -106,14 +114,11 @@ with st.container(key="subtitle_container"):
         """,
         unsafe_allow_html=True,
     )
-st.markdown(
-    """<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.0/css/all.min.css">""",
-    unsafe_allow_html=True,
-)
 
 user: User = auth.get_user()
 
 
+@backoff.on_exception(backoff.expo, openai.RateLimitError, max_time=60, max_tries=10)
 def run(
     generic_leader: Agent,
     question: str,
@@ -255,7 +260,7 @@ def main() -> None:
 
     if not USERNAME:
         # Improved message for password acceptance
-        st.success("Welcome aboard! Your password has been successfully verified.")
+        st.toast("Welcome aboard! Your password has been successfully verified.")
         USERNAME = user.get_username()
         if not USERNAME:
             return
@@ -372,62 +377,65 @@ def main() -> None:
                 st.markdown(st.query_params["q"])
                 question = st.query_params["q"]
 
-        else:
-            with st.chat_message("assistant"):
-                st.markdown("How can I assist you?")
-
+    audio_bytes = None
     AUDIO_ERROR = None
-    with st.sidebar:
-        with st.container(key="voice_input_container"):
-            AUDIO_RESPONSE_SUPPORT = (
-                COORDINATOR_CONFIG.provider == "OpenAI"
-                and COORDINATOR_CONFIG.model_id in AUDIO_SUPPORTED_MODELS["OpenAI"]
-            )
-            # define sample rate
-            AUDIO_SAMPLE_RATE = 44_100
-            # Add an audio recorder for voice messages
-            if audio_bytes := audio_recorder(
-                text="Voice Input",
-                icon_size="1x",
-                pause_threshold=5,
-                sample_rate=AUDIO_SAMPLE_RATE,
-                key="voice_input_recorder"
-                + ("" if AUDIO_RESPONSE_SUPPORT else "_disabled"),
-            ):
-                # expecting the output should be byte
-                if not isinstance(audio_bytes, bytes):
-                    raise Exception("Recorded audio is not an instance of bytes")
-                # reject audio with less than 2 seconds
-                if len(audio_bytes) < 2 * 4 * AUDIO_SAMPLE_RATE:
-                    AUDIO_ERROR = st.error(
-                        "Recording cannot be less than 2 seconds!", icon="⚠"
-                    )
-                    audio_bytes = None
+    response_in_voice = False
+    AUDIO_RESPONSE_SUPPORT = False
 
-                if audio_bytes:
-                    if AUDIO_ERROR:
-                        AUDIO_ERROR.empty()
-                        AUDIO_ERROR = None
-                    logger.debug(
-                        "Audio recorded: {:,} seconds".format(
-                            len(audio_bytes) / (AUDIO_SAMPLE_RATE * 4)
+    if False:
+        with st.sidebar:
+            with st.container(key="voice_input_container"):
+                AUDIO_RESPONSE_SUPPORT = (
+                    COORDINATOR_CONFIG.provider == "OpenAI"
+                    and COORDINATOR_CONFIG.model_id in AUDIO_SUPPORTED_MODELS["OpenAI"]
+                )
+                # define sample rate
+                AUDIO_SAMPLE_RATE = 44_100
+                # Add an audio recorder for voice messages
+                if audio_bytes := audio_recorder(
+                    text="Voice Input",
+                    icon_size="1x",
+                    pause_threshold=5,
+                    sample_rate=AUDIO_SAMPLE_RATE,
+                    key="voice_input_recorder"
+                    + ("" if AUDIO_RESPONSE_SUPPORT else "_disabled"),
+                ):
+                    # expecting the output should be byte
+                    if not isinstance(audio_bytes, bytes):
+                        raise Exception("Recorded audio is not an instance of bytes")
+                    # reject audio with less than 2 seconds
+                    if len(audio_bytes) < 2 * 4 * AUDIO_SAMPLE_RATE:
+                        AUDIO_ERROR = st.error(
+                            "Recording cannot be less than 2 seconds!", icon="⚠"
+                        )
+                        audio_bytes = None
+
+                    if audio_bytes:
+                        if AUDIO_ERROR:
+                            AUDIO_ERROR.empty()
+                            AUDIO_ERROR = None
+                        logger.debug(
+                            "Audio recorded: {:,} seconds".format(
+                                len(audio_bytes) / (AUDIO_SAMPLE_RATE * 4)
+                            )
+                        )
+                response_in_voice = st.checkbox(
+                    "Response in Voice",
+                    value=False,
+                    disabled=not AUDIO_RESPONSE_SUPPORT,
+                )
+                if not AUDIO_RESPONSE_SUPPORT:
+                    st.warning(
+                        "You need to user following models in OpenAI to receive audio response: {}".format(
+                            ", ".join(AUDIO_SUPPORTED_MODELS["OpenAI"])
                         )
                     )
-            response_in_voice = st.checkbox(
-                "Response in Voice", value=False, disabled=not AUDIO_RESPONSE_SUPPORT
-            )
-            if not AUDIO_RESPONSE_SUPPORT:
-                st.warning(
-                    "You need to user following models in OpenAI to receive audio response: {}".format(
-                        ", ".join(AUDIO_SUPPORTED_MODELS["OpenAI"])
+                if response_in_voice:
+                    generic_leader.storage = None
+                else:
+                    generic_leader.storage = PgAgentStorage(
+                        table_name="agent_sessions", db_url=db_settings.get_db_url()
                     )
-                )
-            if response_in_voice:
-                generic_leader.storage = None
-            else:
-                generic_leader.storage = PgAgentStorage(
-                    table_name="agent_sessions", db_url=db_settings.get_db_url()
-                )
 
     # Process the text or audio input
     if audio_bytes:
@@ -437,8 +445,15 @@ def main() -> None:
             {"role": "user", "content": [{"type": "audio", "audio": audio_bytes}]}
         )
 
-    if prompt := st.chat_input():
-        st.session_state["messages"].append(Message(role="user", content=prompt))
+    float_init()
+    footer_container = st.container(key="footer_container")
+    with footer_container:
+        if prompt := st.chat_input(placeholder="How can CoPlanet LLM-OS assist you?"):
+            st.session_state["messages"].append(Message(role="user", content=prompt))
+
+    footer_container.float(
+        "display:flex; align-items:center;justify-content:center; overflow:hidden visible;flex-direction:column; position:fixed;bottom:15px;"
+    )
 
     if (
         "uploaded_images" not in st.session_state
@@ -811,7 +826,9 @@ def main() -> None:
 
         # -*- Add documents to knowledge base
         if "file_uploader_key" not in st.session_state:
-            st.session_state["file_uploader_key"] = 100
+            st.session_state["file_uploader_key"] = "uploader.{}.{}".format(
+                time(), uuid4()
+            )
 
         if "uploaded_images" not in st.session_state or not isinstance(
             st.session_state["uploaded_images"], list
@@ -824,12 +841,6 @@ def main() -> None:
             accept_multiple_files=True,
         )
         if uploaded_files_:
-            alert = st.sidebar.info(
-                "Processing {} document{}...".format(
-                    len(uploaded_files_), "s" if len(uploaded_files_) > 1 else ""
-                ),
-                icon="🧠",
-            )
             uploaded_images = []
             uploaded_videos = []
             for uploaded_file in uploaded_files_:
@@ -888,7 +899,7 @@ def main() -> None:
                                 "Could not read document: {}".format(document_name)
                             )
                         st.session_state[f"{document_name}_uploaded"] = True
-                        st.sidebar.success(
+                        st.toast(
                             "Document: `{}` successfully added to knowledge base.".format(
                                 document_name
                             )
@@ -900,7 +911,6 @@ def main() -> None:
                             "Could not read document: {}".format(document_name)
                         )
                         continue
-            st.session_state["file_uploader_key"] += 1
 
             if "hash2uploaded_images" not in st.session_state:
                 st.session_state["hash2uploaded_images"] = {}
@@ -922,12 +932,50 @@ def main() -> None:
                     st.session_state["uploaded_images"].extend(images)
                     st.session_state["selected_image"] = images[-1].id
 
-            alert.empty()
-
         if generic_leader.knowledge.vector_db:
             if st.sidebar.button("Delete Knowledge Base", key="delete_knowledge_base"):
                 generic_leader.knowledge.vector_db.delete()
-                st.sidebar.success("Knowledge base deleted")
+                st.toast("Knowledge base deleted")
+
+    with footer_container:
+        cols = st.columns([0.05, 0.05, 0.9])
+        with cols[0]:
+            with st.container(key="chat_file_uploader_container"):
+                file_uploader_js = """
+                    <script>
+                        document.addEventListener('DOMContentLoaded', function () {
+                            const interval = setInterval(() => {
+                                const button = window.parent.document.querySelector('.st-key-cloud_upload button');
+                                if (button) {
+                                    button.addEventListener('click', function (e) {
+                                        e.preventDefault();
+                                        const fileUploader = window.parent.document.querySelector('input[type="file"]');
+                                        debugger;
+                                        if (fileUploader) {
+                                            fileUploader.click();
+                                        }
+                                    });
+                                    clearInterval(interval);
+                                }
+                            }, 100);
+                        });
+                    </script>
+                    """
+                html(file_uploader_js, height=0, width=0)
+            st.button(":material/cloud_upload:", key="cloud_upload")
+
+        with get_db_context() as db:
+            if (
+                UserBinaryData.get_data(
+                    db, user.session_id, UserBinaryData.IMAGE
+                ).count()
+                > 0
+            ):
+                with cols[1]:
+                    if st.button(
+                        ":material/gallery_thumbnail:", key="gallery_thumbnail"
+                    ):
+                        render_galary_display(generic_leader)
 
     EMPTY_SESSIONS = True
 
@@ -1029,7 +1077,7 @@ def main() -> None:
 
     if not EMPTY_SESSIONS:
         st.sidebar.markdown("---")
-        CLEAN_SESSION = False
+        CLEAN_SESSION = True
 
         if generic_leader.storage:
             if st.sidebar.button("Delete All Session", key="delete_all_session_button"):
@@ -1043,18 +1091,11 @@ def main() -> None:
                         )
                         db.commit()
                 NEW_SESSION = True
-                CLEAN_SESSION = True
 
         if NEW_SESSION:
             user.session_id = str(uuid4())
             user.to_auth_param(add_to_query_params=True)
             rerun(clean_session=CLEAN_SESSION)
-
-    with get_db_context() as db:
-        if UserBinaryData.get_data(
-            db, user.session_id, UserBinaryData.IMAGE
-        ).count() > 0 and st.button("Display Gallery"):
-            render_galary_display(generic_leader)
 
 
 if os.getenv("RUNTIME_ENV") != "prd" or user.is_authenticated or check_password():

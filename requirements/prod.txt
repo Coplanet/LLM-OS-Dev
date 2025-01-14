@@ -42,6 +42,7 @@ bcrypt==4.2.1
 beautifulsoup4==4.12.3
     # via
     #   -r requirements/prod.in
+    #   favicon
     #   wikipedia
     #   yfinance
 blinker==1.8.2
@@ -86,8 +87,12 @@ composio-openai==0.6.13
     #   composio-phidata
 composio-phidata==0.6.13
     # via -r requirements/prod.in
+contourpy==1.3.1
+    # via matplotlib
 cryptography==44.0.0
     # via paramiko
+cycler==0.12.1
+    # via matplotlib
 decorator==5.1.1
     # via ipython
 defusedxml==0.7.1
@@ -105,20 +110,28 @@ duckduckgo-search==6.3.2
     # via -r requirements/prod.in
 email-validator==2.2.0
     # via fastapi
+entrypoints==0.4
+    # via streamlit-extras
 et-xmlfile==2.0.0
     # via openpyxl
 exa-py==1.7.0
     # via -r requirements/prod.in
 executing==2.1.0
     # via stack-data
+faker==33.3.1
+    # via streamlit-faker
 fastapi[standard]==0.115.2
     # via
     #   -r requirements/prod.in
     #   composio-core
 fastapi-cli[standard]==0.0.5
     # via fastapi
+favicon==0.7.0
+    # via markdownlit
 feedparser==6.0.11
     # via arxiv
+fonttools==4.55.3
+    # via matplotlib
 frozendict==2.4.6
     # via yfinance
 frozenlist==1.5.0
@@ -169,6 +182,11 @@ h11==0.14.0
     # via
     #   httpcore
     #   uvicorn
+htbuilder==0.9.0
+    # via
+    #   markdownlit
+    #   st-annotated-text
+    #   streamlit-extras
 html5lib==1.1
     # via yfinance
 httpcore==1.0.6
@@ -209,6 +227,9 @@ jinja2==3.1.4
     #   altair
     #   fastapi
     #   pydeck
+    #   streamlit-camera-input-live
+    #   streamlit-image-coordinates
+    #   streamlit-keyup
 jiter==0.6.1
     # via
     #   anthropic
@@ -225,19 +246,30 @@ jsonschema==4.23.0
     #   composio-core
 jsonschema-specifications==2024.10.1
     # via jsonschema
+kiwisolver==1.4.8
+    # via matplotlib
 lxml==5.3.0
     # via
+    #   markdownlit
     #   python-docx
     #   python-pptx
     #   yfinance
 mako==1.3.5
     # via alembic
+markdown==3.7
+    # via
+    #   markdownlit
+    #   pymdown-extensions
 markdown-it-py==3.0.0
     # via rich
+markdownlit==0.0.7
+    # via streamlit-extras
 markupsafe==3.0.1
     # via
     #   jinja2
     #   mako
+matplotlib==3.10.0
+    # via streamlit-faker
 matplotlib-inline==0.1.7
     # via ipython
 mdurl==0.1.2
@@ -259,6 +291,8 @@ nest-asyncio==1.6.0
 numpy==2.1.2
     # via
     #   -r requirements/prod.in
+    #   contourpy
+    #   matplotlib
     #   opencv-python-headless
     #   pandas
     #   pgvector
@@ -281,6 +315,8 @@ openpyxl==3.1.5
 packaging==24.1
     # via
     #   altair
+    #   matplotlib
+    #   plotly
     #   pytest
     #   streamlit
 pandas==2.2.3
@@ -305,15 +341,20 @@ phidata[aws]==2.7.5
 pillow==10.4.0
     # via
     #   -r requirements/prod.in
+    #   matplotlib
     #   python-pptx
     #   streamlit
     #   streamlit-drawable-canvas
 platformdirs==4.3.6
     # via yfinance
+plotly==5.24.1
+    # via streamlit-extras
 pluggy==1.5.0
     # via pytest
 primp==0.6.4
     # via duckduckgo-search
+prometheus-client==0.21.1
+    # via streamlit-extras
 prompt-toolkit==3.0.48
     # via ipython
 propcache==0.2.1
@@ -333,6 +374,7 @@ protobuf==5.28.2
     #   grpcio-status
     #   proto-plus
     #   streamlit
+    #   streamlit-extras
 psycopg[binary]==3.1.19
     # via -r requirements/prod.in
 psycopg-binary==3.1.19
@@ -374,10 +416,14 @@ pygments==2.18.0
     #   rich
 pyjwt==2.10.1
     # via -r requirements/prod.in
+pymdown-extensions==10.14
+    # via markdownlit
 pynacl==1.5.0
     # via paramiko
 pyparsing==3.2.0
-    # via httplib2
+    # via
+    #   httplib2
+    #   matplotlib
 pypdf==5.0.1
     # via -r requirements/prod.in
 pyperclip==1.9.0
@@ -389,6 +435,8 @@ pytest==8.3.3
 python-dateutil==2.9.0.post0
     # via
     #   botocore
+    #   faker
+    #   matplotlib
     #   pandas
 python-docx==1.1.2
     # via -r requirements/prod.in
@@ -408,6 +456,7 @@ pytz==2024.2
 pyyaml==6.0.2
     # via
     #   phidata
+    #   pymdown-extensions
     #   uvicorn
 referencing==0.35.1
     # via
@@ -422,6 +471,7 @@ requests==2.32.3
     #   composio-core
     #   docker
     #   exa-py
+    #   favicon
     #   google-api-core
     #   pysher
     #   resend
@@ -477,8 +527,10 @@ sqlalchemy==2.0.36
     # via
     #   -r requirements/prod.in
     #   alembic
-st-clickable-images==0.0.3
-    # via -r requirements/prod.in
+st-annotated-text==4.0.1
+    # via streamlit-extras
+st-theme==1.2.3
+    # via streamlit-extras
 stack-data==0.6.3
     # via ipython
 starlette==0.40.0
@@ -487,12 +539,51 @@ streamlit==1.39.0
     # via
     #   -r requirements/prod.in
     #   audio-recorder-streamlit
-    #   st-clickable-images
+    #   markdownlit
+    #   st-theme
+    #   streamlit-camera-input-live
+    #   streamlit-card
     #   streamlit-drawable-canvas
+    #   streamlit-embedcode
+    #   streamlit-extras
+    #   streamlit-faker
+    #   streamlit-float
+    #   streamlit-image-coordinates
+    #   streamlit-image-select
+    #   streamlit-keyup
+    #   streamlit-toggle-switch
+    #   streamlit-vertical-slider
+streamlit-camera-input-live==0.2.0
+    # via streamlit-extras
+streamlit-card==1.0.2
+    # via streamlit-extras
 streamlit-drawable-canvas==0.9.3
     # via -r requirements/prod.in
+streamlit-embedcode==0.1.2
+    # via streamlit-extras
+streamlit-extras==0.5.0
+    # via
+    #   -r requirements/prod.in
+    #   markdownlit
+    #   streamlit-faker
+streamlit-faker==0.0.3
+    # via streamlit-extras
+streamlit-float==0.3.5
+    # via -r requirements/prod.in
+streamlit-image-coordinates==0.1.9
+    # via streamlit-extras
+streamlit-image-select==0.6.0
+    # via -r requirements/prod.in
+streamlit-keyup==0.3.0
+    # via streamlit-extras
+streamlit-toggle-switch==1.0.2
+    # via streamlit-extras
+streamlit-vertical-slider==2.5.5
+    # via streamlit-extras
 tenacity==9.0.0
-    # via streamlit
+    # via
+    #   plotly
+    #   streamlit
 tiktoken==0.8.0
     # via -r requirements/prod.in
 toml==0.10.2
@@ -526,6 +617,7 @@ typing-extensions==4.12.2
     #   altair
     #   anthropic
     #   exa-py
+    #   faker
     #   fastapi
     #   google-generativeai
     #   groq
@@ -558,6 +650,8 @@ uvicorn[standard]==0.32.0
     #   fastapi-cli
 uvloop==0.21.0
     # via uvicorn
+validators==0.34.0
+    # via streamlit-extras
 watchdog==5.0.3
     # via streamlit
 watchfiles==0.24.0

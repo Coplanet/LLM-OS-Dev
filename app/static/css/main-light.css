@@ -1,8 +1,16 @@
-.stApp.light div:has(> [aria-label="Chat message from user"]) {
-    background-color: rgb(240, 240, 240) !important;
-    padding: 1rem !important;
-    border-radius: 0.5rem !important;
-    border: 1px solid rgb(200, 200, 200) !important;
-    text-align: right !important;
+.stApp.light [data-testid="stChatMessage"] > [data-testid="stChatMessageContent"][aria-label="Chat message from user"] {
+    background-color: #e0e0e0 !important;
+}
+.stApp.light .st-key-footer_container {
     color: var(--text-color) !important;
+}
+.stApp.light .st-key-footer_container div.stHorizontalBlock:has(.st-key-cloud_upload) button:hover {
+    background-color: #e0e0e0 !important;
+}
+.stApp.light .st-key-footer_container {
+    background-color: #f0f0f0 !important;
+}
+.stApp.light .st-key-footer_container [data-baseweb="textarea"] {
+    background-color: #f0f0f0 !important;
+    border-color: #f0f0f0 !important;
 }
