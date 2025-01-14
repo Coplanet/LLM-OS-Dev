@@ -10,6 +10,7 @@ openai>=1.52.0
 resend
 exa-py
 pandas
+backoff
 openpyxl
 requests
 yfinance

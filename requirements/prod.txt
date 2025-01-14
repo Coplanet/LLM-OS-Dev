@@ -37,6 +37,8 @@ attrs==24.2.0
     #   referencing
 audio-recorder-streamlit==0.0.8
     # via -r requirements/prod.in
+backoff==2.2.1
+    # via -r requirements/prod.in
 bcrypt==4.2.1
     # via paramiko
 beautifulsoup4==4.12.3
