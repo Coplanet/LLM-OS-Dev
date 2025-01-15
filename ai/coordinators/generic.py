@@ -9,7 +9,7 @@ from phi.memory.db.postgres import PgMemoryDb
 from phi.storage.agent.postgres import PgAgentStorage
 from phi.tools.arxiv_toolkit import ArxivToolkit
 from phi.tools.calculator import Calculator
-from phi.tools.duckduckgo import DuckDuckGo
+from phi.tools.exa import ExaTools
 from phi.tools.wikipedia import WikipediaTools
 from phi.tools.yfinance import YFinanceTools
 from phi.tools.youtube_tools import YouTubeTools
@@ -102,11 +102,11 @@ available_tools = [
     },
     {
         "order": 600,
-        "instance": DuckDuckGo(fixed_max_results=3),
-        "name": "Search (DDG)",
+        "instance": ExaTools(num_results=5, text_length_limit=1000),
+        "name": "Search (Exa)",
         "extra_instructions": dedent(
             """\
-            Leverage the DuckDuckGo Search tool for quick internet searches, such as finding \
+            Leverage the Exa Search tool for quick internet searches, such as finding \
                 up-to-date information,
             verifying facts, or answering questions beyond the scope of the knowledge base.
             Use this tool when a direct query requires additional context or when you need to retrieve concise

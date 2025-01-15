@@ -1,4 +1,7 @@
+from collections import OrderedDict
+
 import streamlit as st
+from streamlit_pills import pills
 
 from ai.agents.settings import AgentConfig, agent_settings
 from app.utils import to_label
@@ -6,52 +9,62 @@ from db.session import get_db_context
 from db.tables import UserConfig
 from helpers.log import logger
 
+DEFAULT_TEMPERATURE = OrderedDict(
+    [
+        ("Deterministic", {"value": 0.0, "icon": ":material/border_outer:"}),
+        ("Balanced", {"value": 0.75, "icon": ":material/balance:"}),
+        ("Creative", {"value": 1.5, "icon": ":material/emoji_objects:"}),
+    ]
+)
+
+
+def get_temperature(provider: str, model_id: str, selected_temperature: float):
+    if provider == "OpenAI" or provider == "Anthropic":
+        return {"0.75": 0.5, "1.5": 1}.get(
+            str(selected_temperature), selected_temperature
+        )
+    return selected_temperature
+
+
 MODELS = {
     "OpenAI": {
         # "gpt-4o-audio-preview": {
-        #     "max_temperature": 2,
-        #     "max_token_size": agent_settings.default_max_completion_tokens,
+        #             #     "max_token_size": agent_settings.default_max_completion_tokens,
         #     "kwargs": {
         #         "modalities": ["text", "audio"],
         #         "audio": {"voice": "alloy", "format": "wav"},
         #     },
         # },
         "gpt-4o": {
-            "max_temperature": 2,
             "max_token_size": agent_settings.default_max_completion_tokens,
         },
         "gpt-4o-mini": {
-            "max_temperature": 2,
             "max_token_size": agent_settings.default_max_completion_tokens,
         },
         # "o1-preview": {
-        #     "max_temperature": 2,
-        #     "max_token_size": agent_settings.default_max_completion_tokens,
+        #   "max_token_size": agent_settings.default_max_completion_tokens,
         # },
         # "o1-mini": {
-        #     "max_temperature": 2,
-        #     "max_token_size": agent_settings.default_max_completion_tokens,
+        #   "max_token_size": agent_settings.default_max_completion_tokens,
         # },
     },
     "Google": {
         "gemini-2.0-flash-exp": {
-            "max_temperature": 2,
             "max_token_size": 8_192,
         },
     },
     "Groq": {
-        "llama-3.3-70b-versatile": {"max_temperature": 2, "max_token_size": 32_000},
+        "llama-3.3-70b-versatile": {"max_token_size": 32_000},
         "mixtral-8x7b-32768": {
-            "max_temperature": 2,
             "max_token_size": 32_000,
         },
     },
     "Anthropic": {
-        "claude-3-5-sonnet-20241022": {"max_temperature": 2, "max_token_size": 8_192},
-        "claude-3-5-haiku-20241022": {"max_temperature": 2, "max_token_size": 8_192},
-        "claude-3-opus-20240229": {"max_temperature": 2, "max_token_size": 4_096},
-        "claude-3-sonnet-20240229": {"max_temperature": 2, "max_token_size": 4_096},
-        "claude-3-haiku-20240307": {"max_temperature": 2, "max_token_size": 4_096},
+        "claude-3-5-sonnet-20241022": {"max_token_size": 8_192},
+        "claude-3-5-haiku-20241022": {"max_token_size": 8_192},
+        "claude-3-opus-20240229": {"max_token_size": 4_096},
+        "claude-3-sonnet-20240229": {"max_token_size": 4_096},
+        "claude-3-haiku-20240307": {"max_token_size": 4_096},
     },
 }
 
@@ -86,12 +99,27 @@ def show_popup(session_id, assistant_name, config: AgentConfig, package):
 
     MODEL_CONFIG: dict = PROVIDER_CONFIG[model_id]
 
-    temperature = st.slider(
-        "Temperature",
-        min_value=0.0,
-        max_value=float(MODEL_CONFIG["max_temperature"]),
-        step=0.1,
-        key=f"{label}_temperature",
+    temprature_index = 0
+    for i, key in enumerate(DEFAULT_TEMPERATURE.keys()):
+        if (
+            get_temperature(provider, model_id, DEFAULT_TEMPERATURE[key]["value"])
+            == config.temperature
+        ):
+            temprature_index = i
+            break
+
+    st.session_state[f"{label}_temperature"] = config.temperature = temperature = (
+        get_temperature(
+            provider,
+            model_id,
+            DEFAULT_TEMPERATURE[
+                pills(
+                    "Choose the model's creativity:",
+                    list(DEFAULT_TEMPERATURE.keys()),
+                    index=temprature_index,
+                )
+            ]["value"],
+        )
     )
 
     max_tokens = MODEL_CONFIG["max_token_size"]

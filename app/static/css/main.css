@@ -70,6 +70,9 @@ div:has(> [aria-label="Chat message from assistant"]) {
 div:has(> .stHeading) {
     display: none !important;
 }
+.stChatMessage [data-stale="true"] {
+    display: none !important;
+}
 .st-key-subtitle_container * {
     font-size: 1.5rem !important;
     font-weight: 600 !important;

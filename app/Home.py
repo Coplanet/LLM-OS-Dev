@@ -15,7 +15,6 @@ import nest_asyncio
 import openai
 import sqlalchemy as sql
 import streamlit as st
-import streamlit.components.v1 as components
 from audio_recorder_streamlit import audio_recorder
 from bs4 import BeautifulSoup
 from phi.agent import Agent
@@ -46,10 +45,13 @@ from ai.document.reader.image import ImageReader
 from ai.document.reader.pptx import PPTXReader
 from app.auth import Auth, User
 from app.components.available_agents import AGENTS
+from app.components.configs import IMAGE_DIR
+from app.components.delete_knowledgebase import render_delete_knowledgebase
 from app.components.galary_display import render_galary_display
 from app.components.mask_image import render_mask_image
 from app.components.popup import AUDIO_SUPPORTED_MODELS, show_popup
 from app.components.sidebar import create_sidebar
+from app.components.styles import render_styles
 from db.session import get_db_context
 from db.settings import db_settings
 from db.tables import UserBinaryData, UserConfig, UserNextOp
@@ -58,53 +60,12 @@ from helpers.utils import binary2text, binary_text2data, text2binary
 
 phi_logger.setLevel(logging.DEBUG)
 
-STATIC_DIR = "app/static"
-IMAGE_DIR = f"{STATIC_DIR}/images"
-CSS_DIR = f"{STATIC_DIR}/css"
-
 auth = Auth()
 
 nest_asyncio.apply()
 st.set_page_config(page_title="CoPlanet AI", page_icon=f"{IMAGE_DIR}/favicon.png")
 
-with st.container(key="css_and_theme_container"):
-    st.markdown(
-        """<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.0/css/all.min.css">""",
-        unsafe_allow_html=True,
-    )
-    # load css
-    with open(f"{CSS_DIR}/main.css", "r") as file:
-        st.markdown(f"<style>{file.read()}</style>", unsafe_allow_html=True)
-
-    for theme in ["dark", "light"]:
-        if os.path.exists(f"{CSS_DIR}/main-{theme}.css"):
-            with open(f"{CSS_DIR}/main-{theme}.css", "r") as file:
-                st.markdown(f"<style>{file.read()}</style>", unsafe_allow_html=True)
-
-    components.html(
-        """
-    <script>
-    document.addEventListener("DOMContentLoaded", function() {
-        setInterval(() => {
-            const appElement = window.parent.document.getElementsByClassName("stApp")[0];
-            const currentTheme = window.getComputedStyle(appElement).getPropertyValue("color-scheme");
-
-            // Remove existing theme classes
-            appElement.classList.remove('dark', 'light');
-
-            // Add the current theme class
-            if (currentTheme === 'dark') {
-                appElement.classList.add('dark');
-            } else if (currentTheme === 'light') {
-                appElement.classList.add('light');
-            }
-        }, 300);
-    });
-    </script>
-    """,
-        height=0,
-        width=0,
-    )
+render_styles()
 
 st.title("CoPlanet AI")
 with st.container(key="subtitle_container"):
@@ -450,10 +411,13 @@ def main() -> None:
     with footer_container:
         if prompt := st.chat_input(placeholder="How can CoPlanet LLM-OS assist you?"):
             st.session_state["messages"].append(Message(role="user", content=prompt))
+    try:
+        footer_container.float(
+            "display:flex; align-items:center;justify-content:center; overflow:hidden visible;flex-direction:column; position:fixed;bottom:15px;"
+        )
 
-    footer_container.float(
-        "display:flex; align-items:center;justify-content:center; overflow:hidden visible;flex-direction:column; position:fixed;bottom:15px;"
-    )
+    except Exception as e:
+        logger.error(f"Error floating footer container: {e}")
 
     if (
         "uploaded_images" not in st.session_state
@@ -476,7 +440,6 @@ def main() -> None:
 
     last_prompt = None
     last_user_message_index = None
-    last_user_message_container = None
 
     # Display existing chat messages
     for index, message in enumerate(generic_leader.memory.messages):
@@ -499,10 +462,11 @@ def main() -> None:
             if message_role == "user" and isinstance(message.content, list):
                 if message.content[0].get("type") == "audio":
                     continue
-            chat_message_container = st.chat_message(message_role)
+            chat_message_container = st.chat_message(
+                message_role, avatar="user" if message_role == "user" else "assistant"
+            )
             if message_role == "user":
                 last_user_message_index = index
-                last_user_message_container = chat_message_container
             with chat_message_container:
                 content = message.content
                 if isinstance(content, list):
@@ -511,6 +475,8 @@ def main() -> None:
                             last_prompt = item["text"]
                             st.write(last_prompt)
                         elif item["type"] == "image_url":
+                            if message_role == "user":
+                                continue
                             data_ = item["image_url"]["url"]
                             if not data_.startswith("http"):
                                 hash = hashlib.sha256(text2binary(data_)).hexdigest()
@@ -649,6 +615,7 @@ def main() -> None:
                     [
                         binary2text(d.data_compressed, "image/webp")
                         for d in uploaded_images
+                        if d.id == st.session_state["selected_image"]
                     ],
                     uploaded_videos_,
                     audio_bytes,
@@ -693,7 +660,6 @@ def main() -> None:
             if audio_bytes:
                 audio_bytes = None
 
-            memory = generic_leader.read_from_storage().memory
             requires_update = False
             # Get the images
             image_outputs: Optional[List[Image]] = generic_leader.get_images()
@@ -713,36 +679,6 @@ def main() -> None:
                                 response_in_voice,
                                 AUDIO_RESPONSE_SUPPORT,
                                 audio_bytes_,
-                            )
-
-            if uploaded_images:
-                if not memory:
-                    memory = generic_leader.read_from_storage().memory
-
-                if (
-                    memory
-                    and "messages" in memory
-                    and isinstance(memory["messages"], list)
-                    and len(memory["messages"]) > 1
-                ):
-                    with get_db_context() as db:
-                        images = UserBinaryData.get_latest_group(
-                            db,
-                            user.session_id,
-                            UserBinaryData.IMAGE,
-                            UserBinaryData.DOWNSTREAM,
-                        )
-
-                    with last_user_message_container:
-                        for image in images:
-                            if (
-                                image.data_compressed_hashsum
-                                in st.session_state["rendered_images_hashes"]
-                            ):
-                                continue
-                            st.image(image.data)
-                            st.session_state["rendered_images_hashes"].add(
-                                image.data_compressed_hashsum
                             )
 
             # Render the images
@@ -839,6 +775,7 @@ def main() -> None:
             "Add a Document (video & image files, .pdf, .csv, .pptx, .txt, .md, .docx, .json, .xlsx, .xls and etc)",
             key=st.session_state["file_uploader_key"],
             accept_multiple_files=True,
+            on_change=lambda: st.toast("Uploading...", icon=":material/upload:"),
         )
         if uploaded_files_:
             uploaded_images = []
@@ -932,14 +869,26 @@ def main() -> None:
                     st.session_state["uploaded_images"].extend(images)
                     st.session_state["selected_image"] = images[-1].id
 
-        if generic_leader.knowledge.vector_db:
-            if st.sidebar.button("Delete Knowledge Base", key="delete_knowledge_base"):
-                generic_leader.knowledge.vector_db.delete()
-                st.toast("Knowledge base deleted")
-
     with footer_container:
-        cols = st.columns([0.05, 0.05, 0.9])
-        with cols[0]:
+        IMAGE_UPLOAED = bool(
+            UserBinaryData.get_data(db, user.session_id, UserBinaryData.IMAGE).count()
+            > 0
+        )
+        KNOWLEDGE_BASE_CREATED = bool(generic_leader.knowledge.vector_db)
+        # for upload
+        columns = [0.05]
+        COL_INDEX = 0
+        if IMAGE_UPLOAED:
+            columns.append(0.05)
+        if KNOWLEDGE_BASE_CREATED:
+            columns.append(0.05)
+        # for new session
+        columns.append(0.05)
+        # for in the middle
+        columns.insert(-1, 1 - sum(columns))
+        cols = st.columns(columns)
+        with cols[COL_INDEX]:
+            COL_INDEX += 1
             with st.container(key="chat_file_uploader_container"):
                 file_uploader_js = """
                     <script>
@@ -965,23 +914,26 @@ def main() -> None:
             st.button(":material/cloud_upload:", key="cloud_upload")
 
         with get_db_context() as db:
-            if (
-                UserBinaryData.get_data(
-                    db, user.session_id, UserBinaryData.IMAGE
-                ).count()
-                > 0
-            ):
-                with cols[1]:
+            if IMAGE_UPLOAED:
+                with cols[COL_INDEX]:
+                    COL_INDEX += 1
                     if st.button(
                         ":material/gallery_thumbnail:", key="gallery_thumbnail"
                     ):
                         render_galary_display(generic_leader)
 
+        if KNOWLEDGE_BASE_CREATED:
+            with cols[COL_INDEX]:
+                COL_INDEX += 1
+                if st.button(":material/delete:", key="delete_knowledge_base"):
+                    render_delete_knowledgebase(generic_leader)
+
+        with cols[-1]:
+            NEW_SESSION = st.button(":material/add_box:", key="add_box")
+
     EMPTY_SESSIONS = True
 
     st.sidebar.markdown("---")
-
-    NEW_SESSION = st.sidebar.button("New Session", key="new_session_button")
 
     if generic_leader.storage:
         sessions = generic_leader.storage.get_all_sessions(user_id=user.user_id)
