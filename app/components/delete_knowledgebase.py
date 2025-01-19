@@ -1,6 +1,8 @@
 import streamlit as st
 from phi.agent import Agent
 
+from app.utils import rerun
+
 
 @st.dialog("Delete Knowledgebase?", width="large")
 def render_delete_knowledgebase(agent: Agent):
@@ -14,7 +16,7 @@ def render_delete_knowledgebase(agent: Agent):
         if st.button("Delete"):
             agent.knowledge.vector_db.delete()
             st.toast("Knowledge base deleted")
-            st.rerun()
+            rerun()
     with cols[0]:
         if st.button("Cancel", type="primary"):
-            st.rerun()
+            rerun()

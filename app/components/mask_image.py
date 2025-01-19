@@ -9,6 +9,7 @@ from PIL import Image as PILImage
 from streamlit_drawable_canvas import st_canvas
 
 from ai.tools.stability import Stability
+from app.utils import rerun, run_js
 from db.session import get_db_context
 from db.tables.user_config import UserBinaryData, UserNextOp
 
@@ -91,7 +92,14 @@ def render_mask_image(agent: Agent) -> Union[None, bool]:
                 )
 
             st.success("Image's mask has been added successfully.")
-            st.rerun()
+            run_js(
+                """setTimeout(function() {
+                    window.parent.document
+                        .querySelectorAll('button[aria-label="Close"]')
+                        .forEach(button => button.click());
+                }, 1000);"""
+            )
+            rerun()
 
     with col2:
         if st.button("Cancel"):
@@ -100,4 +108,4 @@ def render_mask_image(agent: Agent) -> Union[None, bool]:
                     db, agent.session_id, UserNextOp.GET_IMAGE_MASK
                 )
             st.warning("Image editing has been cancelled!")
-            st.rerun()
+            rerun()

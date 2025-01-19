@@ -11,9 +11,16 @@ from phi.model.openai import OpenAIChat
 from helpers.log import logger
 
 from .settings import AgentConfig, ComposioAction, agent_settings, extra_settings
-from .transformers.anthropic_to_openai import AnthropicToOpenAI
-from .transformers.base import Provider, Transformer
-from .transformers.openai_to_anthropic import OpenAIToAnthropic
+from .transformers import (
+    AnthropicToGroq,
+    AnthropicToOpenAI,
+    GroqToAnthropic,
+    GroqToOpenAI,
+    OpenAIToAnthropic,
+    OpenAIToGroq,
+    Provider,
+    Transformer,
+)
 
 DEFAULT_GPT_MODEL_CONFIG = {
     "max_tokens": agent_settings.default_max_completion_tokens,
@@ -52,7 +59,11 @@ class Agent(PhiAgent):
             str(getattr(self.model, "temperature", "n/a")),
         )
 
+        self.register_transformer(GroqToOpenAI())
+        self.register_transformer(GroqToAnthropic())
+        self.register_transformer(AnthropicToGroq())
         self.register_transformer(AnthropicToOpenAI())
+        self.register_transformer(OpenAIToGroq())
         self.register_transformer(OpenAIToAnthropic())
 
     @property

@@ -4,10 +4,13 @@
 [data-testid="stSidebarContent"] {
     overflow-x: hidden;
 }
+body.new-session-started [data-testid="stChatMessage"] {
+    display: none !important;
+}
 [data-testid="stChatMessage"] {
     background-color: transparent !important;
 }
-[data-testid="stChatMessage"]:has(> [data-testid="stChatMessageContent"][aria-label="Chat message from user"]) {
+body:not(.new-session-started) [data-testid="stChatMessage"]:has(> [data-testid="stChatMessageContent"][aria-label="Chat message from user"]) {
     display: unset !important;
 }
 [data-testid="stChatMessage"] > [data-testid="stChatMessageContent"] {
@@ -22,6 +25,9 @@
     max-width: 500px !important;
     margin: unset !important;
     width: fit-content !important;
+}
+[data-testid="stChatMessage"] > [data-testid="stChatMessageContent"][aria-label="Chat message from user"] .stMarkdown {
+    width: 100% !important;
 }
 
 @media (max-width: 640px) {
@@ -180,7 +186,7 @@ div:has(> .stHeading) {
     color: unset !important;
     padding: 0 10px 0 10px !important;
 }
-.st-key-chat_file_uploader_container {
+.st-key-js_container_* {
     display: none !important;
 }
 .stElementContainer .stFileUploader {

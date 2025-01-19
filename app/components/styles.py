@@ -31,6 +31,11 @@ def render_styles():
                 const appElement = window.parent.document.getElementsByClassName("stApp")[0];
                 const currentTheme = window.getComputedStyle(appElement).getPropertyValue("color-scheme");
 
+                if(window.parent.current_theme !== currentTheme) {
+                    window.parent.current_theme = currentTheme;
+                } else
+                    return;
+
                 // Remove existing theme classes
                 appElement.classList.remove('dark', 'light');
 

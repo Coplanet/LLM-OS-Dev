@@ -5,6 +5,7 @@ from phi.agent import Agent
 from streamlit.components.v1 import html
 from streamlit_image_select import image_select
 
+from app.utils import rerun
 from db.session import get_db_context
 from db.tables.user_config import UserBinaryData
 from helpers.utils import binary2text
@@ -84,8 +85,8 @@ def render_galary_display(agent: Agent) -> Union[None, bool]:
             st.session_state["selected_image"] = index2id[
                 IMAGE_COUNT - selected_image - 1
             ]
-            st.rerun()
+            rerun()
 
     with cols[0]:
         if st.button("Cancel"):
-            st.rerun()
+            rerun()

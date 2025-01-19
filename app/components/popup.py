@@ -5,7 +5,7 @@ from streamlit_pills import pills
 
 from ai.agents.base import Agent, Provider
 from ai.agents.settings import AgentConfig, agent_settings
-from app.utils import to_label
+from app.utils import rerun, to_label
 from db.session import get_db_context
 from db.tables import UserConfig
 from helpers.log import logger
@@ -55,9 +55,9 @@ MODELS = {
         },
     },
     Provider.Groq.value: {
-        "llama-3.3-70b-versatile": {"max_token_size": 32_000},
+        "llama-3.3-70b-versatile": {"max_token_size": 8_192},
         "mixtral-8x7b-32768": {
-            "max_token_size": 32_000,
+            "max_token_size": 8_192,
         },
     },
     Provider.Anthropic.value: {
@@ -267,7 +267,7 @@ def show_popup(agent: Agent, session_id, assistant_name, config: AgentConfig, pa
         if st.button("Cancel"):
             st.session_state.show_popup = False
             st.session_state.selected_assistant = None
-            st.rerun()
+            rerun()
 
     with col2:
         if st.button("Save"):
@@ -319,4 +319,4 @@ def show_popup(agent: Agent, session_id, assistant_name, config: AgentConfig, pa
             if agent and agent.model.provider != provider:
                 agent.transform(Provider(provider))
 
-            st.rerun()
+            rerun()

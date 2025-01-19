@@ -5,6 +5,7 @@ from typing import Optional
 import jwt
 import streamlit as st
 
+from app.utils import rerun
 from helpers.log import logger
 from workspace.settings import extra_settings
 
@@ -95,7 +96,7 @@ class User:
 
         except jwt.InvalidSignatureError:
             st.query_params.pop(cls.AUTH_KEY)
-            st.rerun()
+            rerun()
 
         except Exception as e:
             if cls.AUTH_KEY in st.query_params:

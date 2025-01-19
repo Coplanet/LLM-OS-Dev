@@ -3,6 +3,7 @@ from typing import Callable, Dict
 import streamlit as st
 
 from ai.agents.base import Agent
+from app.utils import rerun
 from db.session import get_db_context
 from db.tables import UserConfig
 
@@ -92,4 +93,4 @@ def create_sidebar(session_id, agents: Dict[str, Callable[[], Agent]]) -> None:
 
                     with get_db_context() as db:
                         config.save(db)
-                st.rerun()
+                rerun()

@@ -11,6 +11,7 @@ from uuid import uuid4
 
 import backoff
 import google.generativeai as genai
+import groq
 import nest_asyncio
 import openai
 import sqlalchemy as sql
@@ -32,7 +33,6 @@ from phi.storage.agent.postgres import PgAgentStorage
 from phi.tools.streamlit.components import check_password
 from phi.utils.log import logger as phi_logger
 from phi.utils.log import logging
-from streamlit.components.v1 import html
 from streamlit_float import float_init
 
 from ai.agents import base, settings
@@ -53,6 +53,7 @@ from app.components.mask_image import render_mask_image
 from app.components.popup import AUDIO_SUPPORTED_MODELS, show_popup
 from app.components.sidebar import create_sidebar
 from app.components.styles import render_styles
+from app.utils import rerun, run_js
 from db.session import get_db_context
 from db.settings import db_settings
 from db.tables import UserBinaryData, UserConfig, UserNextOp
@@ -80,7 +81,21 @@ with st.container(key="subtitle_container"):
 user: User = auth.get_user()
 
 
-@backoff.on_exception(backoff.expo, openai.RateLimitError, max_time=60, max_tries=10)
+def backoff_handler(details):
+    logger.error(
+        "Backing off {wait:0.1f} seconds after {tries} tries "
+        "calling function {target} with args {args} and kwargs "
+        "{kwargs}".format(**details)
+    )
+
+
+@backoff.on_exception(
+    backoff.expo,
+    (openai.RateLimitError, groq.RateLimitError),
+    max_time=60,
+    max_tries=10,
+    on_backoff=backoff_handler,
+)
 def run(
     generic_leader: Agent,
     question: str,
@@ -133,21 +148,6 @@ def run(
         "Time to response from coordinator: {:.2f} seconds".format(end - start)
     )
     return response
-
-
-def rerun(clean_session: bool = False):
-    if clean_session:
-        logger.debug(">>> Restarting Agent")
-        keys2delete = []
-        for key in st.session_state:
-            keys2delete.append(key)
-
-        for key in keys2delete:
-            try:
-                del st.session_state[key]
-            except Exception:
-                pass
-    st.rerun()
 
 
 def get_selected_assistant_config(session_id, label, package):
@@ -214,6 +214,11 @@ def get_selected_assistant_config(session_id, label, package):
 def main() -> None:
     if os.getenv("TESTING_ENV", False):
         return
+
+    RERUN_SESSION = False
+    if "rerun" in st.session_state:
+        RERUN_SESSION = True
+        del st.session_state["rerun"]
 
     USERNAME: str = user.username
 
@@ -410,19 +415,6 @@ def main() -> None:
             {"role": "user", "content": [{"type": "audio", "audio": audio_bytes}]}
         )
 
-    float_init()
-    footer_container = st.container(key="footer_container")
-    with footer_container:
-        if prompt := st.chat_input(placeholder="How can CoPlanet LLM-OS assist you?"):
-            st.session_state["messages"].append(Message(role="user", content=prompt))
-    try:
-        footer_container.float(
-            "display:flex; align-items:center;justify-content:center; overflow:hidden visible;flex-direction:column; position:fixed;bottom:15px;"
-        )
-
-    except Exception as e:
-        logger.error(f"Error floating footer container: {e}")
-
     if (
         "uploaded_images" not in st.session_state
         or "hash2uploaded_images" not in st.session_state
@@ -438,6 +430,7 @@ def main() -> None:
             ):
                 st.session_state["hash2uploaded_images"][d.data_compressed_hashsum] = d
                 st.session_state["uploaded_images"].append(d)
+            st.session_state["uploaded_images"].reverse()
 
     st.session_state["rendered_images_hashes"] = set()
     hash2images = st.session_state.get("hash2uploaded_images", {})
@@ -480,6 +473,20 @@ def main() -> None:
                     message.content[0].get("type") == "audio"
                     or message.content[0].get("type") == "tool_result"
                 ):
+                    continue
+
+            if message_role == "assistant" and message.content:
+                ct = message.content
+                if not isinstance(ct, list):
+                    ct = [ct]
+
+                skip = False
+                for item in ct:
+                    if isinstance(item, dict):
+                        if "tool" in item.get("type"):
+                            skip = True
+                            break
+                if skip:
                     continue
 
             chat_message_container = st.chat_message(
@@ -531,6 +538,39 @@ def main() -> None:
             generic_leader.memory.messages.pop(index)
         generic_leader.write_to_storage()
 
+    float_init()
+    footer_container = st.container(key="footer_container")
+    with footer_container:
+        if prompt := st.chat_input(placeholder="How can CoPlanet LLM-OS assist you?"):
+            st.session_state["messages"].append(Message(role="user", content=prompt))
+
+    try:
+        footer_container.float(
+            "display:flex; align-items:center;justify-content:center; overflow:hidden visible;flex-direction:column; position:fixed;bottom:15px;"
+        )
+
+    except Exception as e:
+        logger.error(f"Error floating footer container: {e}")
+
+    if prompt:
+        with st.chat_message("user", avatar="user"):
+            st.write(prompt)
+
+    if RERUN_SESSION or "page_loaded" not in st.session_state:
+        st.session_state["page_loaded"] = True
+        # Scroll down the page to bottom
+        run_js(
+            """
+            setTimeout(() => {
+                window.parent.document
+                    .querySelector('[data-testid="stAppIframeResizerAnchor"]')
+                    .scrollIntoView({
+                        behavior: 'smooth'
+                    });
+            }, 100);
+            """
+        )
+
     # If last message is from a user, generate a new response
     last_message = (
         st.session_state["messages"][-1] if st.session_state["messages"] else None
@@ -542,6 +582,11 @@ def main() -> None:
             and render_mask_image(generic_leader)
         ) or UserNextOp.get_op(db, user.session_id, UserNextOp.EDIT_IMAGE_USING_MASK):
             last_message = st.session_state["messages"][last_user_message_index]
+            if isinstance(last_message.content, list):
+                for item in last_message.content:
+                    if item.get("type") == "text":
+                        last_message.content = item["text"]
+                        break
 
     if last_message and last_message.role == "user":
         question = last_message.content
@@ -637,13 +682,17 @@ def main() -> None:
             uploaded_images = st.session_state["uploaded_images"]
 
             with st.spinner("Thinking..."):
+                selected_image = st.session_state.get("selected_image", None)
+                if not selected_image and uploaded_images:
+                    selected_image = uploaded_images[len(uploaded_images) - 1].id
+
                 response = run(
                     generic_leader,
                     question,
                     [
                         binary2text(d.data_compressed, "image/webp")
                         for d in uploaded_images
-                        if d.id == st.session_state["selected_image"]
+                        if d.id == selected_image
                     ],
                     uploaded_videos_,
                     audio_bytes,
@@ -799,11 +848,14 @@ def main() -> None:
         ):
             st.session_state["uploaded_images"] = []
 
+        def file_uploaded_on_change():
+            st.toast("Uploading...", icon=":material/upload:")
+
         uploaded_files_ = st.sidebar.file_uploader(
             "Add a Document (video & image files, .pdf, .csv, .pptx, .txt, .md, .docx, .json, .xlsx, .xls and etc)",
             key=st.session_state["file_uploader_key"],
             accept_multiple_files=True,
-            on_change=lambda: st.toast("Uploading...", icon=":material/upload:"),
+            on_change=file_uploaded_on_change,
         )
         if uploaded_files_:
             uploaded_images = []
@@ -917,28 +969,24 @@ def main() -> None:
         cols = st.columns(columns)
         with cols[COL_INDEX]:
             COL_INDEX += 1
-            with st.container(key="chat_file_uploader_container"):
-                file_uploader_js = """
-                    <script>
-                        document.addEventListener('DOMContentLoaded', function () {
-                            const interval = setInterval(() => {
-                                const button = window.parent.document.querySelector('.st-key-cloud_upload button');
-                                if (button) {
-                                    button.addEventListener('click', function (e) {
-                                        e.preventDefault();
-                                        const fileUploader = window.parent.document.querySelector('input[type="file"]');
-                                        debugger;
-                                        if (fileUploader) {
-                                            fileUploader.click();
-                                        }
-                                    });
-                                    clearInterval(interval);
+            run_js(
+                """document.addEventListener('DOMContentLoaded', function () {
+                    const interval = setInterval(() => {
+                        const button = window.parent.document.querySelector('.st-key-cloud_upload button');
+                        if (button) {
+                            button.addEventListener('click', function (e) {
+                                e.preventDefault();
+                                const fileUploader = window.parent.document.querySelector('input[type="file"]');
+                                debugger;
+                                if (fileUploader) {
+                                    fileUploader.click();
                                 }
-                            }, 100);
-                        });
-                    </script>
-                    """
-                html(file_uploader_js, height=0, width=0)
+                            });
+                            clearInterval(interval);
+                        }
+                    }, 100);
+                })"""
+            )
             st.button(":material/cloud_upload:", key="cloud_upload")
 
         with get_db_context() as db:
@@ -958,6 +1006,8 @@ def main() -> None:
 
         with cols[-1]:
             NEW_SESSION = st.button(":material/add_box:", key="add_box")
+            if NEW_SESSION:
+                run_js("""document.body.classList.add('new-session-started')""")
 
     EMPTY_SESSIONS = True
 
