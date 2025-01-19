@@ -1,6 +1,10 @@
+import json
 from collections import OrderedDict
+from typing import List, Optional
 
 import streamlit as st
+from anthropic.types.tool_use_block import ToolUseBlock
+from phi.model.message import Message
 from streamlit_pills import pills
 
 from ai.agents.base import Agent
@@ -84,26 +88,162 @@ AUDIO_SUPPORTED_MODELS = {
 PROVIDERS_ORDER = ["OpenAI", "Groq", "Google", "Anthropic"]
 
 
+def transfer_from_openai_to_anthropic_new(agent: Agent):
+    def transfer_message(messages: List[Message]):
+        new_messages = []
+        for m in messages:
+            if m.role == "developer":
+                m.role = "system"
+
+            elif "tool_calls" in m.model_fields_set and isinstance(m.tool_calls, list):
+                meta = m.tool_calls[0]
+                if not isinstance(meta, dict):
+                    raise ValueError(f"Tool call metadata is not a dictionary: {meta}")
+
+                tooluse = ToolUseBlock(
+                    type="tool_use",
+                    id=meta.get("id"),
+                    name=meta.get("function", {}).get("name"),
+                    input=meta.get("function", {}).get("arguments", "{}"),
+                )
+                if not isinstance(tooluse.input, dict):
+                    tooluse.input = json.loads(tooluse.input)
+
+                new_messages.append(Message(role="assistant", content=[tooluse]))
+                continue
+
+            elif m.role == "tool":
+                m.role = "user"
+                m.content = [
+                    {
+                        "type": "tool_result",
+                        "content": m.content,
+                        "tool_use_id": m.tool_call_id,
+                    }
+                ]
+            new_messages.append(m)
+
+        return new_messages
+
+    for prev_run in agent.memory.runs:
+        if prev_run.response and prev_run.response.messages:
+            prev_run.response.messages = transfer_message(prev_run.response.messages)
+
+    agent.memory.messages = transfer_message(agent.memory.messages)
+
+
+def transfer_from_anthropic_to_openai(agent: Agent):
+    SYSTEM_MESSAGE = agent.get_system_message()
+
+    def transfer_message(messages: List[Message]):
+        new_messages = []
+        for m in messages:
+            if m.role == "assistant" and (
+                (SYSTEM_MESSAGE and m.content == SYSTEM_MESSAGE.content)
+                or (agent.introduction and m.content == agent.introduction)
+            ):
+                m.role = "system"
+
+            elif (
+                m.role == "assistant"
+                and isinstance(m.content, list)
+                and m.content
+                and any(
+                    [
+                        isinstance(c, ToolUseBlock)
+                        or (isinstance(c, dict) and c.get("type") == "tool_use")
+                        for c in m.content
+                    ]
+                )
+            ):
+                meta: Optional[ToolUseBlock] = None
+                for c in m.content:
+                    if isinstance(c, ToolUseBlock):
+                        meta = c
+                        break
+                    elif isinstance(c, dict) and c.get("type") == "tool_use":
+                        meta = ToolUseBlock(
+                            type="tool_use",
+                            id=c.get("id"),
+                            name=c.get("name"),
+                            input=c.get("input", "{}"),
+                        )
+                        break
+
+                if not isinstance(meta, ToolUseBlock):
+                    raise ValueError(f"Tool call metadata is not a dictionary: {meta}")
+
+                if not isinstance(meta.input, dict):
+                    meta.input = json.loads(meta.input)
+
+                new_messages.append(
+                    Message(
+                        role="assistant",
+                        tool_calls=[
+                            {
+                                "id": meta.id,
+                                "type": "function",
+                                "function": {
+                                    "name": meta.name,
+                                    "arguments": json.dumps(meta.input),
+                                },
+                            }
+                        ],
+                    )
+                )
+                continue
+            elif (
+                m.role == "user"
+                and isinstance(m.content, list)
+                and any([c["type"] == "tool_result" for c in m.content])
+            ):
+                meta = None
+                for c in m.content:
+                    if c["type"] == "tool_result":
+                        meta = c
+                        break
+
+                if not isinstance(meta, dict):
+                    raise ValueError(
+                        f"Tool result metadata is not a dictionary: {meta}"
+                    )
+
+                m.role = "tool"
+                m.tool_call_id = meta["tool_use_id"]
+                m.content = meta["content"]
+
+            new_messages.append(m)
+
+        return new_messages
+
+    for prev_run in agent.memory.runs:
+        if prev_run.response and prev_run.response.messages:
+            prev_run.response.messages = transfer_message(prev_run.response.messages)
+
+    agent.memory.messages = transfer_message(agent.memory.messages)
+
+
 def normalize_memory_messages(agent: Agent, new_provider: str):
+    if agent:
+        agent.read_from_storage()
+
     if not agent or not agent.memory or not agent.memory.messages:
         return
 
-    MODEL2ROLE = {
-        OpenAI: "developer",
-        Google: "model",
+    TRANSFORMERS = {
+        "{}:{}".format(OpenAI, Anthropic): transfer_from_openai_to_anthropic_new,
+        "{}:{}".format(Anthropic, OpenAI): transfer_from_anthropic_to_openai,
     }
 
-    if new_provider not in MODEL2ROLE and agent.model.provider not in MODEL2ROLE:
-        return
+    write_to_storage = False
 
-    NEW_ROLE = MODEL2ROLE[new_provider]
-    SEARCH2REPLACE_ROLE = MODEL2ROLE[agent.model.provider]
+    TRANSFORMATION_KEY = "{}:{}".format(agent.model.provider, new_provider)
+    if TRANSFORMERS.get(TRANSFORMATION_KEY):
+        TRANSFORMERS.get(TRANSFORMATION_KEY)(agent)
+        write_to_storage = True
 
-    for message in agent.memory.messages:
-        if message.role == SEARCH2REPLACE_ROLE:
-            message.role = NEW_ROLE
-
-    agent.write_to_storage()
+    if write_to_storage:
+        agent.write_to_storage()
 
 
 @st.dialog("Configure Agent", width="large")

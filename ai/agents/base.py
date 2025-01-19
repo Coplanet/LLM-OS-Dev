@@ -1,11 +1,12 @@
 from textwrap import dedent
-from typing import Generic, List, Optional, TypeVar
+from typing import Any, Dict, Generic, List, Optional, Sequence, Tuple, TypeVar, Union
 
 from phi.agent import Agent as PhiAgent
 from phi.model.anthropic import Claude
 from phi.model.base import Model
 from phi.model.google import Gemini
 from phi.model.groq import Groq
+from phi.model.message import Message
 from phi.model.openai import OpenAIChat
 
 from helpers.log import logger
@@ -66,6 +67,48 @@ class Agent(PhiAgent):
         from app.utils import to_label
 
         return to_label(self.name)
+
+    def get_messages_for_run(
+        self,
+        *,
+        message: Optional[Union[str, List, Dict, Message]] = None,
+        audio: Optional[Any] = None,
+        images: Optional[Sequence[Any]] = None,
+        videos: Optional[Sequence[Any]] = None,
+        messages: Optional[Sequence[Union[Dict, Message]]] = None,
+        **kwargs: Any,
+    ) -> Tuple[Optional[Message], List[Message], List[Message]]:
+        """This function returns:
+            - the system message
+            - a list of user messages
+            - a list of messages to send to the model
+
+        To build the messages sent to the model:
+        1. Add the system message to the messages list
+        2. Add extra messages to the messages list if provided
+        3. Add history to the messages list
+        4. Add the user messages to the messages list
+
+        Returns:
+            Tuple[Message, List[Message], List[Message]]:
+                - Optional[Message]: the system message
+                - List[Message]: user messages
+                - List[Message]: messages to send to the model
+        """
+        (
+            system_message,
+            user_messages,
+            messages_for_model,
+        ) = super().get_messages_for_run(
+            message=message,
+            audio=audio,
+            images=images,
+            videos=videos,
+            messages=messages,
+            **kwargs,
+        )
+
+        return system_message, user_messages, messages_for_model
 
 
 class AgentTeam(list, Generic[TypeVar("T", bound=Agent)]):

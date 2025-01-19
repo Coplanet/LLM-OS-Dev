@@ -17,6 +17,23 @@ alembic -c db/alembic.ini upgrade head
 ./run-front
 ```
 
+## Deployment in AWS:
+
+```sh
+# deploy all
+# this type of deployment will remove the topics from the previous deployment
+phi ws patch --env prd --infra aws -y --pull -f
+
+# deploy secrets
+phi ws patch --env prd --infra aws -y --pull -f --name secret
+
+# deploy service
+phi ws patch --env prd --infra aws -y --pull -f --name service
+
+# If you updated the Image, CPU, Memory or Environment Variables, update the Task Definition using:
+phi ws patch --env prd --infra aws --name td
+```
+
 ---
 
 ## Official LLM-OS Documentation

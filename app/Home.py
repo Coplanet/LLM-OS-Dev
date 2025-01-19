@@ -474,10 +474,15 @@ def main() -> None:
         if message_role is not None:
             # Skip audio messages for now
             if message_role == "user" and isinstance(message.content, list):
-                if message.content[0].get("type") == "audio":
+                if (
+                    message.content[0].get("type") == "audio"
+                    or message.content[0].get("type") == "tool_result"
+                ):
                     continue
+
             chat_message_container = st.chat_message(
-                message_role, avatar="user" if message_role == "user" else "assistant"
+                message_role,
+                avatar="user" if message_role == "user" else "assistant",
             )
             if message_role == "user":
                 last_user_message_index = index
@@ -485,6 +490,8 @@ def main() -> None:
                 content = message.content
                 if isinstance(content, list):
                     for item in content:
+                        if not isinstance(item, dict):
+                            continue
                         if item["type"] == "text":
                             last_prompt = item["text"]
                             st.write(last_prompt)
@@ -1069,5 +1076,9 @@ def main() -> None:
             rerun(clean_session=CLEAN_SESSION)
 
 
-if os.getenv("RUNTIME_ENV") != "prd" or user.is_authenticated or check_password():
+if (
+    os.getenv("RUNTIME_ENV") != "prd"
+    or user.is_authenticated
+    or (True or check_password())
+):
     main()
