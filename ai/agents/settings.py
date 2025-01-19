@@ -118,11 +118,11 @@ class AgentConfig:
 
     @classmethod
     def default_model(cls):
-        from app.components.popup import OpenAI
+        from .base import Provider
 
         return OpenAIChat(
             id="gpt-4o",
-            provider=OpenAI,
+            provider=Provider.OpenAI.value,
             max_tokens=agent_settings.default_max_completion_tokens,
             temperature=agent_settings.default_temperature,
             modalities=["text"],
@@ -130,11 +130,12 @@ class AgentConfig:
 
     @property
     def get_model(self):
-        models = {"OpenAI", "Groq", "Google", "Anthropic"}
+        from .base import Provider
+
         if self.is_empty or self.provider is None:
             return self.default_model()
 
-        if self.provider not in models:
+        if self.provider not in Provider:
             logger.warning("Model '%s' is not defined!", self.provider)
             return None
 
@@ -145,22 +146,22 @@ class AgentConfig:
         model_class = None
 
         match self.provider:
-            case "OpenAI":
+            case Provider.OpenAI.value:
                 model_class = OpenAIChat
                 model_id = self.model_id or "gpt-4o"
                 configs["api_key"] = extra_settings.gpt_api_key
 
-            case "Groq":
+            case Provider.Groq.value:
                 model_class = Groq
                 model_id = self.model_id or "llama3-groq-70b-8192-tool-use-preview"
                 configs["api_key"] = extra_settings.groq_api_key
 
-            case "Google":
+            case Provider.Google.value:
                 model_class = Gemini
                 model_id = self.model_id or "gemini-1.5-flash"
                 configs["api_key"] = extra_settings.gemini_api_key
 
-            case "Anthropic":
+            case Provider.Anthropic.value:
                 model_class = Claude
                 model_id = self.model_id or "claude-3-5-sonnet-20241022"
                 configs["api_key"] = extra_settings.anthropic_api_key

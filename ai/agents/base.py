@@ -1,17 +1,19 @@
 from textwrap import dedent
-from typing import Any, Dict, Generic, List, Optional, Sequence, Tuple, TypeVar, Union
+from typing import Generic, List, Optional, TypeVar, Union
 
 from phi.agent import Agent as PhiAgent
 from phi.model.anthropic import Claude
 from phi.model.base import Model
 from phi.model.google import Gemini
 from phi.model.groq import Groq
-from phi.model.message import Message
 from phi.model.openai import OpenAIChat
 
 from helpers.log import logger
 
 from .settings import AgentConfig, ComposioAction, agent_settings, extra_settings
+from .transformers.anthropic_to_openai import AnthropicToOpenAI
+from .transformers.base import Provider, Transformer
+from .transformers.openai_to_anthropic import OpenAIToAnthropic
 
 DEFAULT_GPT_MODEL_CONFIG = {
     "max_tokens": agent_settings.default_max_completion_tokens,
@@ -22,6 +24,7 @@ DEFAULT_GPT_MODEL_CONFIG = {
 
 class Agent(PhiAgent):
     enabled: bool = True
+    transformers: dict[str, Transformer] = {}
     model: Optional[Model] = OpenAIChat(id="gpt-4o")
 
     delegation_directives: Optional[List[str]] = []
@@ -49,16 +52,19 @@ class Agent(PhiAgent):
             str(getattr(self.model, "temperature", "n/a")),
         )
 
+        self.register_transformer(AnthropicToOpenAI())
+        self.register_transformer(OpenAIToAnthropic())
+
     @property
     def model_type(self):
         if isinstance(self.model, OpenAIChat):
-            return "OpenAI"
+            return Provider.OpenAI.value
         if isinstance(self.model, Groq):
-            return "Groq"
+            return Provider.Groq.value
         if isinstance(self.model, Gemini):
-            return "Google"
+            return Provider.Google.value
         if isinstance(self.model, Claude):
-            return "Anthropic"
+            return Provider.Anthropic.value
         logger.warning(f"Model type '{self.model}' is not defined!")
         return None
 
@@ -68,47 +74,39 @@ class Agent(PhiAgent):
 
         return to_label(self.name)
 
-    def get_messages_for_run(
-        self,
-        *,
-        message: Optional[Union[str, List, Dict, Message]] = None,
-        audio: Optional[Any] = None,
-        images: Optional[Sequence[Any]] = None,
-        videos: Optional[Sequence[Any]] = None,
-        messages: Optional[Sequence[Union[Dict, Message]]] = None,
-        **kwargs: Any,
-    ) -> Tuple[Optional[Message], List[Message], List[Message]]:
-        """This function returns:
-            - the system message
-            - a list of user messages
-            - a list of messages to send to the model
+    def _transformation_key(
+        self, from_provider: Union[Provider, str], to_provider: Union[Provider, str]
+    ):
+        if isinstance(from_provider, Provider):
+            from_provider = from_provider.value
+        if isinstance(to_provider, Provider):
+            to_provider = to_provider.value
+        return f"{from_provider}:{to_provider}"
 
-        To build the messages sent to the model:
-        1. Add the system message to the messages list
-        2. Add extra messages to the messages list if provided
-        3. Add history to the messages list
-        4. Add the user messages to the messages list
+    def register_transformer(self, transformer: Transformer) -> "Agent":
+        self.transformers[
+            self._transformation_key(transformer.from_provider, transformer.to_provider)
+        ] = transformer
+        return self
 
-        Returns:
-            Tuple[Message, List[Message], List[Message]]:
-                - Optional[Message]: the system message
-                - List[Message]: user messages
-                - List[Message]: messages to send to the model
-        """
-        (
-            system_message,
-            user_messages,
-            messages_for_model,
-        ) = super().get_messages_for_run(
-            message=message,
-            audio=audio,
-            images=images,
-            videos=videos,
-            messages=messages,
-            **kwargs,
-        )
+    def transform(self, to_provider: Provider) -> "Agent":
+        if self.model.provider == to_provider.value:
+            return self
 
-        return system_message, user_messages, messages_for_model
+        TRANSFORMATION_KEY = self._transformation_key(self.model.provider, to_provider)
+
+        if TRANSFORMATION_KEY in self.transformers:
+            self.read_from_storage()
+
+            self.transformers[TRANSFORMATION_KEY].transform(self)
+
+            self.write_to_storage()
+
+        else:
+            logger.warning(
+                f"No transformer found for {self.model.provider} to {to_provider}"
+            )
+        return self
 
 
 class AgentTeam(list, Generic[TypeVar("T", bound=Agent)]):

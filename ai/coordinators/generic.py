@@ -16,7 +16,7 @@ from phi.tools.youtube_tools import YouTubeTools
 from phi.vectordb.pgvector import PgVector2
 
 from ai.agents import funny, journal, linkedin_content_generator, patent_writer, python
-from ai.agents.base import AgentTeam
+from ai.agents.base import AgentTeam, Provider
 from ai.agents.settings import AgentConfig, agent_settings
 from ai.tools.email import EmailSenderTools
 from ai.tools.file import FileIOTools
@@ -225,7 +225,7 @@ def get_coordinator(
         config = AgentConfig.empty()
 
     if config.is_empty:
-        config.model = "OpenAI"
+        config.model = Provider.OpenAI.value
         config.model_id = "gpt-4o"
         config.enabled = True
         config.temperature = 0
@@ -369,7 +369,10 @@ def get_coordinator(
         """
     ).strip()
 
-    if config.provider == "OpenAI" and config.model_id == "gpt-4o-audio-preview":
+    if (
+        config.provider == Provider.OpenAI.value
+        and config.model_id == "gpt-4o-audio-preview"
+    ):
         instructions += [
             "**RED-LINE CRITICAL:** Always respond to the user in voice format.",
             "**RED-LINE CRITICAL:** Your input is in text format. but your response should be in voice format.",

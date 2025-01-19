@@ -10,10 +10,10 @@ from phi.embedder.openai import OpenAIEmbedder
 from phi.knowledge.combined import CombinedKnowledgeBase
 from phi.knowledge.pdf import PDFKnowledgeBase, PDFReader
 from phi.vectordb.pgvector import PgVector2
-from utils.log import logger
 
 from ai.agents.base import agent_settings
 from db.session import db_url
+from helpers.log import logger
 from workspace.settings import extra_settings
 
 

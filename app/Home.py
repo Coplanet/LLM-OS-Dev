@@ -36,6 +36,7 @@ from streamlit.components.v1 import html
 from streamlit_float import float_init
 
 from ai.agents import base, settings
+from ai.agents.base import Provider
 from ai.agents.settings import agent_settings
 from ai.agents.voice_transcriptor import voice2prompt
 from ai.coordinators import generic as coordinator
@@ -170,7 +171,7 @@ def get_selected_assistant_config(session_id, label, package):
             available_tools_manifest[key].append(tool)
 
         default_configs = {
-            "model_type": "OpenAI",
+            "model_type": Provider.OpenAI.value,
             "model_id": "gpt-4o",
             "model_kwargs": {},
             "temperature": 0,
@@ -349,8 +350,9 @@ def main() -> None:
         with st.sidebar:
             with st.container(key="voice_input_container"):
                 AUDIO_RESPONSE_SUPPORT = (
-                    COORDINATOR_CONFIG.provider == "OpenAI"
-                    and COORDINATOR_CONFIG.model_id in AUDIO_SUPPORTED_MODELS["OpenAI"]
+                    COORDINATOR_CONFIG.provider == Provider.OpenAI.value
+                    and COORDINATOR_CONFIG.model_id
+                    in AUDIO_SUPPORTED_MODELS[Provider.OpenAI.value]
                 )
                 # define sample rate
                 AUDIO_SAMPLE_RATE = 44_100
@@ -390,7 +392,7 @@ def main() -> None:
                 if not AUDIO_RESPONSE_SUPPORT:
                     st.warning(
                         "You need to user following models in OpenAI to receive audio response: {}".format(
-                            ", ".join(AUDIO_SUPPORTED_MODELS["OpenAI"])
+                            ", ".join(AUDIO_SUPPORTED_MODELS[Provider.OpenAI.value])
                         )
                     )
                 if response_in_voice:
@@ -557,7 +559,7 @@ def main() -> None:
             uploaded_videos_ = []
             uploaded_videos = st.session_state.get("uploaded_videos", [])
             if uploaded_videos:
-                if COORDINATOR_CONFIG.provider != "Google":
+                if COORDINATOR_CONFIG.provider != Provider.Google.value:
                     st.error("Videos are only supported for Google provider")
                 else:
                     with st.spinner("Uploading videos..."):
