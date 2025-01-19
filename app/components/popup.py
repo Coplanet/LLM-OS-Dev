@@ -3,6 +3,7 @@ from collections import OrderedDict
 import streamlit as st
 from streamlit_pills import pills
 
+from ai.agents.base import Agent
 from ai.agents.settings import AgentConfig, agent_settings
 from app.utils import to_label
 from db.session import get_db_context
@@ -26,8 +27,13 @@ def get_temperature(provider: str, model_id: str, selected_temperature: float):
     return selected_temperature
 
 
+OpenAI = "OpenAI"
+Groq = "Groq"
+Google = "Google"
+Anthropic = "Anthropic"
+
 MODELS = {
-    "OpenAI": {
+    OpenAI: {
         # "gpt-4o-audio-preview": {
         #             #     "max_token_size": agent_settings.default_max_completion_tokens,
         #     "kwargs": {
@@ -48,18 +54,18 @@ MODELS = {
         #   "max_token_size": agent_settings.default_max_completion_tokens,
         # },
     },
-    "Google": {
+    Google: {
         "gemini-2.0-flash-exp": {
             "max_token_size": 8_192,
         },
     },
-    "Groq": {
+    Groq: {
         "llama-3.3-70b-versatile": {"max_token_size": 32_000},
         "mixtral-8x7b-32768": {
             "max_token_size": 32_000,
         },
     },
-    "Anthropic": {
+    Anthropic: {
         "claude-3-5-sonnet-20241022": {"max_token_size": 8_192},
         "claude-3-5-haiku-20241022": {"max_token_size": 8_192},
         "claude-3-opus-20240229": {"max_token_size": 4_096},
@@ -78,8 +84,30 @@ AUDIO_SUPPORTED_MODELS = {
 PROVIDERS_ORDER = ["OpenAI", "Groq", "Google", "Anthropic"]
 
 
+def normalize_memory_messages(agent: Agent, new_provider: str):
+    if not agent or not agent.memory or not agent.memory.messages:
+        return
+
+    MODEL2ROLE = {
+        OpenAI: "developer",
+        Google: "model",
+    }
+
+    if new_provider not in MODEL2ROLE and agent.model.provider not in MODEL2ROLE:
+        return
+
+    NEW_ROLE = MODEL2ROLE[new_provider]
+    SEARCH2REPLACE_ROLE = MODEL2ROLE[agent.model.provider]
+
+    for message in agent.memory.messages:
+        if message.role == SEARCH2REPLACE_ROLE:
+            message.role = NEW_ROLE
+
+    agent.write_to_storage()
+
+
 @st.dialog("Configure Agent", width="large")
-def show_popup(session_id, assistant_name, config: AgentConfig, package):
+def show_popup(agent: Agent, session_id, assistant_name, config: AgentConfig, package):
     label = to_label(assistant_name)
 
     st.markdown(f"Agent: **{assistant_name}**")
@@ -309,4 +337,8 @@ def show_popup(session_id, assistant_name, config: AgentConfig, package):
             logger.debug("User configuration stored for session: '%s'", session_id)
             st.success(f"Settings saved for {assistant_name} Assistant!")
             st.session_state.CONFIG_CHANGED = True
+
+            if agent and agent.model.provider != provider:
+                normalize_memory_messages(agent, provider)
+
             st.rerun()

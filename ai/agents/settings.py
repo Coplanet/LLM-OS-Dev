@@ -118,8 +118,11 @@ class AgentConfig:
 
     @classmethod
     def default_model(cls):
+        from app.components.popup import OpenAI
+
         return OpenAIChat(
             id="gpt-4o",
+            provider=OpenAI,
             max_tokens=agent_settings.default_max_completion_tokens,
             temperature=agent_settings.default_temperature,
             modalities=["text"],
@@ -168,6 +171,7 @@ class AgentConfig:
 
         return model_class(
             id=model_id,
+            provider=self.provider,
             temperature=self.temperature,
             max_tokens=self.max_tokens,
             **configs,

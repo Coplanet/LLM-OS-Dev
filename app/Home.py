@@ -322,7 +322,9 @@ def main() -> None:
             if not agent.get("is_leader", False)
             else COORDINATOR_CONFIG
         )
-        show_popup(user.session_id, selected_assistant, agent_config, package)
+        show_popup(
+            package.agent, user.session_id, selected_assistant, agent_config, package
+        )
         st.session_state.show_popup = False
         st.session_state.selected_assistant = None
 
@@ -440,22 +442,34 @@ def main() -> None:
 
     last_prompt = None
     last_user_message_index = None
+    messages2remove = []
 
+    previous_message_hash = None
     # Display existing chat messages
     for index, message in enumerate(generic_leader.memory.messages):
         if isinstance(message.content, str):
             message.content = re.sub(
                 r"[\n\s]*!\[[^\]]+?\]\([^\)]+?\)", "", message.content
-            )
+            ).strip()
 
         if not message.content:
             continue
 
-        # Skip system and tool messages
-        if message.role in ["system", "tool", "developer"]:
-            continue
-        # Display the message
         message_role = message.role
+
+        message_hash = hashlib.sha256(
+            "{}/{}".format(message_role, message.content).encode()
+        ).hexdigest()
+
+        if previous_message_hash == message_hash:
+            messages2remove.append(index)
+            continue
+
+        previous_message_hash = message_hash
+
+        # Skip system and tool messages
+        if message.role in ["system", "tool", "developer", "model"]:
+            continue
 
         if message_role is not None:
             # Skip audio messages for now
@@ -502,6 +516,11 @@ def main() -> None:
                             )
                 else:
                     st.write(content)
+
+    if messages2remove:
+        for index in messages2remove:
+            generic_leader.memory.messages.pop(index)
+        generic_leader.write_to_storage()
 
     # If last message is from a user, generate a new response
     last_message = (
