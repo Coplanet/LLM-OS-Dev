@@ -40,8 +40,29 @@ available_tools = [
         "name": "Stability",
         "extra_instructions": dedent(
             """\
-            Use the Stability tool to generate images.
-            """
+            Use the Stability tool to generate/edit/recolor images.
+
+            <critical_notes_for_image_tools>
+            **CRITICAL NOTES: NEVER DIVERGE FROM THESE NOTES WHEN USING THE IMAGE TOOLS!**
+            - **NEVER** try provide to provide the image's data by yourself,
+            the image link will be generated from the Stability tool.
+            and provided to the user in different flow.
+            **CRITICAL**: If based on the image and user description, you think that the output image after editing won't be good (specially with `add_feature_or_change_accurately` tool), warn the user about it and if the user presist to edit the image with given prompt, you continue with the task.
+            - Use `add_feature_or_change_accurately` tool to accurately add/remove/change something in the image.
+                - **IMPORTANT**: Never use this tool to change the color of the image.
+                - **IMPORTANT**: Alternative to `search_and_replace` is `add_feature_or_change_accurately` tool that can accurately edit the image.
+                - **IMPORTANT**: When this model return a json that indicates it needs to create a mask, DO NOT switch to different the tool, the UI flow that you are operating in, knows how to handle the mask.
+                - **IMPORTANT**: After capturing the mask, DO NOT switch to different the tool/function, the UI flow that you are operating in, knows how to handle the mask internally.
+                - **IMPORTANT**: After running the `add_feature_or_change_accurately` tool for the first time (getting the mask), The UI will resend the original prompt and you have to send it again to `add_feature_or_change_accurately` tool.
+            - Use the `search_and_recolor` tool to change entire or part of the image ONLY and nothing else.
+            - Use the `remove_background` tool to remove the background of the image (only to remove the background).
+            - Use the `outpaint` tool to add extra pixels to the image.
+            - Use the `search_and_replace` tool to change the color of the image and explicitly asked for replacing an object in the image.
+                - **IMPORTANT**: Never use `search_and_replace` tool to change the color of the image without explicitly asked for replacing an object in the image.
+                - **IMPORTANT**: Alternative to `search_and_replace` is `add_feature_or_change_accurately` tool that can accurately edit the image.
+            - Use the `create_image` tool to create a new image based on the provided prompt (**NEVER** use this tool to edit the image).
+            </critical_notes_for_image_tools>
+            """  # flake8: noqa: E501
         ).strip(),
         "icon": "fa-solid fa-image",
     },
@@ -363,7 +384,7 @@ def get_coordinator(
 
     description = dedent(
         """\
-        You are the most advanced AI system in the world called ` LLM OS`.
+        You are the most advanced AI system in the world called `LLM OS`.
         You have access to a set of tools and a team of AI Assistants at your disposal.
         Your goal is to assist the user in the best way possible.
         """
@@ -416,14 +437,14 @@ def get_coordinator(
             I have access to a set of tools and AI Assistants to assist you.
             Lets get started!\
             """
-        ),
+        ).strip(),
         description=dedent(
             """\
-            You are the most advanced AI system in the world called ` LLM OS`.
+            You are the most advanced AI system in the world called `LLM OS`.
             You have access to a set of tools and a team of AI Assistants at your disposal.
             Your goal is to assist the user in the best way possible.\
             """
-        ),
+        ).strip(),
         instructions=instructions,
         # This setting adds a tool to search the knowledge base for information
         search_knowledge=True,

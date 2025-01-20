@@ -1,22 +1,19 @@
-from collections import OrderedDict
-
 import streamlit as st
 from streamlit_pills import pills
 
 from ai.agents.base import Agent, Provider
-from ai.agents.settings import AgentConfig, agent_settings
-from app.utils import rerun, to_label
+from ai.agents.settings import AgentConfig
+from app.models import (
+    DEFAULT_TEMPERATURE,
+    MODELS,
+    PROVIDERS_ORDER,
+    SupportStrength,
+    SupportTypes,
+)
+from app.utils import next_run_toast, rerun, to_label
 from db.session import get_db_context
 from db.tables import UserConfig
 from helpers.log import logger
-
-DEFAULT_TEMPERATURE = OrderedDict(
-    [
-        ("Deterministic", {"value": 0.0, "icon": ":material/border_outer:"}),
-        ("Balanced", {"value": 0.75, "icon": ":material/balance:"}),
-        ("Creative", {"value": 1.5, "icon": ":material/emoji_objects:"}),
-    ]
-)
 
 
 def get_temperature(provider: str, model_id: str, selected_temperature: float):
@@ -25,63 +22,6 @@ def get_temperature(provider: str, model_id: str, selected_temperature: float):
             str(selected_temperature), selected_temperature
         )
     return selected_temperature
-
-
-MODELS = {
-    Provider.OpenAI.value: {
-        # "gpt-4o-audio-preview": {
-        #             #     "max_token_size": agent_settings.default_max_completion_tokens,
-        #     "kwargs": {
-        #         "modalities": ["text", "audio"],
-        #         "audio": {"voice": "alloy", "format": "wav"},
-        #     },
-        # },
-        "gpt-4o": {
-            "max_token_size": agent_settings.default_max_completion_tokens,
-        },
-        "gpt-4o-mini": {
-            "max_token_size": agent_settings.default_max_completion_tokens,
-        },
-        # "o1-preview": {
-        #   "max_token_size": agent_settings.default_max_completion_tokens,
-        # },
-        # "o1-mini": {
-        #   "max_token_size": agent_settings.default_max_completion_tokens,
-        # },
-    },
-    Provider.Google.value: {
-        "gemini-2.0-flash-exp": {
-            "max_token_size": 8_192,
-        },
-    },
-    Provider.Groq.value: {
-        "llama-3.3-70b-versatile": {"max_token_size": 8_192},
-        "mixtral-8x7b-32768": {
-            "max_token_size": 8_192,
-        },
-    },
-    Provider.Anthropic.value: {
-        "claude-3-5-sonnet-20241022": {"max_token_size": 8_192},
-        "claude-3-5-haiku-20241022": {"max_token_size": 8_192},
-        "claude-3-opus-20240229": {"max_token_size": 4_096},
-        "claude-3-sonnet-20240229": {"max_token_size": 4_096},
-        "claude-3-haiku-20240307": {"max_token_size": 4_096},
-    },
-}
-
-AUDIO_SUPPORTED_MODELS = {
-    Provider.Google.value: {"gemini-2.0-flash-exp"},
-    Provider.OpenAI.value: {
-        "gpt-4o-audio-preview",
-    },
-}
-
-PROVIDERS_ORDER = [
-    Provider.OpenAI.value,
-    Provider.Groq.value,
-    Provider.Google.value,
-    Provider.Anthropic.value,
-]
 
 
 @st.dialog("Configure Agent", width="large")
@@ -94,6 +34,19 @@ def show_popup(agent: Agent, session_id, assistant_name, config: AgentConfig, pa
     provider: str = st.selectbox(
         "Foundation Model Provider", PROVIDERS_ORDER, key=f"{label}_model_type"
     )
+
+    if (
+        provider != agent.model.provider
+        and agent.memory.messages
+        and not agent.transformer_exists(Provider(provider))
+    ):
+        st.error(
+            "You cannot switch from your current provider **'{}'** to **'{}'**.".format(
+                agent.model.provider, provider
+            )
+        )
+        return
+
     PROVIDER_CONFIG: dict = MODELS[provider]
 
     if st.session_state[f"{label}_model_id"] not in PROVIDER_CONFIG:
@@ -104,6 +57,28 @@ def show_popup(agent: Agent, session_id, assistant_name, config: AgentConfig, pa
     )
 
     MODEL_CONFIG: dict = PROVIDER_CONFIG[model_id]
+
+    SUPPORTS: dict = MODEL_CONFIG.get("supports", {})
+    if SUPPORTS:
+        st.markdown("### Provider/Model Capabilities:")
+
+        cols = st.columns(3)
+
+        for index, feature in enumerate(SupportTypes):
+            support_strength = SupportStrength.NotSupported
+            if feature in SUPPORTS:
+                support_strength = SUPPORTS[feature]
+
+            # add color to the support strength
+            color = support_strength.color()
+
+            with cols[index % len(cols)]:
+                st.markdown(
+                    f"<strong>{feature.value}</strong>: <span style='color: {color};'>{support_strength.value}</span>",
+                    unsafe_allow_html=True,
+                )
+
+        st.markdown("---")
 
     temprature_index = 0
     for i, key in enumerate(DEFAULT_TEMPERATURE.keys()):
@@ -264,13 +239,13 @@ def show_popup(agent: Agent, session_id, assistant_name, config: AgentConfig, pa
 
     col1, col2 = st.columns(2)
     with col1:
-        if st.button("Cancel"):
+        if st.button("Cancel", icon=":material/close:", type="secondary"):
             st.session_state.show_popup = False
             st.session_state.selected_assistant = None
             rerun()
 
     with col2:
-        if st.button("Save"):
+        if st.button("Save", icon=":material/check_circle:", type="primary"):
             st.session_state.show_popup = False
             st.session_state["generic_leader"] = None
 
@@ -313,7 +288,10 @@ def show_popup(agent: Agent, session_id, assistant_name, config: AgentConfig, pa
                 )
 
             logger.debug("User configuration stored for session: '%s'", session_id)
-            st.success(f"Settings saved for {assistant_name} Assistant!")
+            next_run_toast(
+                f"Settings saved for {assistant_name} Assistant!",
+                icon=":material/check_circle:",
+            )
             st.session_state.CONFIG_CHANGED = True
 
             if agent and agent.model.provider != provider:

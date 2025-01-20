@@ -9,7 +9,7 @@ from PIL import Image as PILImage
 from streamlit_drawable_canvas import st_canvas
 
 from ai.tools.stability import Stability
-from app.utils import rerun, run_js
+from app.utils import close_dialog, next_run_toast, rerun
 from db.session import get_db_context
 from db.tables.user_config import UserBinaryData, UserNextOp
 
@@ -62,8 +62,10 @@ def render_mask_image(agent: Agent) -> Union[None, bool]:
     stroke = canvas.image_data
 
     col1, col2 = st.columns(2)
-    with col1:
-        if stroke is not None and st.button("Edit Image"):
+    with col2:
+        if stroke is not None and st.button(
+            "Apply mask", icon=":material/check_circle:", type="primary"
+        ):
             mask = cv2.split(stroke)[3]
             mask = np.uint8(mask)
             mask = cv2.resize(mask, (w, h))
@@ -91,18 +93,15 @@ def render_mask_image(agent: Agent) -> Union[None, bool]:
                     "webp",
                 )
 
-            st.success("Image's mask has been added successfully.")
-            run_js(
-                """setTimeout(function() {
-                    window.parent.document
-                        .querySelectorAll('button[aria-label="Close"]')
-                        .forEach(button => button.click());
-                }, 1000);"""
+            next_run_toast(
+                "Image's mask has been added successfully.",
+                icon=":material/check_circle:",
             )
+            close_dialog()
             rerun()
 
-    with col2:
-        if st.button("Cancel"):
+    with col1:
+        if st.button("Cancel", icon=":material/close:", type="secondary"):
             with get_db_context() as db:
                 UserNextOp.delete_all_by_key(
                     db, agent.session_id, UserNextOp.GET_IMAGE_MASK

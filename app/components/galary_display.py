@@ -81,12 +81,16 @@ def render_galary_display(agent: Agent) -> Union[None, bool]:
 
     cols = st.columns(2)
     with cols[1]:
-        if st.button("Selected"):
+        if st.button(
+            "Continue",
+            icon=":material/check_circle:",
+            type="primary",
+        ):
             st.session_state["selected_image"] = index2id[
                 IMAGE_COUNT - selected_image - 1
             ]
             rerun()
 
     with cols[0]:
-        if st.button("Cancel"):
+        if st.button("Cancel", icon=":material/close:", type="secondary"):
             rerun()

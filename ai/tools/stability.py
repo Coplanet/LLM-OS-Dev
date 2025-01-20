@@ -155,7 +155,7 @@ class Stability(Toolkit):
         self.register(self.search_and_replace)
         self.register(self.outpaint)
         self.register(self.remove_background)
-        self.register(self.add_feature)
+        self.register(self.add_feature_or_change_accurately)
         self.register(self.search_and_recolor)
 
     def _req(
@@ -422,6 +422,7 @@ class Stability(Toolkit):
         """Use this function to search for a prompt and replace it with the new prompt.
         for the same prompt don't send parallel requests. it will be handled by the toolkit.
         it will parse the latest user images and edit them. Don't use it to remove background.
+        **CRITICAL NOTE**: Don't use this function when the user needs to select/mask/highlight some area in the image.
 
         Args:
             prompt (str): The new image's prompt to replace.
@@ -447,7 +448,9 @@ class Stability(Toolkit):
                 "prompt": prompt,
                 "search_prompt": search_prompt,
                 "grow_mask": grow_mask,
-                "negative_prompt": negative_prompt,
+                "negative_prompt": "{}, {}".format(
+                    self.DEFAULT_NEGATIVE_PROMPT, negative_prompt
+                ),
                 "seed": seed,
             },
         )
@@ -456,7 +459,7 @@ class Stability(Toolkit):
 
         return "Image has been edited successfully and will be displayed below"
 
-    def add_feature(
+    def add_feature_or_change_accurately(
         self,
         agent: Agent,
         prompt: str,
@@ -468,12 +471,13 @@ class Stability(Toolkit):
         **CRITICAL NOTE**: The `thing_to_avoid_when_editing` should be a very descriptive \
             text for the undesired image outcome, the negative prompt should be send as \
             possitive words, e.g. instead of "no crippled face", send "crippled face".
+        **CRITICAL NOTE**: Use this function when the user needs to select/mask/highlight some area \
+            in the image for accurate editing.
 
         Args:
             prompt (str): User's exact input prompt.
             thing_to_avoid_when_editing (str): Text describing the elements to avoid when editing the image.
-            seed (int): A specific value that is used to guide the 'randomness' of the generation. \
-                (Omit this parameter or pass 0 to use a random seed.)
+            seed (int): Base on the input prompt and the image's description, choose a seed value at your choice.
 
         Returns:
             str: Message indicating success or error.
@@ -510,7 +514,9 @@ class Stability(Toolkit):
             files={"image": image.data, "mask": mask.data},
             data={
                 "prompt": prompt,
-                "negative_prompt": thing_to_avoid_when_editing,
+                "negative_prompt": "{}, {}".format(
+                    self.DEFAULT_NEGATIVE_PROMPT, thing_to_avoid_when_editing
+                ),
                 "seed": seed,
             },
         )
@@ -622,7 +628,9 @@ class Stability(Toolkit):
             data={
                 "prompt": prompt,
                 "select_prompt": select_prompt,
-                "negative_prompt": thing_to_avoid_when_editing,
+                "negative_prompt": "{}, {}".format(
+                    self.DEFAULT_NEGATIVE_PROMPT, thing_to_avoid_when_editing
+                ),
                 "seed": seed,
             },
         )

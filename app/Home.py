@@ -50,10 +50,11 @@ from app.components.configs import IMAGE_DIR
 from app.components.delete_knowledgebase import render_delete_knowledgebase
 from app.components.galary_display import render_galary_display
 from app.components.mask_image import render_mask_image
-from app.components.popup import AUDIO_SUPPORTED_MODELS, show_popup
+from app.components.popup import show_popup
 from app.components.sidebar import create_sidebar
 from app.components.styles import render_styles
-from app.utils import rerun, run_js
+from app.models import AUDIO_SUPPORTED_MODELS
+from app.utils import rerun, run_js, run_next_run_toast, scroll_to_bottom
 from db.session import get_db_context
 from db.settings import db_settings
 from db.tables import UserBinaryData, UserConfig, UserNextOp
@@ -113,6 +114,12 @@ def run(
 
     if not AUDIO_RESPONSE_SUPPORT or not response_in_voice:
         try:
+            # THIS IS A HACK TO SUPPORT IMAGES IN ANTHROPIC
+            # Phidata doesn't support base64 images in Anthropic
+            if generic_leader.model.provider == Provider.Anthropic.value:
+                imgs = [text2binary(img) for img in uploaded_images]
+                uploaded_images = imgs
+
             for delta in generic_leader.run(
                 message=question,
                 images=uploaded_images,
@@ -123,6 +130,12 @@ def run(
                 response += delta.content  # type: ignore
                 response = re.sub(r"[\n\s]*!\[[^\]]+?\]\([^\)]+?\)", "", response)
                 resp_container.markdown(response)
+
+            # THIS IS A HACK TO SUPPORT IMAGES IN ANTHROPIC
+            # Phidata doesn't support base64 images in Anthropic
+            if generic_leader.model.provider == Provider.Anthropic.value:
+                imgs = [text2binary(img) for img in uploaded_images]
+                uploaded_images = imgs
 
         except Exception as e:
             logger.exception(e)
@@ -214,6 +227,8 @@ def get_selected_assistant_config(session_id, label, package):
 def main() -> None:
     if os.getenv("TESTING_ENV", False):
         return
+
+    run_next_run_toast()
 
     RERUN_SESSION = False
     if "rerun" in st.session_state:
@@ -440,100 +455,114 @@ def main() -> None:
     messages2remove = []
 
     previous_message_hash = None
-    # Display existing chat messages
-    for index, message in enumerate(generic_leader.memory.messages):
-        if isinstance(message.content, str):
-            message.content = re.sub(
-                r"[\n\s]*!\[[^\]]+?\]\([^\)]+?\)", "", message.content
-            ).strip()
 
-        if not message.content:
-            continue
+    try:
+        # Display existing chat messages
+        for index, message in enumerate(generic_leader.memory.messages):
+            if isinstance(message.content, str):
+                message.content = re.sub(
+                    r"[\n\s]*!\[[^\]]+?\]\([^\)]+?\)", "", message.content
+                ).strip()
 
-        message_role = message.role
+            if not message.content:
+                continue
 
-        message_hash = hashlib.sha256(
-            "{}/{}".format(message_role, message.content).encode()
-        ).hexdigest()
+            message_role = message.role
 
-        if previous_message_hash == message_hash:
-            messages2remove.append(index)
-            continue
+            message_hash = hashlib.sha256(
+                "{}/{}".format(message_role, message.content).encode()
+            ).hexdigest()
 
-        previous_message_hash = message_hash
+            if previous_message_hash == message_hash:
+                messages2remove.append(index)
+                continue
 
-        # Skip system and tool messages
-        if message.role in ["system", "tool", "developer", "model"]:
-            continue
+            previous_message_hash = message_hash
 
-        if message_role is not None:
-            # Skip audio messages for now
-            if message_role == "user" and isinstance(message.content, list):
-                if (
-                    message.content[0].get("type") == "audio"
-                    or message.content[0].get("type") == "tool_result"
-                ):
-                    continue
+            # Skip system and tool messages
+            if message.role in ["system", "tool", "developer", "model"]:
+                continue
 
-            if message_role == "assistant" and message.content:
-                ct = message.content
-                if not isinstance(ct, list):
-                    ct = [ct]
+            if message_role is not None:
+                # Skip audio messages for now
+                if message_role == "user" and isinstance(message.content, list):
+                    if (
+                        message.content[0].get("type") == "audio"
+                        or message.content[0].get("type") == "tool_result"
+                    ):
+                        continue
 
-                skip = False
-                for item in ct:
-                    if isinstance(item, dict):
-                        if "tool" in item.get("type"):
-                            skip = True
-                            break
-                if skip:
-                    continue
+                if message_role == "assistant" and message.content:
+                    ct = message.content
+                    if not isinstance(ct, list):
+                        ct = [ct]
 
-            chat_message_container = st.chat_message(
-                message_role,
-                avatar="user" if message_role == "user" else "assistant",
-            )
-            if message_role == "user":
-                last_user_message_index = index
-            with chat_message_container:
-                content = message.content
-                if isinstance(content, list):
-                    for item in content:
-                        if not isinstance(item, dict):
-                            continue
-                        if item["type"] == "text":
-                            last_prompt = item["text"]
-                            st.write(last_prompt)
-                        elif item["type"] == "image_url":
-                            if message_role == "user":
+                    skip = False
+                    for item in ct:
+                        if isinstance(item, dict):
+                            if "tool" in item.get("type"):
+                                skip = True
+                                break
+                    if skip:
+                        continue
+
+                chat_message_container = st.chat_message(
+                    message_role,
+                    avatar="user" if message_role == "user" else "assistant",
+                )
+                if message_role == "user":
+                    last_user_message_index = index
+                with chat_message_container:
+                    content = message.content
+                    if isinstance(content, list):
+                        for item in content:
+                            if not isinstance(item, dict):
                                 continue
-                            data_ = item["image_url"]["url"]
-                            if not data_.startswith("http"):
-                                hash = hashlib.sha256(text2binary(data_)).hexdigest()
-                                if hash in st.session_state["rendered_images_hashes"]:
-                                    continue
-                                data_ = hash2images.get(hash, item["image_url"]["url"])
+                            if item["type"] == "text":
+                                last_prompt = item["text"]
+                                st.write(last_prompt)
+                            elif item["type"] == "image_url":
                                 if message_role == "user":
-                                    st.session_state["rendered_images_hashes"].add(hash)
-                            st.image(
-                                (
-                                    data_.data
-                                    if isinstance(data_, UserBinaryData)
-                                    else data_
-                                ),
-                                caption=item.get("image_caption"),
-                                use_column_width=True,
-                            )
-                        # We disable audio rendering for now
-                        elif item["type"] == "audio" and False:
-                            st.audio(
-                                text2binary(item["audio"]),
-                                format="audio/wav",
-                            )
-                else:
-                    st.write(content)
+                                    continue
+                                data_ = item["image_url"]["url"]
+                                if not data_.startswith("http"):
+                                    hash = hashlib.sha256(
+                                        text2binary(data_)
+                                    ).hexdigest()
+                                    if (
+                                        hash
+                                        in st.session_state["rendered_images_hashes"]
+                                    ):
+                                        continue
+                                    data_ = hash2images.get(
+                                        hash, item["image_url"]["url"]
+                                    )
+                                    if message_role == "user":
+                                        st.session_state["rendered_images_hashes"].add(
+                                            hash
+                                        )
+                                st.image(
+                                    (
+                                        data_.data
+                                        if isinstance(data_, UserBinaryData)
+                                        else data_
+                                    ),
+                                    caption=item.get("image_caption"),
+                                    use_column_width=True,
+                                )
+                            # We disable audio rendering for now
+                            elif item["type"] == "audio" and False:
+                                st.audio(
+                                    text2binary(item["audio"]),
+                                    format="audio/wav",
+                                )
+                    else:
+                        st.write(content)
+    except Exception as e:
+        st.exception(e)
 
     if messages2remove:
+        messages2remove.reverse()
         for index in messages2remove:
             generic_leader.memory.messages.pop(index)
         generic_leader.write_to_storage()
@@ -555,21 +584,11 @@ def main() -> None:
     if prompt:
         with st.chat_message("user", avatar="user"):
             st.write(prompt)
+        scroll_to_bottom()
 
     if RERUN_SESSION or "page_loaded" not in st.session_state:
         st.session_state["page_loaded"] = True
-        # Scroll down the page to bottom
-        run_js(
-            """
-            setTimeout(() => {
-                window.parent.document
-                    .querySelector('[data-testid="stAppIframeResizerAnchor"]')
-                    .scrollIntoView({
-                        behavior: 'smooth'
-                    });
-            }, 100);
-            """
-        )
+        scroll_to_bottom()
 
     # If last message is from a user, generate a new response
     last_message = (
@@ -577,16 +596,27 @@ def main() -> None:
     )
 
     with get_db_context() as db:
+        mask_captured = False
         if (
             UserNextOp.get_op(db, user.session_id, UserNextOp.GET_IMAGE_MASK)
             and render_mask_image(generic_leader)
-        ) or UserNextOp.get_op(db, user.session_id, UserNextOp.EDIT_IMAGE_USING_MASK):
+        ) or (
+            mask_captured := UserNextOp.get_op(
+                db, user.session_id, UserNextOp.EDIT_IMAGE_USING_MASK
+            )
+        ):
             last_message = st.session_state["messages"][last_user_message_index]
             if isinstance(last_message.content, list):
                 for item in last_message.content:
                     if item.get("type") == "text":
                         last_message.content = item["text"]
                         break
+            if mask_captured:
+                with st.chat_message("assistant", avatar="assistant"):
+                    st.write("Captured the mask, processing...")
+                last_message.content = "**Mask captured, Proceed with:** {}".format(
+                    last_message.content
+                )
 
     if last_message and last_message.role == "user":
         question = last_message.content
@@ -761,7 +791,10 @@ def main() -> None:
             # Render the images
             if image_outputs:
                 image_outputs_ = {}
-                for img in image_outputs:
+                for index in range(len(image_outputs)):
+                    img = image_outputs[index]
+                    if isinstance(img, dict):
+                        image_outputs[index] = Image.model_validate(img)
                     image_outputs_[img.id] = img
                 image_outputs = list(image_outputs_.values())
                 logger.debug("Rendering '{}' images...".format(len(image_outputs)))
@@ -769,9 +802,6 @@ def main() -> None:
                 contents.append({"type": "text", "text": response})
 
                 for img in image_outputs:
-                    if isinstance(img, dict):
-                        img = Image.model_validate(img)
-
                     if not isinstance(img, Image):
                         logger.error(
                             "Image is not a valid Image model; it is a: {} [skipping]".format(
@@ -977,12 +1007,12 @@ def main() -> None:
                             button.addEventListener('click', function (e) {
                                 e.preventDefault();
                                 const fileUploader = window.parent.document.querySelector('input[type="file"]');
-                                debugger;
                                 if (fileUploader) {
                                     fileUploader.click();
                                 }
                             });
                             clearInterval(interval);
+                            {cleanup_code}
                         }
                     }, 100);
                 })"""
@@ -1006,8 +1036,6 @@ def main() -> None:
 
         with cols[-1]:
             NEW_SESSION = st.button(":material/add_box:", key="add_box")
-            if NEW_SESSION:
-                run_js("""document.body.classList.add('new-session-started')""")
 
     EMPTY_SESSIONS = True
 

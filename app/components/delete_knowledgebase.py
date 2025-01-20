@@ -13,10 +13,10 @@ def render_delete_knowledgebase(agent: Agent):
     )
     cols = st.columns(2)
     with cols[1]:
-        if st.button("Delete"):
+        if st.button("Delete", icon=":material/delete:"):
             agent.knowledge.vector_db.delete()
             st.toast("Knowledge base deleted")
             rerun()
     with cols[0]:
-        if st.button("Cancel", type="primary"):
+        if st.button("Cancel", icon=":material/close:", type="primary"):
             rerun()

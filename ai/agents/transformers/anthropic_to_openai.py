@@ -4,6 +4,8 @@ from typing import List, Optional
 from anthropic.types.tool_use_block import ToolUseBlock
 from phi.model.message import Message
 
+from helpers.utils import binary2text
+
 from .base import Provider, Transformer
 
 
@@ -90,6 +92,34 @@ class AnthropicToOpenAI(Transformer):
                 m.tool_call_id = meta["tool_use_id"]
                 m.content = meta["content"]
 
+            if isinstance(m.content, list) and m.content:
+                for index in range(len(m.content)):
+                    c = m.content[index]
+                    if isinstance(c, dict):
+                        if c.get("type") == "image":
+                            image_media_type = c["source"]["media_type"]
+                            img = c["source"]["data"]
+                            if isinstance(img, bytes):
+                                img = binary2text(img, image_media_type)
+                            else:
+                                img = str(img)
+
+                            if img.startswith("http"):
+                                image_data = img
+                            else:
+                                image_data = "data:{};base64,{}".format(
+                                    image_media_type, img
+                                )
+
+                            m.content[index] = {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": image_data,
+                                },
+                            }
+
             new_messages.append(m)
+
+        agent.prune_openai_messages(new_messages)
 
         return new_messages
