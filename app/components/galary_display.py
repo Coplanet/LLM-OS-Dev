@@ -11,7 +11,7 @@ from db.tables.user_config import UserBinaryData
 from helpers.utils import binary2text
 
 
-@st.dialog("Display Gallery", width="large")
+@st.dialog("Image Gallery", width="large")
 def render_galary_display(agent: Agent) -> Union[None, bool]:
     selected_image = st.session_state.get("selected_image", 0)
     st.subheader("Gallery, click on an image to start working on it")

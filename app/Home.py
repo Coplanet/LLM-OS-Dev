@@ -9,6 +9,7 @@ from typing import Dict, List, Optional
 from urllib.parse import urlencode
 from uuid import uuid4
 
+import anthropic
 import backoff
 import google.generativeai as genai
 import groq
@@ -93,7 +94,7 @@ def backoff_handler(details):
 
 @backoff.on_exception(
     backoff.expo,
-    (openai.RateLimitError, groq.RateLimitError),
+    (openai.RateLimitError, groq.RateLimitError, anthropic.APIStatusError),
     max_time=60,
     max_tries=10,
     on_backoff=backoff_handler,
@@ -748,17 +749,32 @@ def main() -> None:
 
             with st.spinner("Thinking..."):
                 selected_image = st.session_state.get("selected_image", None)
+
+                image_data = None
+                image_type = "image/webp"
+
                 if not selected_image and uploaded_images:
-                    selected_image = uploaded_images[len(uploaded_images) - 1].id
+                    img: UserBinaryData = uploaded_images[len(uploaded_images) - 1]
+                    if img:
+                        image_data = img.data_compressed
+                        image_type = img.mimetype or "image/webp"
+
+                if not image_data and not selected_image and not uploaded_images:
+                    with get_db_context() as db:
+                        image = UserBinaryData.get_data(
+                            db,
+                            generic_leader.session_id,
+                            UserBinaryData.IMAGE,
+                        ).first()
+                        if image:
+                            image_data = image.data_compressed
+                            selected_image = image.id
+                            image_type = image.mimetype or "image/webp"
 
                 response = run(
                     generic_leader,
                     question,
-                    [
-                        binary2text(d.data_compressed, "image/webp")
-                        for d in uploaded_images
-                        if d.id == selected_image
-                    ],
+                    [binary2text(image_data, image_type)] if image_data else [],
                     uploaded_videos_,
                     audio_bytes,
                     response_in_voice,
@@ -806,22 +822,19 @@ def main() -> None:
             # Get the images
             image_outputs: Optional[List[Image]] = generic_leader.get_images()
 
-            if uploaded_images:
-                with get_db_context() as db:
-                    if UserNextOp.get_op(
-                        db, user.session_id, UserNextOp.GET_IMAGE_MASK
-                    ):
-                        if render_mask_image(generic_leader):
-                            run(
-                                generic_leader,
-                                question,
-                                uploaded_images,
-                                uploaded_videos_,
-                                audio_bytes,
-                                response_in_voice,
-                                AUDIO_RESPONSE_SUPPORT,
-                                audio_bytes_,
-                            )
+            with get_db_context() as db:
+                if UserNextOp.get_op(db, user.session_id, UserNextOp.GET_IMAGE_MASK):
+                    if render_mask_image(generic_leader):
+                        run(
+                            generic_leader,
+                            question,
+                            uploaded_images,
+                            uploaded_videos_,
+                            audio_bytes,
+                            response_in_voice,
+                            AUDIO_RESPONSE_SUPPORT,
+                            audio_bytes_,
+                        )
 
             # Render the images
             if image_outputs:
