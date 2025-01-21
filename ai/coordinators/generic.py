@@ -309,8 +309,11 @@ def get_coordinator(
                 - If no tool/agent is available, and you haven't found any information in the knowledge base, JUST RETURN THAT YOU DON'T KNOW.
                 - If no other tool/agent is available, and you haven't found any information in the knowledge base, JUST RETURN THAT YOU DON'T KNOW.
                 - You need to ask a clarifying question.
+                - If you cannot response from a tool/agent, just return that you cannot response from it.
 
-            IMPORTANT: Do not write Python code to fetch data when you couldn't find it your knowledge base nor any other tool/agent is available unless the user explicitly requests it.\
+            YOUR LIMITATIONS:
+                - You cannot provide files or plots to users as result of any operation, if users asks for them, just return that you can do it and ask if they want you to render markdawn for requested data.
+                - DO NOT WRITE PYTHON CODE to fetch data when you couldn't find it your knowledge base nor any other tool/agent is available unless the user explicitly requests it.\
             """
         ).strip(),
         "**CRITICAL**: NEVER AND EVER consider the tool's output in the history, only follow up the general dicsussion in the history you receive.",
@@ -384,6 +387,9 @@ def get_coordinator(
         (
             "**IMPORTANT**: When sending emails, always use HTML format. if the input is not HTML "
             "(e.g. markdown), convert it to HTML before sending it."
+        ),
+        (
+            "**IMPORTANT** Stop using a task if you couldn't fetch a valid result and response to user after 3 attempts."
         ),
         "If no image is provided, and user asks for an image related task, ask the user to provide one.",
     ]
