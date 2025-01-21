@@ -302,10 +302,12 @@ def get_coordinator(
         dedent(
             """\
             WORKFLOW: When the user sends a message, first **think** and determine if:
-                - You need to search the knowledge base (limited to 3 attempts with specific refinements).
+                - You need to search the knowledge base **ONCE**.
                 - You need to answer using the tools available to you.
                 - You need to search the internet if the knowledge base does not yield results.
                 - You need to delegate the task to a team member.
+                - If no tool/agent is available, and you haven't found any information in the knowledge base, JUST RETURN THAT YOU DON'T KNOW.
+                - If no other tool/agent is available, and you haven't found any information in the knowledge base, JUST RETURN THAT YOU DON'T KNOW.
                 - You need to ask a clarifying question.
 
             After you conclude your thought process, **respond** to the user with the appropriate action in the given order above.\

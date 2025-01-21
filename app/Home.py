@@ -521,6 +521,40 @@ def main() -> None:
                             if item["type"] == "text":
                                 last_prompt = item["text"]
                                 st.write(last_prompt)
+                            elif item["type"] == "image":
+                                if message_role == "user":
+                                    continue
+                                if "source" in item:
+                                    data_ = item["source"]["data"]
+                                    if not data_.startswith("http"):
+                                        hash = hashlib.sha256(
+                                            text2binary(data_)
+                                        ).hexdigest()
+                                        if (
+                                            hash
+                                            in st.session_state[
+                                                "rendered_images_hashes"
+                                            ]
+                                        ):
+                                            continue
+                                        data_ = hash2images.get(
+                                            hash, item["image_url"]["url"]
+                                        )
+                                        if message_role == "user":
+                                            st.session_state[
+                                                "rendered_images_hashes"
+                                            ].add(hash)
+                                    st.image(
+                                        (
+                                            data_.data
+                                            if isinstance(data_, UserBinaryData)
+                                            else data_
+                                        ),
+                                        caption=item.get("image_caption"),
+                                        use_column_width=True,
+                                    )
+                                else:
+                                    continue
                             elif item["type"] == "image_url":
                                 if message_role == "user":
                                     continue

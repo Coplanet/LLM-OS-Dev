@@ -68,6 +68,4 @@ class OpenAIToAnthropic(Transformer):
 
             new_messages.append(m)
 
-        agent.prune_anthropic_messages(new_messages)
-
         return new_messages

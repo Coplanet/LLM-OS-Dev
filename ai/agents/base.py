@@ -3,6 +3,7 @@ import imghdr
 from textwrap import dedent
 from typing import Generic, List, Optional, Tuple, TypeVar, Union
 
+from anthropic.types import ToolUseBlock
 from phi.agent import Agent as PhiAgent
 from phi.agent.session import AgentSession
 from phi.model.anthropic import Claude
@@ -202,20 +203,27 @@ class Agent(PhiAgent):
                 and isinstance(cp.content, list)
                 and any(c.get("type") == "tool_result" for c in cp.content)
             ):
-                if (
-                    pp.role != "assistant"
-                    or not isinstance(pp.content, list)
-                    or not any(c.get("type") == "tool_use" for c in pp.content)
-                ):
-                    index2remove.append(index)
+                if pp.role != "assistant" or not isinstance(pp.content, list):
+                    TOOLUSE = False
+                    for c in pp.content:
+                        if (
+                            isinstance(c, dict) and c.get("type") == "tool_use"
+                        ) or isinstance(c, ToolUseBlock):
+                            TOOLUSE = True
+                            break
+                    if not TOOLUSE:
+                        index2remove.append(index)
             # remove tool uses that are not followed by a tool result
-            if (
-                np
-                and cp.role == "assistant"
-                and isinstance(cp.content, list)
-                and any(c.get("type") == "tool_use" for c in cp.content)
-            ):
-                if (
+            if np and cp.role == "assistant" and isinstance(cp.content, list):
+                TOOLUSE = False
+                for c in cp.content:
+                    if (
+                        isinstance(c, dict) and c.get("type") == "tool_use"
+                    ) or isinstance(c, ToolUseBlock):
+                        TOOLUSE = True
+                        break
+
+                if TOOLUSE and (
                     np.role != "user"
                     or not isinstance(np.content, list)
                     or not any(c.get("type") == "tool_result" for c in np.content)
