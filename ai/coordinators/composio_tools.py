@@ -2,27 +2,27 @@ from ai.agents.base import ComposioAction
 
 COMPOSIO_ACTIONS = {
     # Gmail
-    "GMAIL": {
-        "name": "Gmail",
-        "icon": "fa-solid fa-at",
-        "actions": [
-            ComposioAction.GMAIL_ADD_LABEL_TO_EMAIL,
-            ComposioAction.GMAIL_CREATE_EMAIL_DRAFT,
-            ComposioAction.GMAIL_CREATE_LABEL,
-            ComposioAction.GMAIL_FETCH_EMAILS,
-            ComposioAction.GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID,
-            ComposioAction.GMAIL_FETCH_MESSAGE_BY_THREAD_ID,
-            ComposioAction.GMAIL_GET_ATTACHMENT,
-            ComposioAction.GMAIL_GET_PEOPLE,
-            ComposioAction.GMAIL_GET_PROFILE,
-            ComposioAction.GMAIL_LIST_LABELS,
-            ComposioAction.GMAIL_LIST_THREADS,
-            ComposioAction.GMAIL_MODIFY_THREAD_LABELS,
-            ComposioAction.GMAIL_REMOVE_LABEL,
-            ComposioAction.GMAIL_REPLY_TO_THREAD,
-            ComposioAction.GMAIL_SEND_EMAIL,
-        ],
-    },
+    # "GMAIL": {
+    #     "name": "Gmail",
+    #     "icon": "fa-solid fa-at",
+    #     "actions": [
+    #         ComposioAction.GMAIL_ADD_LABEL_TO_EMAIL,
+    #         ComposioAction.GMAIL_CREATE_EMAIL_DRAFT,
+    #         ComposioAction.GMAIL_CREATE_LABEL,
+    #         ComposioAction.GMAIL_FETCH_EMAILS,
+    #         ComposioAction.GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID,
+    #         ComposioAction.GMAIL_FETCH_MESSAGE_BY_THREAD_ID,
+    #         ComposioAction.GMAIL_GET_ATTACHMENT,
+    #         ComposioAction.GMAIL_GET_PEOPLE,
+    #         ComposioAction.GMAIL_GET_PROFILE,
+    #         ComposioAction.GMAIL_LIST_LABELS,
+    #         ComposioAction.GMAIL_LIST_THREADS,
+    #         ComposioAction.GMAIL_MODIFY_THREAD_LABELS,
+    #         ComposioAction.GMAIL_REMOVE_LABEL,
+    #         ComposioAction.GMAIL_REPLY_TO_THREAD,
+    #         ComposioAction.GMAIL_SEND_EMAIL,
+    #     ],
+    # },
     # Google Calendar
     "GOOGLECALENDAR": {
         "name": "Google Calendar",
