@@ -650,8 +650,9 @@ def main() -> None:
             if mask_captured:
                 with st.chat_message("assistant", avatar="assistant"):
                     st.write("Captured the mask, processing...")
-                last_message.content = "**Mask captured, Proceed with:** {}".format(
-                    last_message.content
+                prefix = "**Mask captured, Proceed with:** "
+                last_message.content = "{}{}".format(
+                    prefix, last_message.content.replace(prefix, "")
                 )
 
     if last_message and last_message.role == "user":
