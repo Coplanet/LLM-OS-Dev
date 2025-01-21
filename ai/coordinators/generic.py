@@ -313,6 +313,10 @@ def get_coordinator(
             IMPORTANT: Do not write Python code to fetch data when you couldn't find it your knowledge base nor any other tool/agent is available unless the user explicitly requests it.\
             """
         ).strip(),
+        "**CRITICAL**: NEVER AND EVER consider the tool's output in the history, only follow up the general dicsussion in the history you receive.",
+        "**CRITICAL**: NEVER AND EVER stock in a loop of tools/agents.",
+        "**CRITICAL**: NEVER AND EVER follow up a tool calling if it doesn't make sense for the input prompt.",
+        "**CRITICAL**: NEVER AND EVER over estimate the tools capabilities -- just consider the tools capabilities as they are without any additional capabilities assumptions.",
         (
             "IMPORTANT: If the user asks about a topic, **FIRST** attempt to search your knowledge "
             "base using the `search_knowledge_base` tool **up to 3 times**. Each attempt "
