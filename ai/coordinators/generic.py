@@ -310,7 +310,7 @@ def get_coordinator(
                 - If no other tool/agent is available, and you haven't found any information in the knowledge base, JUST RETURN THAT YOU DON'T KNOW.
                 - You need to ask a clarifying question.
 
-            After you conclude your thought process, **respond** to the user with the appropriate action in the given order above.\
+            IMPORTANT: Do not write Python code to fetch data when you couldn't find it your knowledge base nor any other tool/agent is available unless the user explicitly requests it.\
             """
         ).strip(),
         (

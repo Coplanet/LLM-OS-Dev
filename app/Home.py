@@ -79,6 +79,7 @@ with st.container(key="subtitle_container"):
         unsafe_allow_html=True,
     )
 
+
 user: User = auth.get_user()
 
 
