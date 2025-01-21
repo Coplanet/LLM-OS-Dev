@@ -224,7 +224,7 @@ for group, details in COMPOSIO_ACTIONS.items():
                 "instance": instance,
                 "name": instance.name,
                 "icon": details["icon"],
-                "default_status": "disabled",
+                # "default_status": "disabled",
                 # "extra_instructions": "Use `{}` tool for {}".format(
                 #     instance.name, instance.functions["function_template"].description,
                 # ),
