@@ -173,16 +173,27 @@ class Agent(PhiAgent):
     def prune_openai_messages(self, messages: List[Message]):
         # remove inconsistent tool calls/results
         index2remove = []
-        for index in range(len(messages)):
-            if index == 0:
-                continue
+        index = 0
+
+        while index < len(messages):
             cp = messages[index]
-            pp = messages[index - 1]
-            np = messages[index + 1] if index + 1 < len(messages) else None
-            if cp.role == "tool" and not pp.tool_calls:
-                index2remove.append(index)
-            if np and cp.role == "assistant" and not np.role == "tool":
-                index2remove.append(index)
+            if cp.role == "assistant" and cp.tool_calls:
+                if isinstance(cp.tool_calls, list):
+                    cindex = index
+                    tools_index = []
+                    while index < len(messages):
+                        index += 1
+                        wp = messages[index]
+                        if wp.role == "tool":
+                            tools_index.append(index)
+                        else:
+                            break
+
+                    if len(cp.tool_calls) != len(tools_index):
+                        index2remove.append(cindex)
+                        index2remove.extend(tools_index)
+
+            index += 1
 
         index2remove.reverse()
         for index in index2remove:
