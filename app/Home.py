@@ -1188,7 +1188,7 @@ def main() -> None:
 
         if generic_leader.storage:
             if st.sidebar.button("Delete All Session", key="delete_all_session_button"):
-                ids = generic_leader.storage.get_all_session_ids()
+                ids = generic_leader.storage.get_all_session_ids(user_id=user.user_id)
                 for id in ids:
                     generic_leader.storage.delete_session(id)
                 if ids:
