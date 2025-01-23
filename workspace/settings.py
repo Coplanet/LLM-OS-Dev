@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 from typing import Optional
+from urllib.parse import urlencode
 
 from phi.workspace.settings import WorkspaceSettings
 
@@ -61,7 +62,10 @@ class Settings:
     resend_email_address: Optional[str] = os.getenv(
         "RESEND_EMAIL_ADDRESS", "info@test.coplanet.com"
     )
+    composio_api_key: Optional[str] = os.getenv("COMPOSIO_API_KEY", None)
     secret_key: Optional[str] = os.getenv("SECRET_KEY", None)
+    domain: Optional[str] = os.getenv("DOMAIN", "localhost:8501")
+    domain_scheme: Optional[str] = os.getenv("DOMAIN_SCHEME", "http")
 
     @property
     def scratch_dir(self):
@@ -70,6 +74,11 @@ class Settings:
     @property
     def knowledgebase_dir(self):
         return self.ws_root.joinpath("knowledgebase")
+
+    def get_redirect_url(self, params: dict):
+        return (
+            f"{self.domain_scheme}://{self.domain}/?callback=true&{urlencode(params)}"
+        )
 
 
 extra_settings = Settings()

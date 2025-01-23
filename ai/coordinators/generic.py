@@ -15,7 +15,17 @@ from phi.tools.yfinance import YFinanceTools
 from phi.tools.youtube_tools import YouTubeTools
 from phi.vectordb.pgvector import PgVector2
 
-from ai.agents import funny, journal, linkedin_content_generator, patent_writer, python
+from ai.agents import (
+    funny,
+    github,
+    gmail,
+    google_calendar,
+    journal,
+    linkedin_content_generator,
+    patent_writer,
+    python,
+    tweeter,
+)
 from ai.agents.base import AgentTeam, Provider
 from ai.agents.settings import AgentConfig, agent_settings
 from ai.tools.email import EmailSenderTools
@@ -29,7 +39,6 @@ from helpers.tool_processor import process_tools
 from workspace.settings import extra_settings
 
 from .base import Coordinator
-from .composio_tools import COMPOSIO_ACTIONS
 
 agent = None
 agent_name = "Coordinator"
@@ -211,27 +220,6 @@ available_tools = [
         "icon": "fa-solid fa-calculator",
     },
 ]
-
-for group, details in COMPOSIO_ACTIONS.items():
-    for order, instance in enumerate(
-        agent_settings.composio_tools.get_tools(actions=details["actions"])
-    ):
-        name = details["name"]
-        available_tools.append(
-            {
-                "group": name,
-                "order": 500 + order + 1,
-                "instance": instance,
-                "name": instance.name,
-                "icon": details["icon"],
-                # "default_status": "disabled",
-                # "extra_instructions": "Use `{}` tool for {}".format(
-                #     instance.name, instance.functions["function_template"].description,
-                # ),
-            }
-        )
-
-
 available_tools = sorted(available_tools, key=lambda x: x["order"])
 
 
@@ -242,6 +230,7 @@ def get_coordinator(
     user_id: Optional[str] = None,
     session_id: Optional[str] = None,
 ):
+
     if config is None:
         config = AgentConfig.empty()
 
@@ -256,7 +245,12 @@ def get_coordinator(
     team_members = AgentTeam()
 
     def conditional_agent_enable(pkg):
-        config: AgentConfig = team_config.get(pkg.agent_name)
+        config: Optional[AgentConfig] = team_config.get(pkg.agent_name)
+
+        if not config and getattr(pkg, "composio_agent", False):
+            pkg.agent = None
+            logger.debug("DEACTICATING %s", pkg.agent_name)
+            return
 
         if not config or config.is_empty or config.enabled:
             pkg.agent = pkg.get_agent(
@@ -276,6 +270,10 @@ def get_coordinator(
     conditional_agent_enable(patent_writer)
     conditional_agent_enable(funny)
     conditional_agent_enable(linkedin_content_generator)
+    conditional_agent_enable(tweeter)
+    conditional_agent_enable(github)
+    conditional_agent_enable(google_calendar)
+    conditional_agent_enable(gmail)
 
     tools, extra_instructions = process_tools(agent_name, config, available_tools)
 

@@ -46,7 +46,8 @@ from ai.document.reader.general import GenericReader
 from ai.document.reader.image import ImageReader
 from ai.document.reader.pptx import PPTXReader
 from app.auth import Auth, User
-from app.components.available_agents import AGENTS
+from app.components.available_agents import get_available_agents
+from app.components.composio_integrations import composio_integrations
 from app.components.configs import IMAGE_DIR
 from app.components.delete_knowledgebase import render_delete_knowledgebase
 from app.components.galary_display import render_galary_display
@@ -58,9 +59,10 @@ from app.models import AUDIO_SUPPORTED_MODELS
 from app.utils import rerun, run_js, run_next_run_toast, scroll_to_bottom
 from db.session import get_db_context
 from db.settings import db_settings
-from db.tables import UserBinaryData, UserConfig, UserNextOp
+from db.tables import UserBinaryData, UserConfig, UserIntegration, UserNextOp
 from helpers.log import logger
 from helpers.utils import binary2text, binary_text2data, text2binary
+from workspace.settings import extra_settings
 
 phi_logger.setLevel(logging.DEBUG)
 
@@ -165,7 +167,7 @@ def run(
     return response
 
 
-def get_selected_assistant_config(session_id, label, package):
+def get_selected_assistant_config(user: User, label, package):
     try:
         available_tools_manifest = {}
         if isinstance(package.available_tools, dict):
@@ -197,7 +199,7 @@ def get_selected_assistant_config(session_id, label, package):
 
         with get_db_context() as db:
             config: UserConfig = UserConfig.get_models_config(
-                db, session_id, auto_create=False
+                db, user.session_id, auto_create=False
             )
 
         if config:
@@ -213,6 +215,7 @@ def get_selected_assistant_config(session_id, label, package):
                         tools[tool.get("name")] = tool
 
         return settings.AgentConfig(
+            user=user,
             provider=default_configs["model_type"],
             model_id=default_configs["model_id"],
             model_kwargs=default_configs.get("model_kwargs", {}),
@@ -257,6 +260,55 @@ def main() -> None:
 
     st.sidebar.info(f":label: User: {user.username}")
 
+    st.sidebar.markdown("### Connect your apps to LLM OS")
+    st.sidebar.button(
+        "Integrate with Composio",
+        on_click=lambda: composio_integrations(user),
+        type="primary",
+    )
+    st.sidebar.markdown("---")
+
+    if "callback" in st.query_params:
+        source = st.query_params.get("source")
+        if source == "composio":
+            app = st.query_params.get("app")
+            if app:
+                hash = st.query_params.get("hash")
+                if (
+                    not hash
+                    or hash
+                    != hashlib.sha256(
+                        f"{extra_settings.secret_key}:{user.username}:{user.session_id}:{app}:{source}".encode()
+                    ).hexdigest()
+                ):
+                    st.toast("Invalid request!", icon=":material/error:")
+                    rerun(True)
+                    return
+                status = st.query_params.get("status")
+                connection_id = st.query_params.get("connectedAccountId")
+
+                if str(status).lower() == "success" and connection_id:
+                    if UserIntegration.add_integration(
+                        user.user_id, app, connection_id, user.to_dict()
+                    ):
+                        st.toast("Connected to " + app + "!", icon=":material/check:")
+                    else:
+                        st.toast(
+                            "Connection to " + app + " already exists!",
+                            icon=":material/warning:",
+                        )
+
+                    for key in list(st.query_params.keys()):
+                        del st.query_params[key]
+
+                    user.to_auth_param(add_to_query_params=True)
+                    rerun(clean_session=True)
+                    return
+
+                else:
+                    st.toast(
+                        "Failed to connect to " + app + "!", icon=":material/error:"
+                    )
     # Initialize session state for popup control
     if "show_popup" not in st.session_state:
         st.session_state.show_popup = False
@@ -265,14 +317,15 @@ def main() -> None:
     # Get the Agent
     generic_leader: Agent
 
-    COORDINATOR_CONFIG = settings.AgentConfig.empty()
+    AGENTS = get_available_agents(user)
+    COORDINATOR_CONFIG = settings.AgentConfig.empty(user)
     AGENTS_CONFIG: Dict[str, settings.AgentConfig] = {}
 
     logger.debug(">>> Identified Session ID: %s", user)
 
     for agent, agent_config in AGENTS.items():
         config = get_selected_assistant_config(
-            user.session_id,
+            user,
             agent_config.get("label", agent),
             agent_config.get("package"),
         )
@@ -308,9 +361,9 @@ def main() -> None:
     for agent in [generic_leader] + generic_leader.team:
         agent: base.Agent
 
-        config: settings.AgentConfig = (
-            AGENTS_CONFIG.get(agent.name) or settings.AgentConfig.empty()
-        )
+        config: settings.AgentConfig = AGENTS_CONFIG.get(
+            agent.name
+        ) or settings.AgentConfig.empty(user)
 
         st.session_state[f"{agent.label}_model_id"] = config.model_id or agent.model.id
         st.session_state[f"{agent.label}_model_type"] = (

@@ -1,6 +1,19 @@
-from ai.agents import funny, journal, linkedin_content_generator, patent_writer, python
+from ai.agents import (
+    funny,
+    github,
+    gmail,
+    google_calendar,
+    journal,
+    linkedin_content_generator,
+    patent_writer,
+    python,
+    tweeter,
+)
 from ai.coordinators import generic as coordinator
+from app.auth import User
+from app.components.composio_integrations import AVAILABLE_APPS, App
 from app.utils import to_label
+from db.tables.user_config import UserIntegration
 
 # Define agents dictionary
 AGENTS = {
@@ -39,4 +52,39 @@ AGENTS = {
     },
 }
 
-__all__ = ["AGENTS"]
+COMPOSIO_AGENTS = {
+    App.TWITTER: {
+        "label": to_label(tweeter.agent_name),
+        "get_agent": tweeter.get_agent,
+        "package": tweeter,
+    },
+    App.GITHUB: {
+        "label": to_label(github.agent_name),
+        "get_agent": github.get_agent,
+        "package": github,
+    },
+    App.GOOGLECALENDAR: {
+        "label": to_label(google_calendar.agent_name),
+        "get_agent": google_calendar.get_agent,
+        "package": google_calendar,
+    },
+    App.GMAIL: {
+        "label": to_label(gmail.agent_name),
+        "get_agent": gmail.get_agent,
+        "package": gmail,
+    },
+}
+
+
+def get_available_agents(user: User) -> dict:
+    agents = AGENTS.copy()
+
+    for i in UserIntegration.get_integrations(user.user_id):
+        app = App(i.app)
+        if app in COMPOSIO_AGENTS and app in AVAILABLE_APPS:
+            agents[COMPOSIO_AGENTS[app]["package"].agent_name] = COMPOSIO_AGENTS[app]
+
+    return agents
+
+
+__all__ = ["AGENTS", "get_available_agents"]

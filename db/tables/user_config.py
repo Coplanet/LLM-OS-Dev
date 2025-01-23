@@ -374,3 +374,74 @@ class UserNextOp(Base):
     ) -> None:
         kwargs["auto_commit"] = auto_commit
         cls.delete_all(db, cls.session_id == session_id, cls.key == key, **kwargs)
+
+
+class UserIntegration(Base):
+    __tablename__ = "user_integrations"
+    username = Column(String(255), nullable=False, index=True)
+    app = Column(String(255), nullable=False, index=True)
+    connection_id = Column(String(255), nullable=False, index=True)
+    meta = Column(Text, nullable=True, default=lambda: "{}")
+
+    __table_args__ = (UniqueConstraint("username", "app", name="_username_app_uc"),)
+
+    @classmethod
+    def get_integrations(
+        cls,
+        username: str,
+        app: Optional[str] = None,
+        db: Optional[orm.Session] = None,
+    ) -> List["UserIntegration"]:
+        def _fetch(db: orm.Session) -> List[UserIntegration]:
+            query = db.query(cls).filter_by(username=username)
+            if app:
+                query = query.filter_by(app=app)
+            return query.order_by(cls.id.desc())
+
+        if db:
+            return _fetch(db)
+
+        from db.session import get_db_context
+
+        with get_db_context() as db:
+            return _fetch(db)
+
+    @classmethod
+    def add_integration(
+        cls,
+        username: str,
+        app: str,
+        connection_id: str,
+        meta: dict = {},
+        db: Optional[orm.Session] = None,
+        auto_commit: bool = True,
+    ) -> Optional["UserIntegration"]:
+        try:
+
+            def _add(db_: orm.Session) -> None:
+                nonlocal db, auto_commit
+
+                instance = cls(
+                    username=username,
+                    app=app,
+                    connection_id=connection_id,
+                    meta=json.dumps(meta),
+                )
+                db_.add(instance)
+                if auto_commit or not db:
+                    db_.commit()
+                    db_.refresh(instance)
+
+                return instance
+
+            if db:
+                return _add(db)
+
+            from db.session import get_db_context
+
+            with get_db_context() as db_:
+                return _add(db_)
+
+        except exc.IntegrityError:
+            db.rollback()
+            return None

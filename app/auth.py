@@ -129,6 +129,12 @@ class User:
     def guest(cls) -> "User":
         return cls()
 
+    def to_dict(self) -> dict:
+        return {
+            self.USERNAME_KEY: self.username,
+            self.SESSION_KEY: self.session_id,
+        }
+
     @classmethod
     def validate_auth(cls, auth: dict) -> "User":
         if (

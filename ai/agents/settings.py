@@ -11,6 +11,7 @@ from phi.model.openai import OpenAIChat
 from phi.tools import Toolkit
 from pydantic_settings import BaseSettings
 
+from app.auth import User
 from helpers.log import logger
 from workspace.settings import extra_settings
 
@@ -60,6 +61,7 @@ class AgentSettings(BaseSettings):
 
 
 class AgentConfig:
+    user: User
     provider: Optional[str] = None
     model_id: Optional[str] = None
     model_kwargs: Optional[Dict] = {}
@@ -70,6 +72,7 @@ class AgentConfig:
 
     def __init__(
         self,
+        user: User,
         provider: str,
         model_id: str,
         model_kwargs: Dict,
@@ -78,6 +81,7 @@ class AgentConfig:
         max_tokens: int,
         tools: Dict[Toolkit, Dict] = {},
     ):
+        self.user = user
         self.provider = provider
         self.model_id = model_id
         self.model_kwargs = model_kwargs
@@ -97,8 +101,8 @@ class AgentConfig:
         )
 
     @classmethod
-    def empty(cls):
-        return cls(None, None, None, None, None, None, {})
+    def empty(cls, user: User):
+        return cls(user, None, None, None, None, None, None, {})
 
     def __str__(self):
         return str(

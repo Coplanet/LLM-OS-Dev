@@ -4,6 +4,8 @@ from textwrap import dedent
 from typing import Generic, List, Optional, Tuple, TypeVar, Union
 
 from anthropic.types import ToolUseBlock
+from composio.exceptions import ComposioSDKError
+from composio_phidata import App, ComposioToolSet
 from phi.agent import Agent as PhiAgent
 from phi.agent.session import AgentSession
 from phi.model.anthropic import Claude
@@ -12,7 +14,9 @@ from phi.model.google import Gemini
 from phi.model.groq import Groq
 from phi.model.message import Message
 from phi.model.openai import OpenAIChat
+from phi.tools import Toolkit
 
+from db.tables import UserIntegration
 from helpers.log import logger
 from helpers.utils import binary2text, text2binary
 
@@ -365,6 +369,65 @@ class Agent(PhiAgent):
                 f"No transformer found for {self.model.provider} to {to_provider}"
             )
         return self
+
+    @classmethod
+    def get_tools_as_composio_tools(
+        cls, agent_name: str, config: AgentConfig, app: App
+    ) -> List[Toolkit]:
+        user_integrations = UserIntegration.get_integrations(
+            config.user.user_id, app=str(app)
+        )
+
+        toolset = None
+
+        if user_integrations.count() > 0:
+            try:
+                toolset = ComposioToolSet(
+                    entity_id=config.user.user_id,
+                    connected_account_ids={
+                        i.app: i.connection_id for i in user_integrations
+                    },
+                )
+
+            except ComposioSDKError as e:
+                logger.error(f"Error getting tools as composio tools: {e}")
+                for i in user_integrations:
+                    if i.app in str(e):
+                        i.delete()
+
+        config.tools = []
+        available_tools = []
+
+        if toolset:
+            from ai.coordinators.composio_tools import COMPOSIO_ACTIONS
+
+            for integration in user_integrations:
+                if integration.app in COMPOSIO_ACTIONS:
+                    details = COMPOSIO_ACTIONS[integration.app]
+                    for order, instance in enumerate(
+                        toolset.get_tools(actions=details["actions"])
+                    ):
+                        name = details["name"]
+                        available_tools.append(
+                            {
+                                "group": name,
+                                "order": 500 + order + 1,
+                                "instance": instance,
+                                "name": instance.name,
+                                "icon": details["icon"],
+                            }
+                        )
+
+        if not available_tools:
+            return []
+
+        config.tools = available_tools
+
+        from helpers.tool_processor import process_tools
+
+        tools, _ = process_tools(agent_name, config, available_tools)
+
+        return tools
 
 
 class AgentTeam(list, Generic[TypeVar("T", bound=Agent)]):
