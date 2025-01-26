@@ -24,7 +24,7 @@ from ai.agents import (
     linkedin_content_generator,
     patent_writer,
     python,
-    tweeter,
+    twitter,
 )
 from ai.agents.base import AgentTeam, Provider
 from ai.agents.settings import AgentConfig, agent_settings
@@ -245,16 +245,13 @@ def get_coordinator(
     team_members = AgentTeam()
 
     def conditional_agent_enable(pkg):
-        config: Optional[AgentConfig] = team_config.get(pkg.agent_name)
+        config_: Optional[AgentConfig] = team_config.get(pkg.agent_name)
 
-        if not config and getattr(pkg, "composio_agent", False):
-            pkg.agent = None
-            logger.debug("DEACTICATING %s", pkg.agent_name)
-            return
-
-        if not config or config.is_empty or config.enabled:
+        if not config_ or config_.is_empty or config_.enabled:
             pkg.agent = pkg.get_agent(
-                config if config and not config.is_empty else None
+                config_
+                if config_ and not config_.is_empty
+                else AgentConfig.empty(user=config.user)
             )
 
         if pkg.agent:
@@ -270,7 +267,7 @@ def get_coordinator(
     conditional_agent_enable(patent_writer)
     conditional_agent_enable(funny)
     conditional_agent_enable(linkedin_content_generator)
-    conditional_agent_enable(tweeter)
+    conditional_agent_enable(twitter)
     conditional_agent_enable(github)
     conditional_agent_enable(google_calendar)
     conditional_agent_enable(gmail)

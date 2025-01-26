@@ -19,6 +19,7 @@ import sqlalchemy as sql
 import streamlit as st
 from audio_recorder_streamlit import audio_recorder
 from bs4 import BeautifulSoup
+from composio import App
 from phi.agent import Agent
 from phi.document import Document
 from phi.document.reader import Reader
@@ -259,14 +260,6 @@ def main() -> None:
         rerun()
 
     st.sidebar.info(f":label: User: {user.username}")
-
-    st.sidebar.markdown("### Connect your apps to LLM OS")
-    st.sidebar.button(
-        "Integrate with Composio",
-        on_click=lambda: composio_integrations(user),
-        type="primary",
-    )
-    st.sidebar.markdown("---")
 
     if "callback" in st.query_params:
         source = st.query_params.get("source")
@@ -890,6 +883,16 @@ def main() -> None:
                             audio_bytes_,
                         )
 
+                AUTH_USER = UserNextOp.get_op(db, user.session_id, UserNextOp.AUTH_USER)
+                if AUTH_USER:
+                    if "app" in AUTH_USER.value_json:
+                        composio_integrations(
+                            user, App(AUTH_USER.value_json.get("app"))
+                        )
+                    else:
+                        composio_integrations(user)
+                    AUTH_USER.delete()
+
             # Render the images
             if image_outputs:
                 image_outputs_ = {}
@@ -1094,10 +1097,14 @@ def main() -> None:
             columns.append(0.05)
         if KNOWLEDGE_BASE_CREATED:
             columns.append(0.05)
-        # for new session
-        columns.append(0.05)
+        # for
+        #   1. composio integration
+        #   2. new session
+        NUMBER_OF_RIGHT_COLUMNS = 2
+        for _ in range(NUMBER_OF_RIGHT_COLUMNS):
+            columns.append(0.05)
         # for in the middle
-        columns.insert(-1, 1 - sum(columns))
+        columns.insert(-NUMBER_OF_RIGHT_COLUMNS, 1 - sum(columns))
         cols = st.columns(columns)
         with cols[COL_INDEX]:
             COL_INDEX += 1
@@ -1135,6 +1142,10 @@ def main() -> None:
                 COL_INDEX += 1
                 if st.button(":material/delete:", key="delete_knowledge_base"):
                     render_delete_knowledgebase(generic_leader)
+
+        with cols[-2]:
+            if st.button(":material/admin_panel_settings:", key="composio_integration"):
+                composio_integrations(user)
 
         with cols[-1]:
             NEW_SESSION = st.button(":material/add_box:", key="add_box")

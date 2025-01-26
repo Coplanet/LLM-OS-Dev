@@ -1,4 +1,5 @@
 import hashlib
+from typing import Optional
 
 import streamlit as st
 from composio import App, ComposioToolSet
@@ -19,7 +20,7 @@ NAME_TO_APP = {details["name"]: app for app, details in AVAILABLE_APPS.items()}
 
 
 @st.dialog("Account integrations", width="large")
-def composio_integrations(user: User):
+def composio_integrations(user: User, target_app: Optional[App] = None):
     st.subheader("Integrate your account with Composio")
     st.markdown("Integrate your account with Composio to enable AI-powered actions.")
     st.markdown("---")
@@ -84,11 +85,32 @@ def composio_integrations(user: User):
     with cols[0]:
         if to_be_connected_apps:
             st.subheader("Connect an app")
-            SELECTED_APP = st.selectbox(
-                "Select an app",
-                options=to_be_connected_apps,
-                index=None,
-                placeholder="Choose an app",
+
+            target_app_name = None
+            if target_app:
+                target_app_name = AVAILABLE_APPS.get(target_app, {}).get("name")
+
+                if target_app not in AVAILABLE_APPS:
+                    target_app = None
+
+            index = None
+
+            if target_app and target_app_name:
+                try:
+                    index = list(to_be_connected_apps).index(target_app_name)
+
+                except ValueError:
+                    target_app = None
+                    target_app_name = None
+
+            SELECTED_APP = (
+                st.selectbox(
+                    "Select an app",
+                    options=to_be_connected_apps,
+                    index=index,
+                    placeholder="Choose an app",
+                )
+                or target_app_name
             )
 
             if SELECTED_APP:

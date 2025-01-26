@@ -7,13 +7,12 @@ from ai.agents import (
     linkedin_content_generator,
     patent_writer,
     python,
-    tweeter,
+    twitter,
 )
 from ai.coordinators import generic as coordinator
 from app.auth import User
 from app.components.composio_integrations import AVAILABLE_APPS, App
 from app.utils import to_label
-from db.tables.user_config import UserIntegration
 
 # Define agents dictionary
 AGENTS = {
@@ -54,9 +53,9 @@ AGENTS = {
 
 COMPOSIO_AGENTS = {
     App.TWITTER: {
-        "label": to_label(tweeter.agent_name),
-        "get_agent": tweeter.get_agent,
-        "package": tweeter,
+        "label": to_label(twitter.agent_name),
+        "get_agent": twitter.get_agent,
+        "package": twitter,
     },
     App.GITHUB: {
         "label": to_label(github.agent_name),
@@ -79,9 +78,8 @@ COMPOSIO_AGENTS = {
 def get_available_agents(user: User) -> dict:
     agents = AGENTS.copy()
 
-    for i in UserIntegration.get_integrations(user.user_id):
-        app = App(i.app)
-        if app in COMPOSIO_AGENTS and app in AVAILABLE_APPS:
+    for app in COMPOSIO_AGENTS:
+        if app in AVAILABLE_APPS:
             agents[COMPOSIO_AGENTS[app]["package"].agent_name] = COMPOSIO_AGENTS[app]
 
     return agents

@@ -113,6 +113,7 @@ def show_popup(agent: Agent, session_id, assistant_name, config: AgentConfig, pa
         max_tokens,
     )
 
+    hidden_tools = {}
     enabled_tools = {}
     available_tools_manifest = {}
 
@@ -180,6 +181,12 @@ def show_popup(agent: Agent, session_id, assistant_name, config: AgentConfig, pa
                 "icon": icon,
             }
 
+            if tool.get("hidden", False):
+                hidden_tools[key] = True
+                enabled_tools[key] = (
+                    tool.get("default_status", "enabled").lower() == "enabled"
+                )
+
             if not enable_all:
                 if disable_all or key not in enabled_tools:
                     continue
@@ -197,6 +204,9 @@ def show_popup(agent: Agent, session_id, assistant_name, config: AgentConfig, pa
             with super_cols[col_index % 3]:
                 icon = manifest["icon"]
                 name = manifest["name"]
+                # if the tool is hidden, skip it
+                if key in hidden_tools:
+                    continue
                 # Create columns for layout
                 col1, col2 = None, None
 

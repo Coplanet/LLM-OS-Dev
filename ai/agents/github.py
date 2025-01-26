@@ -1,20 +1,20 @@
 from composio_phidata import App
 
-from .base import Agent, AgentConfig
+from .base import AgentConfig, ComposioAgent
 
 agent = None
 agent_name = "GitHub Agent"
 available_tools = []
-composio_agent = True
 
 
 def get_agent(config: AgentConfig = None):
     # flake8: noqa: E501
 
-    agent = Agent(
+    agent = ComposioAgent(
+        app=App.GITHUB,
+        user=config.user,
         name=agent_name,
         agent_config=config,
-        tools=Agent.get_tools_as_composio_tools(agent_name, config, App.GITHUB),
         delegation_directives=[
             (
                 f"Delegate any GitHub-related operations or API interactions to the `{agent_name}`. "

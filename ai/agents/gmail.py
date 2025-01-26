@@ -1,20 +1,20 @@
 from composio_phidata import App
 
-from .base import Agent, AgentConfig
+from .base import AgentConfig, ComposioAgent
 
 agent = None
 agent_name = "Gmail Agent"
 available_tools = []
-composio_agent = True
 
 
 def get_agent(config: AgentConfig = None):
     # flake8: noqa: E501
 
-    agent = Agent(
+    agent = ComposioAgent(
+        app=App.GMAIL,
+        user=config.user,
         name=agent_name,
         agent_config=config,
-        tools=Agent.get_tools_as_composio_tools(agent_name, config, App.GMAIL),
         instructions=[
             "Always write HTML formatted emails.",
             "If markdown has been provided to you, convert it to HTML before performing the email operation.",

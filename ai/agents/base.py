@@ -1,12 +1,13 @@
 import hashlib
 import imghdr
 from textwrap import dedent
-from typing import Generic, List, Optional, Tuple, TypeVar, Union
+from typing import Any, Dict, Generic, Iterator, List, Optional, Tuple, TypeVar, Union
 
 from anthropic.types import ToolUseBlock
 from composio.exceptions import ComposioSDKError
 from composio_phidata import App, ComposioToolSet
 from phi.agent import Agent as PhiAgent
+from phi.agent import RunResponse
 from phi.agent.session import AgentSession
 from phi.model.anthropic import Claude
 from phi.model.base import Model
@@ -15,8 +16,11 @@ from phi.model.groq import Groq
 from phi.model.message import Message
 from phi.model.openai import OpenAIChat
 from phi.tools import Toolkit
+from pydantic import ConfigDict, Field
 
-from db.tables import UserIntegration
+from app.auth import User
+from db.session import get_db_context
+from db.tables import UserIntegration, UserNextOp
 from helpers.log import logger
 from helpers.utils import binary2text, text2binary
 
@@ -473,8 +477,69 @@ class AgentTeam(list, Generic[TypeVar("T", bound=Agent)]):
         )
 
 
+class ComposioAgent(Agent):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    app: Any = Field(default=None)
+    user: User = Field(default=None)
+    app_name: str = Field(default=None)
+
+    def __init__(self, app: App, user: User, *args, **kwargs):
+        from ai.coordinators.composio_tools import COMPOSIO_ACTIONS
+
+        if app not in COMPOSIO_ACTIONS:
+            raise ValueError(f"App {app} is not supported")
+
+        super().__init__(*args, **kwargs)
+
+        self.app = app
+        self.user = user
+        self.app_name = str(app)
+
+        if self.has_integrations:
+            self.tools = self.get_tools_as_composio_tools(
+                self.name, kwargs.get("agent_config", None), self.app
+            )
+        else:
+            self.tools = ComposioToolSet().get_tools(
+                actions=COMPOSIO_ACTIONS[self.app]["actions"]
+            )
+
+    @property
+    def has_integrations(self):
+        return (
+            UserIntegration.get_integrations(self.user.user_id, self.app_name).count()
+            > 0
+        )
+
+    def run(
+        self, message: Optional[Union[str, List, Dict, Message]] = None, *args, **kwargs
+    ) -> Union[RunResponse, Iterator[RunResponse]]:
+        if not self.has_integrations:
+            with get_db_context() as db:
+                UserNextOp.save_op(
+                    db,
+                    self.user.session_id,
+                    UserNextOp.AUTH_USER,
+                    {"app": self.app_name},
+                )
+                message = (
+                    dedent(
+                        """
+                    ANNOUNCE THIS AS RESPONSE:
+                    The `{}` operation was not successful. Ask user to integrate his/her `{}` account with you.
+                    """
+                    )
+                    .strip()
+                    .format(self.app_name, self.app_name)
+                )
+
+        return super().run(message, *args, **kwargs)
+
+
 __all__ = [
     "Agent",
+    "ComposioAgent",
     "ComposioAction",
     "AgentTeam",
 ]
