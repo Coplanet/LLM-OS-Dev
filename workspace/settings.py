@@ -1,6 +1,7 @@
+import json
 import os
 from pathlib import Path
-from typing import Optional
+from typing import Any, Dict, Optional
 from urllib.parse import urlencode
 
 from phi.workspace.settings import WorkspaceSettings
@@ -66,6 +67,7 @@ class Settings:
     secret_key: Optional[str] = os.getenv("SECRET_KEY", None)
     domain: Optional[str] = os.getenv("DOMAIN", "localhost:8501")
     domain_scheme: Optional[str] = os.getenv("DOMAIN_SCHEME", "http")
+    proxies: Optional[Dict[str, Any]] = json.loads(os.getenv("PROXIES", "{}")) or None
 
     @property
     def scratch_dir(self):

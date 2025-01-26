@@ -77,7 +77,7 @@ available_tools = [
     },
     {
         "order": 200,
-        "instance": YouTubeTools(),
+        "instance": YouTubeTools(proxies=extra_settings.proxies),
         "name": "YouTube",
         "extra_instructions": dedent(
             """\
