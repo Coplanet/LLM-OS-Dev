@@ -7,6 +7,7 @@ from ai.agents import (
     linkedin_content_generator,
     patent_writer,
     python,
+    reasoning,
     twitter,
 )
 from ai.coordinators import generic as coordinator
@@ -48,6 +49,11 @@ AGENTS = {
         "label": to_label(funny.agent_name),
         "get_agent": funny.get_agent,
         "package": funny,
+    },
+    reasoning.agent_name: {
+        "label": to_label(reasoning.agent_name),
+        "get_agent": reasoning.get_agent,
+        "package": reasoning,
     },
 }
 

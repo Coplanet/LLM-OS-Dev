@@ -24,6 +24,7 @@ from ai.agents import (
     linkedin_content_generator,
     patent_writer,
     python,
+    reasoning,
     twitter,
 )
 from ai.agents.base import AgentTeam, Provider
@@ -271,6 +272,7 @@ def get_coordinator(
     conditional_agent_enable(github)
     conditional_agent_enable(google_calendar)
     conditional_agent_enable(gmail)
+    conditional_agent_enable(reasoning)
 
     tools, extra_instructions = process_tools(agent_name, config, available_tools)
 

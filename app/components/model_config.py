@@ -25,14 +25,21 @@ def get_temperature(provider: str, model_id: str, selected_temperature: float):
 
 
 @st.dialog("Configure Agent", width="large")
-def show_popup(agent: Agent, session_id, assistant_name, config: AgentConfig, package):
+def model_config(
+    agent: Agent, session_id, assistant_name, config: AgentConfig, package
+):
     label = to_label(assistant_name)
 
     st.markdown(f"Agent: **{assistant_name}**")
 
+    available_models = getattr(package, "available_models", []) or MODELS
+
     # Two dropdowns with string options
     provider: str = st.selectbox(
-        "Foundation Model Provider", PROVIDERS_ORDER, key=f"{label}_model_type"
+        "Foundation Model Provider",
+        [i for i in PROVIDERS_ORDER if i in available_models],
+        key=f"{label}_model_type",
+        disabled=len(available_models) <= 1,
     )
 
     if (
@@ -47,13 +54,16 @@ def show_popup(agent: Agent, session_id, assistant_name, config: AgentConfig, pa
         )
         return
 
-    PROVIDER_CONFIG: dict = MODELS[provider]
+    PROVIDER_CONFIG: dict = available_models[provider]
 
     if st.session_state[f"{label}_model_id"] not in PROVIDER_CONFIG:
         st.session_state[f"{label}_model_id"] = list(PROVIDER_CONFIG.keys())[0]
 
     model_id: str = st.selectbox(
-        "Model ID", list(PROVIDER_CONFIG.keys()), key=f"{label}_model_id"
+        "Model ID",
+        list(PROVIDER_CONFIG.keys()),
+        key=f"{label}_model_id",
+        disabled=len(PROVIDER_CONFIG) <= 1,
     )
 
     MODEL_CONFIG: dict = PROVIDER_CONFIG[model_id]

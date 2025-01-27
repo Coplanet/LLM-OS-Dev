@@ -7,6 +7,7 @@ from ai.agents import (
     linkedin_content_generator,
     patent_writer,
     python,
+    reasoning,
     twitter,
 )
 
@@ -20,4 +21,5 @@ ICONS = {
     github.agent_name: "fab fa-github",
     google_calendar.agent_name: "fa-solid fa-calendar-days",
     gmail.agent_name: "fa-solid fa-envelope",
+    reasoning.agent_name: "fa-solid fa-brain",
 }

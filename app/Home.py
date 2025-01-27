@@ -53,7 +53,7 @@ from app.components.configs import IMAGE_DIR
 from app.components.delete_knowledgebase import render_delete_knowledgebase
 from app.components.galary_display import render_galary_display
 from app.components.mask_image import render_mask_image
-from app.components.popup import show_popup
+from app.components.model_config import model_config
 from app.components.sidebar import create_sidebar
 from app.components.styles import render_styles
 from app.models import AUDIO_SUPPORTED_MODELS
@@ -391,7 +391,7 @@ def main() -> None:
             if not agent.get("is_leader", False)
             else COORDINATOR_CONFIG
         )
-        show_popup(
+        model_config(
             package.agent, user.session_id, selected_assistant, agent_config, package
         )
         st.session_state.show_popup = False

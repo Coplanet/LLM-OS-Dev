@@ -156,7 +156,7 @@ class Agent(PhiAgent):
 
     @property
     def supports(self) -> dict:
-        from app.components.popup import MODELS, SupportStrength
+        from app.components.model_config import MODELS, SupportStrength
 
         return {
             type_: strength
@@ -168,7 +168,7 @@ class Agent(PhiAgent):
 
     @property
     def limits(self) -> dict:
-        from app.components.popup import MODELS
+        from app.components.model_config import MODELS
 
         return MODELS[self.model.provider][self.model.id].get("limits", {})
 
