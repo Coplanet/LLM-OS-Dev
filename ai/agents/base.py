@@ -111,6 +111,9 @@ class Agent(PhiAgent):
 
         def normalize_images(messages: List[Message]):
             for m in messages:
+                if not hasattr(m, "images"):
+                    continue
+
                 if m.images:
                     for index in range(len(m.images)):
                         img = m.images[index]
