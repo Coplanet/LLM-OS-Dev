@@ -51,13 +51,6 @@ class SupportTypes(Enum):
 
 MODELS = {
     Provider.OpenAI.value: {
-        # "gpt-4o-audio-preview": {
-        #             #     "max_token_size": agent_settings.default_max_completion_tokens,
-        #     "kwargs": {
-        #         "modalities": ["text", "audio"],
-        #         "audio": {"voice": "alloy", "format": "wav"},
-        #     },
-        # },
         "gpt-4o": {
             "max_token_size": agent_settings.default_max_completion_tokens,
             "supports": {
@@ -78,12 +71,6 @@ MODELS = {
                 SupportTypes.ParallelToolCalling: SupportStrength.Full,
             },
         },
-        # "o1-preview": {
-        #   "max_token_size": agent_settings.default_max_completion_tokens,
-        # },
-        # "o1-mini": {
-        #   "max_token_size": agent_settings.default_max_completion_tokens,
-        # },
     },
     Provider.Google.value: {
         "gemini-2.0-flash-exp": {

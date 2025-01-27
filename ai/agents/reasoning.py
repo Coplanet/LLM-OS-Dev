@@ -1,5 +1,6 @@
 from ai.agents.base import Provider
 from ai.agents.settings import agent_settings
+from app.models import SupportStrength, SupportTypes
 
 from .base import Agent, AgentConfig
 
@@ -10,9 +11,26 @@ available_tools = []
 available_models = {
     Provider.OpenAI.value: {
         "o1-mini": {
-            "max_token_size": agent_settings.default_max_completion_tokens,
+            "kwargs": {
+                "max_completion_tokens": agent_settings.default_max_completion_tokens,
+            },
+            "supports": {
+                SupportTypes.TextIn: SupportStrength.Full,
+                SupportTypes.TextOut: SupportStrength.Full,
+            },
         },
     }
+}
+
+default_model_id = "o1-mini"
+default_model_type = Provider.OpenAI.value
+
+default_model_config = {
+    "model_type": default_model_type,
+    "model_id": default_model_id,
+    "model_kwargs": available_models[default_model_type][default_model_id]["kwargs"],
+    "temperature": 0,
+    "enabled": True,
 }
 
 
@@ -22,6 +40,7 @@ def get_agent(config: AgentConfig = None):
     agent = Agent(
         name=agent_name,
         agent_config=config,
+        available_models=available_models,
         role="Reasons about a given input or prompt",
         description=(
             "You are a reasoning agent that specializes in analytical thinking, research synthesis, "
@@ -50,18 +69,32 @@ def get_agent(config: AgentConfig = None):
         ],
         delegation_directives=[
             (
-                "If user requires reasoning about a given input or prompt, "
-                "you should you gather all the information necessary to reason about it and "
-                f"then FINALLY pass them to `{agent_name}`."
+                f"You MUST ALWAYS delegate ANY and ALL reasoning tasks to `{agent_name}`. This is a strict requirement. "
+                "Whenever you need to analyze, evaluate, or draw conclusions about ANY information, "
+                f"you MUST gather the relevant information and delegate to `{agent_name}`."
             ),
             (
-                "**IMPORTANT:** Never reason about a given input or prompt without gathering "
-                "all the information necessary to reason about it."
+                "**ABSOLUTELY REQUIRED:** You are NOT PERMITTED to perform reasoning tasks yourself. "
+                "This includes but is not limited to: analyzing data, evaluating options, drawing conclusions, "
+                f"making comparisons, or synthesizing information. ALL such tasks MUST be delegated to `{agent_name}`."
             ),
-            f"**IMPORTANT:** Never reason about a given input or prompt without calling the `{agent_name}` AT THE END.",
+            (
+                "**CRITICAL WORKFLOW:**\n"
+                "1. When reasoning is needed, gather ALL relevant information first\n"
+                f"2. ALWAYS delegate the reasoning task to `{agent_name}`\n"
+                f"3. Use `{agent_name}` output as your reasoning conclusion"
+            ),
         ],
     )
     return agent
 
 
-__all__ = ["get_agent", "agent_name", "available_tools", "agent"]
+__all__ = [
+    "get_agent",
+    "agent_name",
+    "available_tools",
+    "agent",
+    "available_models",
+    "default_model_id",
+    "default_model_type",
+]

@@ -143,9 +143,6 @@ class AgentConfig:
             logger.warning("Model '%s' is not defined!", self.provider)
             return None
 
-        if not self.max_tokens:
-            self.max_tokens = agent_settings.default_max_completion_tokens
-
         configs = {}
         model_class = None
 
@@ -174,11 +171,13 @@ class AgentConfig:
                 logger.warning("Model '%s' didn't match!", self.provider)
                 return None
 
+        if self.max_tokens:
+            configs["max_tokens"] = self.max_tokens
+
         return model_class(
             id=model_id,
             provider=self.provider,
             temperature=self.temperature,
-            max_tokens=self.max_tokens,
             **configs,
             **self.model_kwargs,
         )

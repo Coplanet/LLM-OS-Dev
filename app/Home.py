@@ -188,15 +188,24 @@ def get_selected_assistant_config(user: User, label, package):
                 available_tools_manifest[key] = []
             available_tools_manifest[key].append(tool)
 
-        default_configs = {
-            "model_type": Provider.OpenAI.value,
-            "model_id": "gpt-4o",
-            "model_kwargs": {},
-            "temperature": 0,
-            "enabled": True,
-            "max_tokens": agent_settings.default_max_completion_tokens,
-            "tools": {k: True for k in available_tools_manifest.keys()},
-        }
+        default_model_id = getattr(package, "default_model_id", "gpt-4o")
+        default_model_type = getattr(
+            package, "default_model_type", Provider.OpenAI.value
+        )
+
+        default_configs = getattr(
+            package,
+            "default_model_config",
+            {
+                "model_type": default_model_type,
+                "model_id": default_model_id,
+                "model_kwargs": {},
+                "temperature": 0,
+                "enabled": True,
+                "max_tokens": agent_settings.default_max_completion_tokens,
+                "tools": {k: True for k in available_tools_manifest.keys()},
+            },
+        )
 
         with get_db_context() as db:
             config: UserConfig = UserConfig.get_models_config(
@@ -222,7 +231,7 @@ def get_selected_assistant_config(user: User, label, package):
             model_kwargs=default_configs.get("model_kwargs", {}),
             temperature=default_configs["temperature"],
             enabled=default_configs["enabled"],
-            max_tokens=default_configs["max_tokens"],
+            max_tokens=default_configs.get("max_tokens"),
             tools=tools,
         )
     except Exception as e:

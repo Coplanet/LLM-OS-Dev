@@ -44,9 +44,14 @@ DEFAULT_GPT_MODEL_CONFIG = {
 
 
 class Agent(PhiAgent):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     enabled: bool = True
     transformers: dict[str, Transformer] = {}
     model: Optional[Model] = OpenAIChat(id="gpt-4o")
+
+    agent_config: AgentConfig = Field(default=None)
+    available_models: dict[str, dict[str, Any]] = Field(default={})
 
     delegation_directives: Optional[List[str]] = []
     debug_mode: bool = agent_settings.debug_mode
@@ -55,16 +60,28 @@ class Agent(PhiAgent):
     add_datetime_to_instructions: bool = True
 
     def __init__(self, *args, **kwargs):
+        from app.components.model_config import MODELS
+
         agent_config: AgentConfig = kwargs.pop("agent_config", None)
+        available_models: dict[str, dict[str, Any]] = kwargs.pop("available_models", {})
+
         if agent_config:
             if not isinstance(agent_config, AgentConfig):
                 raise Exception("agent_config must be an instance of AgentConfig")
             kwargs["model"] = agent_config.get_model
 
+        if available_models and not isinstance(available_models, dict):
+            raise Exception("available_models must be a dictionary")
+
         if "model" not in kwargs or kwargs["model"] is None:
             kwargs["model"] = AgentConfig.default_model()
 
         super().__init__(*args, **kwargs)
+
+        self.agent_config = agent_config
+        self.available_models = (
+            available_models or MODELS[self.model.provider][self.model.id]
+        )
 
         logger.debug(
             "Agent '%s' initialized using model: '%s' with temperature: '%s'",
@@ -159,21 +176,17 @@ class Agent(PhiAgent):
 
     @property
     def supports(self) -> dict:
-        from app.components.model_config import MODELS, SupportStrength
+        from app.models import SupportStrength
 
         return {
             type_: strength
-            for type_, strength in MODELS[self.model.provider][self.model.id]
-            .get("supports", {})
-            .items()
+            for type_, strength in self.available_models.get("supports", {}).items()
             if strength != SupportStrength.NotSupported
         }
 
     @property
     def limits(self) -> dict:
-        from app.components.model_config import MODELS
-
-        return MODELS[self.model.provider][self.model.id].get("limits", {})
+        return self.available_models.get("limits", {})
 
     def prune_messages(self, messages: List[Message]):
         if self.model.provider == Provider.Anthropic.value:
@@ -312,6 +325,17 @@ class Agent(PhiAgent):
                     message.images = None
 
         self.prune_messages(messages_for_model)
+
+        if self.model.provider == Provider.OpenAI.value:
+            if self.model.id == "o1-mini":
+                index2remove = []
+                for index, message in enumerate(messages_for_model):
+                    if message.role not in ["user", "assistant"]:
+                        index2remove.append(index)
+
+                index2remove.reverse()
+                for index in index2remove:
+                    messages_for_model.pop(index)
 
         return system_message, user_messages, messages_for_model
 

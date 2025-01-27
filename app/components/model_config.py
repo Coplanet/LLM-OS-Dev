@@ -113,7 +113,7 @@ def model_config(
         )
     )
 
-    max_tokens = MODEL_CONFIG["max_token_size"]
+    max_tokens = MODEL_CONFIG.get("max_token_size")
 
     logger.info(
         "Provider: '%s', Model: '%s', Temperature: '%s', Max Tokens: '%s'",
