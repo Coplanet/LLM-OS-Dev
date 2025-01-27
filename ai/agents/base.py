@@ -2,6 +2,7 @@ import hashlib
 import imghdr
 from textwrap import dedent
 from typing import Any, Dict, Generic, Iterator, List, Optional, Tuple, TypeVar, Union
+from uuid import uuid4
 
 from anthropic.types import ToolUseBlock
 from composio.exceptions import ComposioSDKError
@@ -550,16 +551,26 @@ class ComposioAgent(Agent):
                     UserNextOp.AUTH_USER,
                     {"app": self.app_name},
                 )
-                message = (
-                    dedent(
+                # Create the run_response object
+                self.run_id = str(uuid4())
+                self.run_response = RunResponse(
+                    run_id=self.run_id,
+                    session_id=self.session_id,
+                    agent_id=self.agent_id,
+                    content=dedent(
                         """
-                    ANNOUNCE THIS AS RESPONSE:
-                    The `{}` operation was not successful. Ask user to integrate his/her `{}` account with you.
-                    """
+                        ANNOUNCE THIS AS RESPONSE:
+                        The `{}` operation was not successful. Ask user to integrate his/her `{}` account with you.
+                        """
                     )
                     .strip()
-                    .format(self.app_name, self.app_name)
+                    .format(self.app_name, self.app_name),
                 )
+                self.stream = kwargs.get("stream", False) and self.is_streamable
+                if self.stream and self.is_streamable:
+                    yield self.run_response
+                else:
+                    return self.run_response
 
         return super().run(message, *args, **kwargs)
 
