@@ -29,7 +29,7 @@ default_model_config = {
     "model_type": default_model_type,
     "model_id": default_model_id,
     "model_kwargs": available_models[default_model_type][default_model_id]["kwargs"],
-    "temperature": 0,
+    "temperature": 1,  # this is the only temperature for o1-mini
     "enabled": True,
 }
 

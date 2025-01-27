@@ -16,7 +16,15 @@ from db.tables import UserConfig
 from helpers.log import logger
 
 
+def get_temperature_list(provider: str, model_id: str):
+    if provider == Provider.OpenAI.value and model_id == "o1-mini":
+        return ["Creative"]
+    return list(DEFAULT_TEMPERATURE.keys())
+
+
 def get_temperature(provider: str, model_id: str, selected_temperature: float):
+    if provider == Provider.OpenAI.value and model_id == "o1-mini":
+        return 1
     if provider == Provider.OpenAI.value or provider == Provider.Anthropic.value:
         return {"0.75": 0.5, "1.5": 1}.get(
             str(selected_temperature), selected_temperature
@@ -106,7 +114,7 @@ def model_config(
             DEFAULT_TEMPERATURE[
                 pills(
                     "Choose the model's creativity:",
-                    list(DEFAULT_TEMPERATURE.keys()),
+                    get_temperature_list(provider, model_id),
                     index=temprature_index,
                 )
             ]["value"],
