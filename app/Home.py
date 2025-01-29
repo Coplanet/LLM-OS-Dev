@@ -1278,9 +1278,5 @@ def main() -> None:
             rerun(clean_session=CLEAN_SESSION)
 
 
-if (
-    os.getenv("RUNTIME_ENV") != "prd"
-    or user.is_authenticated
-    or (True or check_password())
-):
+if os.getenv("RUNTIME_ENV") != "prd" or user.is_authenticated or check_password():
     main()
