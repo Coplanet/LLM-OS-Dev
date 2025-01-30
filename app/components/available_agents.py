@@ -8,6 +8,7 @@ from ai.agents import (
     patent_writer,
     python,
     reasoning,
+    task_generator,
     twitter,
 )
 from ai.coordinators import generic as coordinator
@@ -54,6 +55,11 @@ AGENTS = {
         "label": to_label(reasoning.agent_name),
         "get_agent": reasoning.get_agent,
         "package": reasoning,
+    },
+    task_generator.agent_name: {
+        "label": to_label(task_generator.agent_name),
+        "get_agent": task_generator.get_agent,
+        "package": task_generator,
     },
 }
 

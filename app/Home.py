@@ -49,6 +49,7 @@ from ai.document.reader.pptx import PPTXReader
 from app.auth import Auth, User
 from app.components.available_agents import get_available_agents
 from app.components.composio_integrations import composio_integrations
+from app.components.computer_use import computer_use
 from app.components.configs import IMAGE_DIR
 from app.components.delete_knowledgebase import render_delete_knowledgebase
 from app.components.galary_display import render_galary_display
@@ -902,6 +903,13 @@ def main() -> None:
                         composio_integrations(user)
                     AUTH_USER.delete()
 
+                COMPUTER_USE = UserNextOp.get_op(
+                    db, user.session_id, UserNextOp.COMPUTER_USE
+                )
+                if COMPUTER_USE:
+                    computer_use()
+                    COMPUTER_USE.delete()
+
             # Render the images
             if image_outputs:
                 image_outputs_ = {}
@@ -1107,9 +1115,14 @@ def main() -> None:
         if KNOWLEDGE_BASE_CREATED:
             columns.append(0.05)
         # for
-        #   1. composio integration
-        #   2. new session
-        NUMBER_OF_RIGHT_COLUMNS = 2
+        #   1. computer use
+        #   2. composio integration
+        #   3. new session
+        NUMBER_OF_RIGHT_COLUMNS = 3
+
+        if not extra_settings.computer_url_link:
+            NUMBER_OF_RIGHT_COLUMNS -= 1
+
         for _ in range(NUMBER_OF_RIGHT_COLUMNS):
             columns.append(0.05)
         # for in the middle
@@ -1151,6 +1164,11 @@ def main() -> None:
                 COL_INDEX += 1
                 if st.button(":material/delete:", key="delete_knowledge_base"):
                     render_delete_knowledgebase(generic_leader)
+
+        if extra_settings.computer_url_link:
+            with cols[-3]:
+                if st.button(":material/dvr:", key="computer_use"):
+                    computer_use()
 
         with cols[-2]:
             if st.button(":material/admin_panel_settings:", key="composio_integration"):

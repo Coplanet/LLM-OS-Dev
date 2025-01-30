@@ -302,6 +302,7 @@ class UserBinaryData(Base):
 
 class UserNextOp(Base):
     AUTH_USER = "auth_user"
+    COMPUTER_USE = "computer_use"
     GET_IMAGE_MASK = "get_image_mask"
     EDIT_IMAGE_USING_MASK = "edit_image_using_mask"
 

@@ -8,6 +8,7 @@ from ai.agents import (
     patent_writer,
     python,
     reasoning,
+    task_generator,
     twitter,
 )
 
@@ -22,4 +23,5 @@ ICONS = {
     google_calendar.agent_name: "fa-solid fa-calendar-days",
     gmail.agent_name: "fa-solid fa-envelope",
     reasoning.agent_name: "fa-solid fa-brain",
+    task_generator.agent_name: "fa-brands fa-jira",
 }

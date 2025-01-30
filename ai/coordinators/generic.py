@@ -25,10 +25,12 @@ from ai.agents import (
     patent_writer,
     python,
     reasoning,
+    task_generator,
     twitter,
 )
 from ai.agents.base import AgentTeam, Provider
 from ai.agents.settings import AgentConfig, agent_settings
+from ai.tools.computer_use import ComputerUseTools
 from ai.tools.email import EmailSenderTools
 from ai.tools.file import FileIOTools
 from ai.tools.stability import Stability
@@ -44,6 +46,16 @@ from .base import Coordinator
 agent = None
 agent_name = "Coordinator"
 available_tools = [
+    {
+        "order": 99,
+        "instance": ComputerUseTools(),
+        "name": "Computer Use",
+        "extra_instructions": dedent(
+            """\
+            Use the Computer Use tool to access the computer use's interface.
+            """
+        ).strip(),
+    },
     {
         "order": 100,
         "instance": Stability(),
@@ -273,6 +285,7 @@ def get_coordinator(
     conditional_agent_enable(google_calendar)
     conditional_agent_enable(gmail)
     conditional_agent_enable(reasoning)
+    conditional_agent_enable(task_generator)
 
     tools, extra_instructions = process_tools(agent_name, config, available_tools)
 
@@ -389,6 +402,11 @@ def get_coordinator(
             "**IMPORTANT** Stop using a task if you couldn't fetch a valid result and response to user after 3 attempts."
         ),
         "If no image is provided, and user asks for an image related task, ask the user to provide one.",
+        (
+            "FORMATTING RULE: ALL MATHEMATICAL FORMULAS MUST BE ENCLOSED IN DOLLAR SIGNS (`$`) FOR LATEX FORMATTING. "
+            "YOU MUST ENSURE THAT EVERY FORMULA IS WRITTEN WITHIN DOLLAR SIGNS, e.g., $x^2 + y^2 = z^2$. "
+            "FAILURE TO DO SO WILL RESULT IN INCORRECT FORMATTING."
+        ),
     ]
 
     description = dedent(
