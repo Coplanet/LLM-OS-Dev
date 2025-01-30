@@ -26,4 +26,4 @@ class ComputerUseTools(Toolkit):
                 UserNextOp.COMPUTER_USE,
             )
 
-        return "A link to the computer use's interface is provided."
+        return "The UI will guide the user to the computer use's interface."
