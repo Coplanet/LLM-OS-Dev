@@ -55,6 +55,12 @@ black==24.10.0
     # via -r requirements/dev.in
 blinker==1.8.2
     # via streamlit
+boto3==1.36.11
+    # via -r requirements/prod.in
+botocore==1.36.11
+    # via
+    #   boto3
+    #   s3transfer
 build==1.2.2.post1
     # via pip-tools
 cachetools==5.5.0
@@ -277,6 +283,10 @@ jiter==0.6.1
     # via
     #   anthropic
     #   openai
+jmespath==1.0.1
+    # via
+    #   boto3
+    #   botocore
 jsbeautifier==1.15.1
     # via
     #   cssbeautifier
@@ -518,6 +528,7 @@ pytest==8.3.3
     # via -r requirements/prod.in
 python-dateutil==2.9.0.post0
     # via
+    #   botocore
     #   faker
     #   matplotlib
     #   pandas
@@ -588,6 +599,8 @@ rsa==4.9
     # via google-auth
 ruff==0.6.9
     # via -r requirements/prod.in
+s3transfer==0.11.2
+    # via boto3
 semver==3.0.2
     # via composio-core
 sentry-sdk==2.19.0
@@ -741,6 +754,7 @@ uritemplate==4.1.1
     # via google-api-python-client
 urllib3==2.2.3
     # via
+    #   botocore
     #   requests
     #   sentry-sdk
 uvicorn[standard]==0.32.0

@@ -326,6 +326,9 @@ def main() -> None:
         )
         if SESSION_CHANGED:
             generic_leader.new_session()
+            generic_leader.session_id = user.session_id
+            generic_leader.write_to_storage()
+
         st.session_state["generic_leader"] = generic_leader
         if "CONFIG_CHANGED" in st.session_state:
             del st.session_state["CONFIG_CHANGED"]
@@ -743,6 +746,12 @@ def main() -> None:
                         image_data = image.data_compressed
                         selected_image = image.id
 
+            if not image_data and selected_image and uploaded_images:
+                for image in uploaded_images:
+                    if image.id == selected_image:
+                        image_data = image.data_compressed
+                        break
+
             model_kwargs = {
                 "uploaded_images": [Image(content=image_data)] if image_data else [],
                 "uploaded_videos": (
@@ -844,10 +853,9 @@ def main() -> None:
                         {
                             "type": "image_url",
                             "image_url": {"url": img.url},
-                            "image_caption": img.original_prompt,
                         }
                     )
-                    st.image(img.url, caption=img.original_prompt)
+                    st.image(img.url)
 
                 generic_leader.images = []
 

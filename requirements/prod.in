@@ -2,6 +2,7 @@ ipython
 agno
 pyjwt
 
+boto3
 groq
 xlrd
 arxiv
