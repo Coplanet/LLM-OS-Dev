@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 from urllib.parse import urlencode
 
-from phi.workspace.settings import WorkspaceSettings
+from agno.workspace.settings import WorkspaceSettings
 
 #
 # -*- Define workspace settings using a WorkspaceSettings object

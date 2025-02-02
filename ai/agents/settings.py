@@ -2,13 +2,13 @@ import os
 from enum import Enum, unique
 from typing import Dict, Optional
 
+from agno.models.anthropic import Claude
+from agno.models.google import Gemini
+from agno.models.groq import Groq
+from agno.models.openai import OpenAIChat
+from agno.tools import Toolkit
 from composio_phidata import Action as ComposioAction
 from composio_phidata import ComposioToolSet
-from phi.model.anthropic import Claude
-from phi.model.google import Gemini
-from phi.model.groq import Groq
-from phi.model.openai import OpenAIChat
-from phi.tools import Toolkit
 from pydantic_settings import BaseSettings
 
 from app.auth import User

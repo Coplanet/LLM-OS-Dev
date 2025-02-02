@@ -3,10 +3,10 @@ from textwrap import dedent
 from typing import Optional, Tuple, Union
 
 import google.generativeai as genai
+from agno.agent import Agent
+from agno.models.google import Gemini
+from agno.workflow import RunResponse
 from google.generativeai.types.file_types import File
-from phi.agent import Agent
-from phi.model.google import Gemini
-from phi.workflow import RunResponse
 from pydantic import BaseModel, Field
 
 from helpers.utils import text2binary

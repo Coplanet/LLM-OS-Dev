@@ -1,22 +1,27 @@
-from phi.agent.python import PythonAgent
+from agno.tools.python import PythonTools
 
 from helpers.tool_processor import process_tools
 
 from .base import Agent, AgentConfig
 from .settings import extra_settings
 
-
-class IPythonAgent(Agent, PythonAgent):
-    def __init__(self, *args, **kwargs):
-        if "model" not in kwargs or kwargs["model"] is None:
-            kwargs["model"] = self.default_model()
-
-        super().__init__(*args, **kwargs)
-
-
 agent = None
 agent_name = "Python Agent"
-available_tools = []
+available_tools = [
+    {
+        "instance": PythonTools(
+            base_dir=extra_settings.scratch_dir,
+            save_and_run=True,
+            pip_install=True,
+            run_code=True,
+            list_files=True,
+            run_files=True,
+            read_files=True,
+        ),
+        "name": "Python",
+        "icon": "fa-brands fa-python",
+    }
+]
 
 
 def get_agent(config: AgentConfig = None):
@@ -27,15 +32,12 @@ def get_agent(config: AgentConfig = None):
         agent_config=config,
         tools=tools,
         role="Advanced Python Code Writer and Executor",
-        pip_install=True,
         description=(
             "The Python Agent is a specialized tool designed to not only write "
             "advanced professional Python code but also execute it seamlessly. "
             "It supports various charting libraries, including Pandas, matplotlib, numpy, seaborn, "
             "Streamlit, to facilitate data visualization and analysis."
         ),
-        charting_libraries=["streamlit", "plotly", "matplotlib", "seaborn"],
-        base_dir=extra_settings.scratch_dir,
         delegation_directives=[
             "To write and run Python code, delegate the task to the `Python Agent`."
         ],

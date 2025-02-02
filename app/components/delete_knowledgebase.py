@@ -1,5 +1,5 @@
 import streamlit as st
-from phi.agent import Agent
+from agno.agent import Agent
 
 from app.utils import rerun
 

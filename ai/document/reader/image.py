@@ -3,8 +3,8 @@ from io import BytesIO
 from pathlib import Path
 from typing import IO, Any, List, Union
 
-from phi.document.base import Document
-from phi.document.reader.base import Reader
+from agno.document.base import Document
+from agno.document.reader.base import Reader
 from PIL import Image
 
 from helpers.log import logger

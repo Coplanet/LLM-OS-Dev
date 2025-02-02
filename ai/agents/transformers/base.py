@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from enum import Enum, unique
 from typing import List
 
-from phi.model.message import Message
+from agno.models.message import Message
 
 
 @unique

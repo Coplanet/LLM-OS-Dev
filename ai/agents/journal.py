@@ -1,9 +1,8 @@
 from textwrap import dedent
 
-from phi.tools.exa import ExaTools
+from agno.tools.exa import ExaTools
 
 from helpers.tool_processor import process_tools
-from workspace.settings import extra_settings
 
 from .base import Agent, AgentConfig
 
@@ -26,7 +25,6 @@ def get_agent(config: AgentConfig = None):
         agent_config=config,
         role="Write a research report on a given topic",
         tools=tools,
-        save_output_to_file=extra_settings.scratch_dir / "{run_id}.md",
         description="You are a Senior Report Writer tasked with writing a cover story research report.",
         instructions=[
             "For a given topic, use the `search_exa` to get the top 10 search results.",

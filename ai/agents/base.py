@@ -4,19 +4,18 @@ from textwrap import dedent
 from typing import Any, Dict, Generic, Iterator, List, Optional, Tuple, TypeVar, Union
 from uuid import uuid4
 
+from agno.agent import Agent as PhiAgent
+from agno.agent import AgentSession, RunResponse
+from agno.models.anthropic import Claude
+from agno.models.base import Model
+from agno.models.google import Gemini
+from agno.models.groq import Groq
+from agno.models.message import Message
+from agno.models.openai import OpenAIChat
+from agno.tools import Toolkit
 from anthropic.types import ToolUseBlock
 from composio.exceptions import ComposioSDKError
 from composio_phidata import App, ComposioToolSet
-from phi.agent import Agent as PhiAgent
-from phi.agent import RunResponse
-from phi.agent.session import AgentSession
-from phi.model.anthropic import Claude
-from phi.model.base import Model
-from phi.model.google import Gemini
-from phi.model.groq import Groq
-from phi.model.message import Message
-from phi.model.openai import OpenAIChat
-from phi.tools import Toolkit
 from pydantic import ConfigDict, Field
 
 from app.auth import User
@@ -60,11 +59,16 @@ class Agent(PhiAgent):
     markdown: bool = True
     add_datetime_to_instructions: bool = True
 
-    def __init__(self, *args, **kwargs):
+    def __init__(
+        self,
+        agent_config: Optional[AgentConfig] = None,
+        available_models: dict[str, dict[str, Any]] = {},
+        delegation_directives: Optional[List[str]] = [],
+        *args,
+        **kwargs,
+    ):
+        self.run_id
         from app.components.model_config import MODELS
-
-        agent_config: AgentConfig = kwargs.pop("agent_config", None)
-        available_models: dict[str, dict[str, Any]] = kwargs.pop("available_models", {})
 
         if agent_config:
             if not isinstance(agent_config, AgentConfig):
@@ -78,6 +82,8 @@ class Agent(PhiAgent):
             kwargs["model"] = AgentConfig.default_model()
 
         super().__init__(*args, **kwargs)
+
+        self.delegation_directives = delegation_directives
 
         self.agent_config = agent_config
         self.available_models = (
@@ -100,6 +106,7 @@ class Agent(PhiAgent):
 
     def read_from_storage(self) -> Optional[AgentSession]:
         session = super().read_from_storage()
+        return session
 
         if self.model.provider == Provider.Anthropic.value:
 
@@ -120,6 +127,8 @@ class Agent(PhiAgent):
         return session
 
     def write_to_storage(self) -> Optional[AgentSession]:
+        return super().write_to_storage()
+
         type_mapping = {
             "jpeg": "image/jpeg",
             "png": "image/png",

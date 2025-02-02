@@ -2,8 +2,8 @@ from pathlib import Path
 from typing import IO, Any, List, Union
 
 import pandas as pd
-from phi.document.base import Document
-from phi.document.reader.base import Reader
+from agno.document.base import Document
+from agno.document.reader.base import Reader
 
 from helpers.log import logger
 

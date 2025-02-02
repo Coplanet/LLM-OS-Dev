@@ -1,9 +1,8 @@
 from textwrap import dedent
 
-from phi.tools.exa import ExaTools
+from agno.tools.exa import ExaTools
 
 from helpers.tool_processor import process_tools
-from workspace.settings import extra_settings
 
 from .base import Agent, AgentConfig
 
@@ -26,7 +25,6 @@ def get_agent(config: AgentConfig = None):
         name=agent_name,
         agent_config=config,
         tools=tools,
-        save_output_to_file=extra_settings.scratch_dir / "{run_id}.md",
         role="I am a LinkedIn content creation specialist with expertise in crafting engaging LinkedIn content.",
         description=(
             "You are a LinkedIn content creation assistant specialized in crafting "

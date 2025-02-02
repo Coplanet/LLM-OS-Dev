@@ -4,7 +4,7 @@ from typing import Union
 import cv2
 import numpy as np
 import streamlit as st
-from phi.agent import Agent
+from agno.agent import Agent
 from PIL import Image as PILImage
 from streamlit_drawable_canvas import st_canvas
 

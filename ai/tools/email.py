@@ -1,6 +1,6 @@
 from typing import Optional
 
-from phi.tools.resend_tools import ResendTools
+from agno.tools.resend import ResendTools
 
 
 class EmailSenderTools(ResendTools):

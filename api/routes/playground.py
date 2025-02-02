@@ -1,6 +1,6 @@
 from os import getenv
 
-from phi.playground import Playground
+from agno.playground import Playground
 
 from ai.coordinators.generic import get_coordinator as get_generic_leader
 

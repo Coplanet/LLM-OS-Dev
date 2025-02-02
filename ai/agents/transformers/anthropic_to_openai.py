@@ -1,8 +1,8 @@
 import json
 from typing import List, Optional
 
+from agno.models.message import Message
 from anthropic.types.tool_use_block import ToolUseBlock
-from phi.model.message import Message
 
 from helpers.utils import binary2text
 

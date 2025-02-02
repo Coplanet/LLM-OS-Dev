@@ -1,6 +1,6 @@
 from typing import Optional
 
-from phi.eval import Eval, EvalResult
+from agno.eval import Eval, EvalResult
 
 from ai.coordinators.generic import get_coordinator
 

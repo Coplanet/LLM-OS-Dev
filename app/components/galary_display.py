@@ -1,7 +1,7 @@
 from typing import Union
 
 import streamlit as st
-from phi.agent import Agent
+from agno.agent import Agent
 from streamlit.components.v1 import html
 from streamlit_image_select import image_select
 

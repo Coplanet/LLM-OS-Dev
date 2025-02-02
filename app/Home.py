@@ -1,40 +1,38 @@
 import hashlib
 import os
 import re
-import tempfile
 from datetime import datetime, timedelta
 from os import getenv
-from time import sleep, time
+from time import time
 from typing import Dict, List, Optional
 from urllib.parse import urlencode
 from uuid import uuid4
 
 import anthropic
 import backoff
-import google.generativeai as genai
 import groq
 import nest_asyncio
 import openai
 import sqlalchemy as sql
 import streamlit as st
+from agno.agent import Agent
+from agno.document import Document
+from agno.document.reader import Reader
+from agno.document.reader.csv_reader import CSVReader
+from agno.document.reader.docx_reader import DocxReader
+from agno.document.reader.json_reader import JSONReader
+from agno.document.reader.pdf_reader import PDFReader
+from agno.document.reader.text_reader import TextReader
+from agno.document.reader.website_reader import WebsiteReader
+from agno.media import Audio, Image, Video
+from agno.models.message import Message
+from agno.storage.agent.postgres import PostgresAgentStorage
+from agno.tools.streamlit.components import check_password
+from agno.utils.log import logger as phi_logger
+from agno.utils.log import logging
 from audio_recorder_streamlit import audio_recorder
 from bs4 import BeautifulSoup
 from composio import App
-from phi.agent import Agent
-from phi.document import Document
-from phi.document.reader import Reader
-from phi.document.reader.csv_reader import CSVReader
-from phi.document.reader.docx import DocxReader
-from phi.document.reader.json import JSONReader
-from phi.document.reader.pdf import PDFReader
-from phi.document.reader.text import TextReader
-from phi.document.reader.website import WebsiteReader
-from phi.model.content import Image
-from phi.model.message import Message
-from phi.storage.agent.postgres import PgAgentStorage
-from phi.tools.streamlit.components import check_password
-from phi.utils.log import logger as phi_logger
-from phi.utils.log import logging
 from streamlit_float import float_init
 
 from ai.agents import base, settings
@@ -107,60 +105,31 @@ def run(
     generic_leader: Agent,
     question: str,
     uploaded_images: List[Image],
-    uploaded_videos_: List[Image],
-    audio_bytes: bytes,
-    response_in_voice: bool,
-    AUDIO_RESPONSE_SUPPORT: bool,
-    audio_bytes_: bytes,
+    uploaded_videos: List[Video],
+    audio_bytes: List[Audio],
 ):
 
     response = ""
     resp_container = st.empty()
     start = time()
 
-    if not AUDIO_RESPONSE_SUPPORT or not response_in_voice:
-        try:
-            # THIS IS A HACK TO SUPPORT IMAGES IN ANTHROPIC
-            # Phidata doesn't support base64 images in Anthropic
-            if generic_leader.model.provider == Provider.Anthropic.value:
-                imgs = [text2binary(img) for img in uploaded_images]
-                uploaded_images = imgs
+    try:
+        kwargs = {
+            "message": question,
+            "images": uploaded_images,
+            "videos": uploaded_videos,
+            "audio": audio_bytes,
+            "stream": True,
+        }
 
-            for delta in generic_leader.run(
-                message=question,
-                images=uploaded_images,
-                videos=uploaded_videos_,
-                audio=audio_bytes,
-                stream=True,
-            ):
-                response += delta.content  # type: ignore
-                response = re.sub(r"[\n\s]*!\[[^\]]+?\]\([^\)]+?\)", "", response)
-                resp_container.markdown(response)
+        for delta in generic_leader.run(**kwargs):
+            response += delta.content  # type: ignore
+            response = re.sub(r"[\n\s]*!\[[^\]]+?\]\([^\)]+?\)", "", response)
+            resp_container.markdown(response)
 
-            # THIS IS A HACK TO SUPPORT IMAGES IN ANTHROPIC
-            # Phidata doesn't support base64 images in Anthropic
-            if generic_leader.model.provider == Provider.Anthropic.value:
-                imgs = [text2binary(img) for img in uploaded_images]
-                uploaded_images = imgs
-
-        except Exception as e:
-            logger.exception(e)
-            st.exception(e)
-    else:
-        try:
-            generic_leader.run(
-                message="Answer the input audio.",
-                images=uploaded_images,
-                videos=uploaded_videos_,
-                audio={
-                    "data": binary_text2data(audio_bytes_),
-                    "format": "wav",
-                },
-            )
-
-        except Exception as e:
-            logger.exception(e)
-            st.exception(e)
+    except Exception as e:
+        logger.exception(e)
+        st.exception(e)
 
     end = time()
     logger.debug(
@@ -341,12 +310,13 @@ def main() -> None:
     for agent, config in AGENTS_CONFIG.items():
         logger.debug(f"'{agent}' configed to: {config}")
 
-    if (
-        "CONFIG_CHANGED" in st.session_state
-        or "generic_leader" not in st.session_state
-        or st.session_state["generic_leader"] is None
+    SESSION_CHANGED = (
+        "generic_leader" not in st.session_state
         or st.session_state["generic_leader"].session_id != user.session_id
-    ):
+        or st.session_state["generic_leader"] is None
+    )
+
+    if "CONFIG_CHANGED" in st.session_state or SESSION_CHANGED:
         logger.debug(">>> Creating leader agent with config: %s", COORDINATOR_CONFIG)
         coordinator.agent = generic_leader = coordinator.get_coordinator(
             team_config=AGENTS_CONFIG,
@@ -354,7 +324,8 @@ def main() -> None:
             session_id=user.session_id,
             user_id=user.user_id,
         )
-        generic_leader.create_session()
+        if SESSION_CHANGED:
+            generic_leader.new_session()
         st.session_state["generic_leader"] = generic_leader
         if "CONFIG_CHANGED" in st.session_state:
             del st.session_state["CONFIG_CHANGED"]
@@ -476,7 +447,7 @@ def main() -> None:
                 if response_in_voice:
                     generic_leader.storage = None
                 else:
-                    generic_leader.storage = PgAgentStorage(
+                    generic_leader.storage = PostgresAgentStorage(
                         table_name="agent_sessions", db_url=db_settings.get_db_url()
                     )
 
@@ -724,62 +695,11 @@ def main() -> None:
                     generic_leader.write_to_storage()
 
         with st.chat_message("assistant"):
-            uploaded_videos_ = []
             uploaded_videos = st.session_state.get("uploaded_videos", [])
-            if uploaded_videos:
-                if COORDINATOR_CONFIG.provider != Provider.Google.value:
-                    st.error("Videos are only supported for Google provider")
-                else:
-                    with st.spinner("Uploading videos..."):
-                        if "genai_uploaded_videos" not in st.session_state:
-                            st.session_state["genai_uploaded_videos"] = {}
-
-                        for video in uploaded_videos:
-                            # if already uploaded?
-                            if (
-                                video.file_id
-                                in st.session_state["genai_uploaded_videos"]
-                            ):
-                                uploaded_videos_.append(
-                                    st.session_state["genai_uploaded_videos"][
-                                        video.file_id
-                                    ]
-                                )
-                                continue
-                            # store audio bytes in a temp file
-                            with tempfile.NamedTemporaryFile(
-                                suffix="." + video.name.split(".")[-1]
-                            ) as temp_file:
-                                temp_file.write(video.read())
-                                temp_file_path = temp_file.name
-                                while True:
-                                    gfile = genai.upload_file(
-                                        temp_file_path, mime_type=video.type
-                                    )
-                                    if gfile and gfile.state.name != "FAILED":
-                                        break
-                                uploaded_videos_.append(gfile)
-
-                            st.session_state["genai_uploaded_videos"][
-                                video.file_id
-                            ] = gfile
-
-                        all_uploaded = False
-                        while not all_uploaded:
-                            all_uploaded = True
-                            for gfile in uploaded_videos_:
-                                if (
-                                    genai.get_file(gfile.name).state.name
-                                    == "PROCESSING"
-                                ):
-                                    all_uploaded = False
-                                    sleep(1)
-                                    break
 
             voice_transcribe: bool = False
             is_prompt: bool = False
             prompt: str = ""
-            audio_bytes_ = audio_bytes
 
             if audio_bytes:
                 with st.spinner("Listening..."):
@@ -803,41 +723,38 @@ def main() -> None:
                 question += "\n\n**RESPONSE WITH AUDIO.**"
 
             uploaded_images = st.session_state["uploaded_images"]
+            selected_image = st.session_state.get("selected_image", None)
+
+            image_data = None
+
+            if not selected_image and uploaded_images:
+                img: UserBinaryData = uploaded_images[len(uploaded_images) - 1]
+                if img:
+                    image_data = img.data_compressed
+
+            if not image_data and not selected_image and not uploaded_images:
+                with get_db_context() as db:
+                    image = UserBinaryData.get_data(
+                        db,
+                        generic_leader.session_id,
+                        UserBinaryData.IMAGE,
+                    ).first()
+                    if image:
+                        image_data = image.data_compressed
+                        selected_image = image.id
+
+            model_kwargs = {
+                "uploaded_images": [Image(content=image_data)] if image_data else [],
+                "uploaded_videos": (
+                    [Video(content=video) for video in uploaded_videos]
+                    if uploaded_videos
+                    else []
+                ),
+                "audio_bytes": [Audio(content=audio_bytes)] if audio_bytes else [],
+            }
 
             with st.spinner("Thinking..."):
-                selected_image = st.session_state.get("selected_image", None)
-
-                image_data = None
-                image_type = "image/webp"
-
-                if not selected_image and uploaded_images:
-                    img: UserBinaryData = uploaded_images[len(uploaded_images) - 1]
-                    if img:
-                        image_data = img.data_compressed
-                        image_type = img.mimetype or "image/webp"
-
-                if not image_data and not selected_image and not uploaded_images:
-                    with get_db_context() as db:
-                        image = UserBinaryData.get_data(
-                            db,
-                            generic_leader.session_id,
-                            UserBinaryData.IMAGE,
-                        ).first()
-                        if image:
-                            image_data = image.data_compressed
-                            selected_image = image.id
-                            image_type = image.mimetype or "image/webp"
-
-                response = run(
-                    generic_leader,
-                    question,
-                    [binary2text(image_data, image_type)] if image_data else [],
-                    uploaded_videos_,
-                    audio_bytes,
-                    response_in_voice,
-                    AUDIO_RESPONSE_SUPPORT,
-                    audio_bytes_,
-                )
+                response = run(generic_leader, question, **model_kwargs)
 
             if AUDIO_RESPONSE_SUPPORT:
                 if (
@@ -882,16 +799,7 @@ def main() -> None:
             with get_db_context() as db:
                 if UserNextOp.get_op(db, user.session_id, UserNextOp.GET_IMAGE_MASK):
                     if render_mask_image(generic_leader):
-                        run(
-                            generic_leader,
-                            question,
-                            uploaded_images,
-                            uploaded_videos_,
-                            audio_bytes,
-                            response_in_voice,
-                            AUDIO_RESPONSE_SUPPORT,
-                            audio_bytes_,
-                        )
+                        run(generic_leader, question, **model_kwargs)
 
                 AUTH_USER = UserNextOp.get_op(db, user.session_id, UserNextOp.AUTH_USER)
                 if AUTH_USER:

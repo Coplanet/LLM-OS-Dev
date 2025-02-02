@@ -1,7 +1,6 @@
 from textwrap import dedent
 
 from helpers.tool_processor import process_tools
-from workspace.settings import extra_settings
 
 from .base import Agent, AgentConfig
 
@@ -18,7 +17,6 @@ def get_agent(config: AgentConfig = None):
         name=agent_name,
         agent_config=config,
         tools=tools,
-        save_output_to_file=extra_settings.scratch_dir / "{run_id}.md",
         role="I am a hilariously agent which takes any text and makes it funny.",
         description=(
             "I am a hilariously wacky translation agent whose mission is to take any scientific, "

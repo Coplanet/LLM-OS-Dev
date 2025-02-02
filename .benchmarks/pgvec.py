@@ -6,12 +6,11 @@ import sys
 from pathlib import Path
 from time import time
 
-from phi.embedder.openai import OpenAIEmbedder
-from phi.knowledge.combined import CombinedKnowledgeBase
-from phi.knowledge.pdf import PDFKnowledgeBase, PDFReader
-from phi.vectordb.pgvector import PgVector2
+from agno.embedder.openai import OpenAIEmbedder
+from agno.knowledge.combined import CombinedKnowledgeBase
+from agno.knowledge.pdf import PDFKnowledgeBase, PDFReader
+from agno.vectordb.pgvector import PgVector2
 
-from ai.agents.base import agent_settings
 from db.session import db_url
 from helpers.log import logger
 from workspace.settings import extra_settings
@@ -27,9 +26,7 @@ def main():
         vector_db=PgVector2(
             db_url=db_url,
             collection="pgvec_benchmark",
-            embedder=OpenAIEmbedder(
-                model=agent_settings.embedding_model, dimensions=1536
-            ),
+            embedder=OpenAIEmbedder(dimensions=1536),
         ),
         num_documents=5,
     )

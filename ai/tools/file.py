@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Optional
 
-from phi.tools.file import FileTools
+from agno.tools.file import FileTools
 
 
 class FileIOTools(FileTools):

@@ -1,19 +1,19 @@
 from textwrap import dedent
 from typing import Dict, Optional
 
-from phi.agent import AgentMemory
-from phi.embedder.openai import OpenAIEmbedder
-from phi.knowledge.combined import CombinedKnowledgeBase
-from phi.knowledge.pdf import PDFKnowledgeBase, PDFReader
-from phi.memory.db.postgres import PgMemoryDb
-from phi.storage.agent.postgres import PgAgentStorage
-from phi.tools.arxiv_toolkit import ArxivToolkit
-from phi.tools.calculator import Calculator
-from phi.tools.exa import ExaTools
-from phi.tools.wikipedia import WikipediaTools
-from phi.tools.yfinance import YFinanceTools
-from phi.tools.youtube_tools import YouTubeTools
-from phi.vectordb.pgvector import PgVector2
+from agno.agent import AgentMemory
+from agno.embedder.openai import OpenAIEmbedder
+from agno.knowledge.combined import CombinedKnowledgeBase
+from agno.knowledge.pdf import PDFKnowledgeBase, PDFReader
+from agno.memory.db.postgres import PgMemoryDb
+from agno.storage.agent.postgres import PostgresAgentStorage
+from agno.tools.arxiv import ArxivTools
+from agno.tools.calculator import CalculatorTools
+from agno.tools.exa import ExaTools
+from agno.tools.wikipedia import WikipediaTools
+from agno.tools.yfinance import YFinanceTools
+from agno.tools.youtube import YouTubeTools
+from agno.vectordb.pgvector import PgVector
 
 from ai.agents import (
     funny,
@@ -110,7 +110,7 @@ available_tools = [
     },
     {
         "order": 300,
-        "instance": ArxivToolkit(),
+        "instance": ArxivTools(),
         "name": "Arxiv",
         "icon": "fa-solid fa-book-open",
     },
@@ -211,7 +211,7 @@ available_tools = [
     },
     {
         "order": 1000,
-        "instance": Calculator(
+        "instance": CalculatorTools(
             add=True,
             subtract=True,
             multiply=True,
@@ -239,7 +239,6 @@ available_tools = sorted(available_tools, key=lambda x: x["order"])
 def get_coordinator(
     config: Optional[AgentConfig] = None,
     team_config: Dict[str, AgentConfig] = {},
-    run_id: Optional[str] = None,
     user_id: Optional[str] = None,
     session_id: Optional[str] = None,
 ):
@@ -298,12 +297,10 @@ def get_coordinator(
                 path=extra_settings.knowledgebase_dir, reader=PDFReader(chunk=True)
             )
         ],
-        vector_db=PgVector2(
+        vector_db=PgVector(
             db_url=db_url,
-            collection="llm_os_documents",
-            embedder=OpenAIEmbedder(
-                model=agent_settings.embedding_model, dimensions=1536
-            ),
+            table_name="llm_os_documents",
+            embedder=OpenAIEmbedder(),
         ),
         num_documents=5,
     )
@@ -442,14 +439,13 @@ def get_coordinator(
         # Add tools to the Assistant
         tools=tools,
         # Introduce knowledge base to the leader
-        knowledge_base=knowledge_base,
+        knowledge=knowledge_base,
         # Set addication context to the system's prompt
         additional_context=extra_instructions,
         # Inject some app related items
-        run_id=run_id,
         user_id=user_id,
         session_id=session_id,
-        storage=PgAgentStorage(
+        storage=PostgresAgentStorage(
             table_name="agent_sessions", db_url=db_settings.get_db_url()
         ),
         # Store the memories and summary in a database

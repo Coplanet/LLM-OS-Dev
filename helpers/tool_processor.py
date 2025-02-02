@@ -1,7 +1,7 @@
 from typing import Any, Dict, List, Optional, Tuple, Union
 
-from phi.tools import Toolkit
-from phi.tools.function import Function
+from agno.tools import Toolkit
+from agno.tools.function import Function
 
 from ai.agents.settings import AgentConfig
 

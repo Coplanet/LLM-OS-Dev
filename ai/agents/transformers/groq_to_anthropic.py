@@ -1,6 +1,6 @@
 from typing import List
 
-from phi.model.message import Message
+from agno.models.message import Message
 
 from .base import Provider, Transformer
 from .groq_to_openai import GroqToOpenAI

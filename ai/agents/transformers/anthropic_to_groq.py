@@ -1,6 +1,6 @@
 from typing import List
 
-from phi.model.message import Message
+from agno.models.message import Message
 
 from .anthropic_to_openai import AnthropicToOpenAI
 from .base import Provider, Transformer

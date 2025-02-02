@@ -3,10 +3,10 @@ from typing import Dict, List, Optional
 from urllib.parse import urljoin, urlparse
 
 import httpx
-from phi.document.base import Document
-from phi.document.reader.website import WebsiteReader as WR
-from phi.tools.website import WebsiteKnowledgeBase, WebsiteTools
-from phi.utils.log import logger
+from agno.document.base import Document
+from agno.document.reader.website_reader import WebsiteReader as WR
+from agno.tools.website import WebsiteKnowledgeBase, WebsiteTools
+from agno.utils.log import logger
 
 try:
     from bs4 import BeautifulSoup  # noqa: F401

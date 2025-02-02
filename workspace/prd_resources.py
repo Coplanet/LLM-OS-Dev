@@ -1,16 +1,16 @@
 from os import getenv
 
-from phi.aws.app.fastapi import FastApi
-from phi.aws.app.streamlit import Streamlit
-from phi.aws.resource.ec2 import InboundRule, SecurityGroup
-from phi.aws.resource.ecs import EcsCluster
-from phi.aws.resource.rds import DbInstance, DbSubnetGroup
-from phi.aws.resource.reference import AwsReference
-from phi.aws.resource.s3 import S3Bucket
-from phi.aws.resource.secret import SecretsManager
-from phi.aws.resources import AwsResources
-from phi.docker.resource.image import DockerImage
-from phi.docker.resources import DockerResources
+from agno.aws.app.fastapi import FastApi
+from agno.aws.app.streamlit import Streamlit
+from agno.aws.resource.ec2 import InboundRule, SecurityGroup
+from agno.aws.resource.ecs import EcsCluster
+from agno.aws.resource.rds import DbInstance, DbSubnetGroup
+from agno.aws.resource.reference import AwsReference
+from agno.aws.resource.s3 import S3Bucket
+from agno.aws.resource.secret import SecretsManager
+from agno.aws.resources import AwsResources
+from agno.docker.resource.image import DockerImage
+from agno.docker.resources import DockerResources
 
 from workspace.settings import ws_settings
 

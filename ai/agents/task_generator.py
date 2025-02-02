@@ -1,6 +1,6 @@
 from textwrap import dedent
 
-from phi.tools.exa import ExaTools
+from agno.tools.exa import ExaTools
 
 from helpers.tool_processor import process_tools
 

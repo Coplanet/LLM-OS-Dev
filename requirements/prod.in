@@ -1,5 +1,5 @@
 ipython
-phidata[aws]==2.7.8
+agno
 pyjwt
 
 groq
@@ -23,9 +23,9 @@ streamlit-float
 streamlit-pills
 streamlit-extras
 streamlit-image-select
-composio_openai>=0.6.16
-composio-core>=0.6.16
-composio-phidata>=0.6.16
+composio_openai>=0.6.19
+composio-core>=0.6.19
+composio-phidata>=0.6.19
 duckduckgo-search
 google-generativeai
 youtube-transcript-api

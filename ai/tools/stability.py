@@ -9,11 +9,11 @@ from typing import Literal, Optional, Tuple, Union
 import boto3
 import requests
 import streamlit as st
-from phi.agent import Agent
-from phi.model.content import Image
-from phi.model.message import Message
-from phi.tools import Toolkit
-from phi.utils.log import logger
+from agno.agent import Agent
+from agno.media import Image
+from agno.models.message import Message
+from agno.tools import Toolkit
+from agno.utils.log import logger
 from sqlalchemy import orm
 
 from db.session import get_db_context
@@ -262,14 +262,7 @@ class Stability(Toolkit):
             logger.debug("Image generated successfully")
 
             # Update the run response with the image URLs
-            agent.add_image(
-                Image(
-                    id=file_name,
-                    url=url,
-                    original_prompt=original_prompt,
-                    revised_prompt=revised_prompt,
-                )
-            )
+            agent.add_image(Image(id=file_name, url=url))
             agent.memory.add_message(
                 Message(
                     role="tool",
