@@ -518,6 +518,21 @@ class ComposioAgent(Agent):
         if app not in COMPOSIO_ACTIONS:
             raise ValueError(f"App {app} is not supported")
 
+        kwargs["instructions"] = [
+            (
+                "<CRITICAL INSTRUCTIONS>\n"
+                "  1. {}\n"
+                "  2. {}\n"
+                "</CRITICAL INSTRUCTIONS>".format(
+                    "ALWAYS USE YOUR TOOLS ENABLED FOR YOU, NEVER DO ANYTHING EXCEPT USING THE TOOLS ENABLED FOR YOU.",
+                    (
+                        "YOU MAY ONLY USE A FUNCTION, DO NOT MAKE UP AN ANSWER. EVEN IF THE TOOL WAS CALLED BEFORE, "
+                        "YOU HAVE TO CALL IT AGAIN.\n"
+                    ),
+                )
+            )
+        ]
+
         super().__init__(*args, **kwargs)
 
         self.app = app
