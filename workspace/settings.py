@@ -68,7 +68,12 @@ class Settings:
     domain: Optional[str] = os.getenv("DOMAIN", "localhost:8501")
     domain_scheme: Optional[str] = os.getenv("DOMAIN_SCHEME", "http")
     proxies: Optional[Dict[str, Any]] = json.loads(os.getenv("PROXIES", "{}")) or None
-    computer_url_link: Optional[str] = os.getenv("COMPUTER_URL_LINK", None)
+    anthropic_computer_url_link: Optional[str] = os.getenv(
+        "ANTHROPIC_COMPUTER_URL_LINK", None
+    )
+    gemini_computer_url_link: Optional[str] = os.getenv(
+        "GEMINI_COMPUTER_URL_LINK", None
+    )
 
     @property
     def scratch_dir(self):

@@ -349,10 +349,9 @@ def main() -> None:
     ):
         logger.debug(">>> Creating leader agent with config: %s", COORDINATOR_CONFIG)
         coordinator.agent = generic_leader = coordinator.get_coordinator(
+            user=user,
             team_config=AGENTS_CONFIG,
             config=COORDINATOR_CONFIG,
-            session_id=user.session_id,
-            user_id=user.user_id,
         )
         generic_leader.create_session()
         st.session_state["generic_leader"] = generic_leader
@@ -907,7 +906,7 @@ def main() -> None:
                     db, user.session_id, UserNextOp.COMPUTER_USE
                 )
                 if COMPUTER_USE:
-                    computer_use()
+                    computer_use(COMPUTER_USE.value_json.get("platform", "gemini"))
                     COMPUTER_USE.delete()
 
             # Render the images
@@ -1120,7 +1119,10 @@ def main() -> None:
         #   3. new session
         NUMBER_OF_RIGHT_COLUMNS = 3
 
-        if not extra_settings.computer_url_link:
+        if (
+            not extra_settings.anthropic_computer_url_link
+            and not extra_settings.gemini_computer_url_link
+        ):
             NUMBER_OF_RIGHT_COLUMNS -= 1
 
         for _ in range(NUMBER_OF_RIGHT_COLUMNS):
@@ -1165,7 +1167,10 @@ def main() -> None:
                 if st.button(":material/delete:", key="delete_knowledge_base"):
                     render_delete_knowledgebase(generic_leader)
 
-        if extra_settings.computer_url_link:
+        if (
+            extra_settings.anthropic_computer_url_link
+            or extra_settings.gemini_computer_url_link
+        ):
             with cols[-3]:
                 if st.button(":material/dvr:", key="computer_use"):
                     computer_use()

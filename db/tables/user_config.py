@@ -327,7 +327,10 @@ class UserNextOp(Base):
         )
 
         if obj:
-            obj.value_json = json.loads(obj.value) if obj.value else {}
+            try:
+                obj.value_json = json.loads(obj.value) if obj.value else {}
+            except json.JSONDecodeError:
+                obj.value_json = {}
 
         return obj
 

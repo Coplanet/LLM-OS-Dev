@@ -35,6 +35,7 @@ from ai.tools.email import EmailSenderTools
 from ai.tools.file import FileIOTools
 from ai.tools.stability import Stability
 from ai.tools.website_crawler import WebSiteCrawlerTools
+from app.auth import User
 from db.session import db_url
 from db.settings import db_settings
 from helpers.log import logger
@@ -237,15 +238,14 @@ available_tools = sorted(available_tools, key=lambda x: x["order"])
 
 
 def get_coordinator(
+    user: User,
     config: Optional[AgentConfig] = None,
     team_config: Dict[str, AgentConfig] = {},
     run_id: Optional[str] = None,
-    user_id: Optional[str] = None,
-    session_id: Optional[str] = None,
 ):
 
     if config is None:
-        config = AgentConfig.empty()
+        config = AgentConfig.empty(user)
 
     if config.is_empty:
         config.model = Provider.OpenAI.value
@@ -447,8 +447,8 @@ def get_coordinator(
         additional_context=extra_instructions,
         # Inject some app related items
         run_id=run_id,
-        user_id=user_id,
-        session_id=session_id,
+        user_id=user.user_id,
+        session_id=user.session_id,
         storage=PgAgentStorage(
             table_name="agent_sessions", db_url=db_settings.get_db_url()
         ),
