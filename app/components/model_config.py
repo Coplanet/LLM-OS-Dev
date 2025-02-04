@@ -17,13 +17,13 @@ from helpers.log import logger
 
 
 def get_temperature_list(provider: str, model_id: str):
-    if provider == Provider.OpenAI.value and model_id == "o1-mini":
+    if provider == Provider.OpenAI.value and model_id in ["o1-mini", "o3-mini"]:
         return ["Creative"]
     return list(DEFAULT_TEMPERATURE.keys())
 
 
 def get_temperature(provider: str, model_id: str, selected_temperature: float):
-    if provider == Provider.OpenAI.value and model_id == "o1-mini":
+    if provider == Provider.OpenAI.value and model_id in ["o1-mini", "o3-mini"]:
         return 1
     if provider == Provider.OpenAI.value or provider == Provider.Anthropic.value:
         return {"0.75": 0.5, "1.5": 1}.get(
