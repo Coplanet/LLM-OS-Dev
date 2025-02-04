@@ -822,6 +822,13 @@ def main() -> None:
                         image_data = img.data_compressed
                         image_type = img.mimetype or "image/webp"
 
+                if selected_image and uploaded_images:
+                    for img in uploaded_images:
+                        if img.id == selected_image:
+                            image_data = img.data_compressed
+                            image_type = img.mimetype or "image/webp"
+                            break
+
                 if not image_data and not selected_image and not uploaded_images:
                     with get_db_context() as db:
                         image = UserBinaryData.get_data(
@@ -833,6 +840,16 @@ def main() -> None:
                             image_data = image.data_compressed
                             selected_image = image.id
                             image_type = image.mimetype or "image/webp"
+
+                if not image_data and selected_image:
+                    image_data: Optional[UserBinaryData] = UserBinaryData.get_by_id(
+                        db,
+                        generic_leader.session_id,
+                        selected_image,
+                    )
+                    if image_data:
+                        image_data = image_data.data_compressed
+                        image_type = image_data.mimetype or "image/webp"
 
                 response = run(
                     generic_leader,

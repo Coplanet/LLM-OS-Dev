@@ -328,7 +328,7 @@ class Agent(PhiAgent):
         self.prune_messages(messages_for_model)
 
         if self.model.provider == Provider.OpenAI.value:
-            if self.model.id in ["o1-mini", "o3-mini"]:
+            if self.model.id in ["o1-mini"]:
                 index2remove = []
                 for index, message in enumerate(messages_for_model):
                     if message.role not in ["user", "assistant"]:

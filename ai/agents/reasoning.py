@@ -21,11 +21,12 @@ available_models = {
         },
         "o3-mini": {
             "kwargs": {
-                "max_completion_tokens": agent_settings.default_max_completion_tokens,
+                "max_completion_tokens": 100_000,
             },
             "supports": {
                 SupportTypes.TextIn: SupportStrength.Full,
                 SupportTypes.TextOut: SupportStrength.Full,
+                SupportTypes.FunctionCalling: SupportStrength.Full,
             },
         },
     }

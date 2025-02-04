@@ -51,6 +51,16 @@ class SupportTypes(Enum):
 
 MODELS = {
     Provider.OpenAI.value: {
+        "o3-mini": {
+            "kwargs": {
+                "max_completion_tokens": 100_000,
+            },
+            "supports": {
+                SupportTypes.TextIn: SupportStrength.Full,
+                SupportTypes.TextOut: SupportStrength.Full,
+                SupportTypes.FunctionCalling: SupportStrength.Full,
+            },
+        },
         "gpt-4o": {
             "max_token_size": agent_settings.default_max_completion_tokens,
             "supports": {
