@@ -300,11 +300,14 @@ def main() -> None:
                             "Connection to " + app + " already exists!",
                             icon=":material/warning:",
                         )
+                    input_prompt = st.query_params.get("q")
 
                     for key in list(st.query_params.keys()):
                         del st.query_params[key]
 
                     user.to_auth_param(add_to_query_params=True)
+                    if input_prompt:
+                        st.query_params["q"] = input_prompt
                     rerun(clean_session=True)
                     return
 
@@ -410,13 +413,12 @@ def main() -> None:
         st.session_state["uploaded_files"] = []
 
     # Load existing messages
+    question: Optional[str] = None
     st.session_state["messages"] = generic_leader.memory.messages
 
-    if not st.session_state["messages"]:
-        if "q" in st.query_params:
-            with st.chat_message("user"):
-                st.markdown(st.query_params["q"])
-                question = st.query_params["q"]
+    if "q" in st.query_params:
+        question = st.query_params["q"]
+        del st.query_params["q"]
 
     audio_bytes = None
     AUDIO_ERROR = None
@@ -661,7 +663,10 @@ def main() -> None:
     float_init()
     footer_container = st.container(key="footer_container")
     with footer_container:
-        if prompt := st.chat_input(placeholder="How can CoPlanet LLM-OS assist you?"):
+        prompt = st.chat_input(placeholder="How can CoPlanet LLM-OS assist you?")
+        if not prompt and question:
+            prompt = question
+        if prompt:
             st.session_state["messages"].append(Message(role="user", content=prompt))
 
     try:
@@ -896,10 +901,12 @@ def main() -> None:
                 if AUTH_USER:
                     if "app" in AUTH_USER.value_json:
                         composio_integrations(
-                            user, App(AUTH_USER.value_json.get("app"))
+                            user,
+                            App(AUTH_USER.value_json.get("app")),
+                            input_prompt=question,
                         )
                     else:
-                        composio_integrations(user)
+                        composio_integrations(user, input_prompt=question)
                     AUTH_USER.delete()
 
                 COMPUTER_USE = UserNextOp.get_op(
@@ -1177,7 +1184,7 @@ def main() -> None:
 
         with cols[-2]:
             if st.button(":material/admin_panel_settings:", key="composio_integration"):
-                composio_integrations(user)
+                composio_integrations(user, input_prompt=question)
 
         with cols[-1]:
             NEW_SESSION = st.button(":material/add_box:", key="add_box")
