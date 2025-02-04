@@ -307,7 +307,9 @@ def main() -> None:
 
                     user.to_auth_param(add_to_query_params=True)
                     if input_prompt:
-                        st.query_params["q"] = input_prompt
+                        st.query_params["q"] = "Connected now...\n{}".format(
+                            input_prompt
+                        )
                     rerun(clean_session=True)
                     return
 
