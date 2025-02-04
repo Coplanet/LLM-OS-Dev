@@ -587,6 +587,7 @@ class ComposioAgent(Agent):
                 else:
                     return self.run_response
 
+        kwargs["stream"] = False
         return super().run(message, *args, **kwargs)
 
 
