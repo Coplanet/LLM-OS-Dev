@@ -316,12 +316,16 @@ def main() -> None:
         logger.debug(f"'{agent}' configed to: {config}")
 
     SESSION_CHANGED = (
-        "generic_leader" not in st.session_state
-        or st.session_state["generic_leader"].session_id != user.session_id
-        or st.session_state["generic_leader"] is None
+        "generic_leader" in st.session_state
+        and st.session_state["generic_leader"].session_id != user.session_id
     )
 
-    if "CONFIG_CHANGED" in st.session_state or SESSION_CHANGED:
+    if (
+        "CONFIG_CHANGED" in st.session_state
+        or "generic_leader" not in st.session_state
+        or st.session_state["generic_leader"] is None
+        or SESSION_CHANGED
+    ):
         logger.debug(">>> Creating leader agent with config: %s", COORDINATOR_CONFIG)
         coordinator.agent = generic_leader = coordinator.get_coordinator(
             user=user,
@@ -691,6 +695,9 @@ def main() -> None:
                     prefix, last_message.content.replace(prefix, "")
                 )
 
+    if isinstance(last_message, dict):
+        last_message = Message.model_validate(last_message)
+
     if last_message and last_message.role == "user":
         question = last_message.content
         if isinstance(question, list):
@@ -733,6 +740,8 @@ def main() -> None:
 
             uploaded_images = st.session_state["uploaded_images"]
             selected_image = st.session_state.get("selected_image", None)
+
+            image_data = None
 
             if not selected_image and uploaded_images:
                 img: UserBinaryData = uploaded_images[len(uploaded_images) - 1]
@@ -1213,7 +1222,6 @@ def main() -> None:
 
     if not EMPTY_SESSIONS:
         st.sidebar.markdown("---")
-        CLEAN_SESSION = True
 
         if generic_leader.storage:
             if st.sidebar.button("Delete All Session", key="delete_all_session_button"):
@@ -1228,10 +1236,10 @@ def main() -> None:
                         db.commit()
                 NEW_SESSION = True
 
-        if NEW_SESSION:
-            user.session_id = str(uuid4())
-            user.to_auth_param(add_to_query_params=True)
-            rerun(clean_session=CLEAN_SESSION)
+    if NEW_SESSION:
+        user.session_id = str(uuid4())
+        user.to_auth_param(add_to_query_params=True)
+        rerun(clean_session=True)
 
 
 if os.getenv("RUNTIME_ENV") != "prd" or user.is_authenticated or check_password():

@@ -20,6 +20,54 @@ from sqlalchemy import (
 from .base import Base
 
 
+class UserSession(Base):
+    __tablename__ = "user_sessions"
+    session_id = Column(String(50), index=True, nullable=False)
+    user_id = Column(String(50), index=True, nullable=False)
+    title = Column(String(255), nullable=False)
+
+    meta = Column(Text, nullable=True, default=lambda: "{}")
+
+    __table_args__ = (
+        UniqueConstraint("session_id", "user_id", name="_session_user_uc"),
+    )
+
+    @classmethod
+    def get_session(
+        cls, db: orm.Session, session_id: str, user_id: str
+    ) -> Optional["UserSession"]:
+        return db.query(cls).filter_by(session_id=session_id, user_id=user_id).first()
+
+    @classmethod
+    def create_session(
+        cls, db: orm.Session, session_id: str, user_id: str, title: str, meta: dict = {}
+    ) -> "UserSession":
+        session = cls(
+            session_id=session_id, user_id=user_id, title=title, meta=json.dumps(meta)
+        )
+        db.add(session)
+        db.commit()
+        db.refresh(session)
+        return session
+
+    @classmethod
+    def update_session(
+        cls, db: orm.Session, session_id: str, user_id: str, title: str, meta: dict = {}
+    ) -> "UserSession":
+        session = cls.get_session(db, session_id, user_id)
+        session.title = title
+        session.meta = json.dumps(meta)
+        db.commit()
+        db.refresh(session)
+        return session
+
+    @classmethod
+    def delete_session(cls, db: orm.Session, session_id: str, user_id: str) -> None:
+        session = cls.get_session(db, session_id, user_id)
+        db.delete(session)
+        db.commit()
+
+
 class UserConfig(Base):
     __tablename__ = "user_configs"
     value_json = None
