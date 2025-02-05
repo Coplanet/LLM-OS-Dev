@@ -269,11 +269,16 @@ def main() -> None:
                             "Connection to " + app + " already exists!",
                             icon=":material/warning:",
                         )
+                    input_prompt = st.query_params.get("q")
 
                     for key in list(st.query_params.keys()):
                         del st.query_params[key]
 
                     user.to_auth_param(add_to_query_params=True)
+                    if input_prompt:
+                        st.query_params["q"] = "Connected now...\n{}".format(
+                            input_prompt
+                        )
                     rerun(clean_session=True)
                     return
 
@@ -319,10 +324,9 @@ def main() -> None:
     if "CONFIG_CHANGED" in st.session_state or SESSION_CHANGED:
         logger.debug(">>> Creating leader agent with config: %s", COORDINATOR_CONFIG)
         coordinator.agent = generic_leader = coordinator.get_coordinator(
+            user=user,
             team_config=AGENTS_CONFIG,
             config=COORDINATOR_CONFIG,
-            session_id=user.session_id,
-            user_id=user.user_id,
         )
         if SESSION_CHANGED:
             generic_leader.new_session()
@@ -385,13 +389,12 @@ def main() -> None:
         st.session_state["uploaded_files"] = []
 
     # Load existing messages
+    question: Optional[str] = None
     st.session_state["messages"] = generic_leader.memory.messages
 
-    if not st.session_state["messages"]:
-        if "q" in st.query_params:
-            with st.chat_message("user"):
-                st.markdown(st.query_params["q"])
-                question = st.query_params["q"]
+    if "q" in st.query_params:
+        question = st.query_params["q"]
+        del st.query_params["q"]
 
     audio_bytes = None
     AUDIO_ERROR = None
@@ -636,7 +639,10 @@ def main() -> None:
     float_init()
     footer_container = st.container(key="footer_container")
     with footer_container:
-        if prompt := st.chat_input(placeholder="How can CoPlanet LLM-OS assist you?"):
+        prompt = st.chat_input(placeholder="How can CoPlanet LLM-OS assist you?")
+        if not prompt and question:
+            prompt = question
+        if prompt:
             st.session_state["messages"].append(Message(role="user", content=prompt))
 
     try:
@@ -728,12 +734,16 @@ def main() -> None:
             uploaded_images = st.session_state["uploaded_images"]
             selected_image = st.session_state.get("selected_image", None)
 
-            image_data = None
-
             if not selected_image and uploaded_images:
                 img: UserBinaryData = uploaded_images[len(uploaded_images) - 1]
                 if img:
                     image_data = img.data_compressed
+
+            if selected_image and uploaded_images:
+                for img in uploaded_images:
+                    if img.id == selected_image:
+                        image_data = img.data_compressed
+                        break
 
             if not image_data and not selected_image and not uploaded_images:
                 with get_db_context() as db:
@@ -746,11 +756,14 @@ def main() -> None:
                         image_data = image.data_compressed
                         selected_image = image.id
 
-            if not image_data and selected_image and uploaded_images:
-                for image in uploaded_images:
-                    if image.id == selected_image:
-                        image_data = image.data_compressed
-                        break
+            if not image_data and selected_image:
+                image_data: Optional[UserBinaryData] = UserBinaryData.get_by_id(
+                    db,
+                    generic_leader.session_id,
+                    selected_image,
+                )
+                if image_data:
+                    image_data = image_data.data_compressed
 
             model_kwargs = {
                 "uploaded_images": [Image(content=image_data)] if image_data else [],
@@ -764,6 +777,7 @@ def main() -> None:
 
             with st.spinner("Thinking..."):
                 response = run(generic_leader, question, **model_kwargs)
+                selected_image = st.session_state.get("selected_image", None)
 
             if AUDIO_RESPONSE_SUPPORT:
                 if (
@@ -814,17 +828,19 @@ def main() -> None:
                 if AUTH_USER:
                     if "app" in AUTH_USER.value_json:
                         composio_integrations(
-                            user, App(AUTH_USER.value_json.get("app"))
+                            user,
+                            App(AUTH_USER.value_json.get("app")),
+                            input_prompt=question,
                         )
                     else:
-                        composio_integrations(user)
+                        composio_integrations(user, input_prompt=question)
                     AUTH_USER.delete()
 
                 COMPUTER_USE = UserNextOp.get_op(
                     db, user.session_id, UserNextOp.COMPUTER_USE
                 )
                 if COMPUTER_USE:
-                    computer_use()
+                    computer_use(COMPUTER_USE.value_json.get("platform", "gemini"))
                     COMPUTER_USE.delete()
 
             # Render the images
@@ -1036,7 +1052,10 @@ def main() -> None:
         #   3. new session
         NUMBER_OF_RIGHT_COLUMNS = 3
 
-        if not extra_settings.computer_url_link:
+        if (
+            not extra_settings.anthropic_computer_url_link
+            and not extra_settings.gemini_computer_url_link
+        ):
             NUMBER_OF_RIGHT_COLUMNS -= 1
 
         for _ in range(NUMBER_OF_RIGHT_COLUMNS):
@@ -1081,14 +1100,17 @@ def main() -> None:
                 if st.button(":material/delete:", key="delete_knowledge_base"):
                     render_delete_knowledgebase(generic_leader)
 
-        if extra_settings.computer_url_link:
+        if (
+            extra_settings.anthropic_computer_url_link
+            or extra_settings.gemini_computer_url_link
+        ):
             with cols[-3]:
                 if st.button(":material/dvr:", key="computer_use"):
                     computer_use()
 
         with cols[-2]:
             if st.button(":material/admin_panel_settings:", key="composio_integration"):
-                composio_integrations(user)
+                composio_integrations(user, input_prompt=question)
 
         with cols[-1]:
             NEW_SESSION = st.button(":material/add_box:", key="add_box")

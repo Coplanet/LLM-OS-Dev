@@ -20,7 +20,9 @@ NAME_TO_APP = {details["name"]: app for app, details in AVAILABLE_APPS.items()}
 
 
 @st.dialog("Account integrations", width="large")
-def composio_integrations(user: User, target_app: Optional[App] = None):
+def composio_integrations(
+    user: User, target_app: Optional[App] = None, input_prompt: Optional[str] = None
+):
     st.subheader("Integrate your account with Composio")
     st.markdown("Integrate your account with Composio to enable AI-powered actions.")
     st.markdown("---")
@@ -135,21 +137,23 @@ def composio_integrations(user: User, target_app: Optional[App] = None):
                             collected_params[param.name] = user_input
 
                 with st.spinner("Initiating connection..."):
-                    redirect_url = extra_settings.get_redirect_url(
-                        {
-                            "app": APP,
-                            "source": "composio",
-                            "hash": hashlib.sha256(
-                                "{}:{}:{}:{}:composio".format(
-                                    extra_settings.secret_key,
-                                    user.username,
-                                    user.session_id,
-                                    APP,
-                                ).encode()
-                            ).hexdigest(),
-                        }
-                        | user.to_auth_param(False)
-                    )
+                    redirect_url_params = {
+                        "app": APP,
+                        "source": "composio",
+                        "hash": hashlib.sha256(
+                            "{}:{}:{}:{}:composio".format(
+                                extra_settings.secret_key,
+                                user.username,
+                                user.session_id,
+                                APP,
+                            ).encode()
+                        ).hexdigest(),
+                    } | user.to_auth_param(False)
+
+                    if input_prompt:
+                        redirect_url_params["q"] = input_prompt
+
+                    redirect_url = extra_settings.get_redirect_url(redirect_url_params)
                     # Initiate the connection
                     connection_request = toolset.initiate_connection(
                         connected_account_params=collected_params,

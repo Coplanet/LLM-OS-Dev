@@ -19,10 +19,20 @@ available_models = {
                 SupportTypes.TextOut: SupportStrength.Full,
             },
         },
+        "o3-mini": {
+            "kwargs": {
+                "max_completion_tokens": 100_000,
+            },
+            "supports": {
+                SupportTypes.TextIn: SupportStrength.Full,
+                SupportTypes.TextOut: SupportStrength.Full,
+                SupportTypes.FunctionCalling: SupportStrength.Full,
+            },
+        },
     }
 }
 
-default_model_id = "o1-mini"
+default_model_id = "o3-mini"
 default_model_type = Provider.OpenAI.value
 
 default_model_config = {
