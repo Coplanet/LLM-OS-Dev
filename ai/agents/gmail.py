@@ -1,4 +1,4 @@
-from composio_openai import App
+from composio_agno import App
 
 from .base import AgentConfig, ComposioAgent
 

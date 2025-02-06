@@ -28,7 +28,7 @@ from agno.models.openai import OpenAIChat
 from agno.tools import Toolkit
 from anthropic.types import ToolUseBlock
 from composio.exceptions import ComposioSDKError
-from composio_openai import App, ComposioToolSet
+from composio_agno import App, ComposioToolSet
 from pydantic import ConfigDict, Field
 
 from app.auth import User
@@ -508,7 +508,7 @@ class Agent(PhiAgent):
                                 "group": name,
                                 "order": 500 + order + 1,
                                 "instance": instance,
-                                "name": instance["function"]["name"],
+                                "name": instance.name,
                                 "icon": details["icon"],
                             }
                         )

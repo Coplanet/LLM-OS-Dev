@@ -7,8 +7,8 @@ from agno.models.google import Gemini
 from agno.models.groq import Groq
 from agno.models.openai import OpenAIChat
 from agno.tools import Toolkit
-from composio_openai import Action as ComposioAction
-from composio_openai import ComposioToolSet
+from composio_agno import Action as ComposioAction
+from composio_agno import ComposioToolSet
 from pydantic_settings import BaseSettings
 
 from app.auth import User
