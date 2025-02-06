@@ -110,13 +110,28 @@ def process_tools(
     if config.is_empty:
         config.tools = available_tools
 
+    tools: list[Toolkit] = None
+    extra_instructions: list[str] = None
+
     if isinstance(available_tools, dict):
-        return _process_tools_dict(agent_name, config, available_tools)
+        tools, extra_instructions = _process_tools_dict(
+            agent_name, config, available_tools
+        )
 
     elif isinstance(available_tools, list):
-        return _process_tools_list(agent_name, config, available_tools)
+        tools, extra_instructions = _process_tools_list(
+            agent_name, config, available_tools
+        )
 
     else:
         raise ValueError(
             "Invalid type for available_tools. Expected a dictionary or list."
         )
+
+    if not tools:
+        return None, []
+
+    if not extra_instructions:
+        return tools, []
+
+    return tools, extra_instructions
