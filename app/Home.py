@@ -603,6 +603,12 @@ def main() -> None:
 
             previous_message_hash = message_hash
 
+            if (
+                message_role == "model"
+                and generic_leader.model.provider == Provider.Google.value
+            ):
+                message_role = "assistant"
+
             # Skip system and tool messages
             if message_role in ["system", "tool", "developer", "model"]:
                 continue
