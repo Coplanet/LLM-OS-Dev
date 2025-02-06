@@ -1,4 +1,4 @@
-from composio_phidata import App
+from composio_openai import App
 
 from .base import AgentConfig, ComposioAgent
 
