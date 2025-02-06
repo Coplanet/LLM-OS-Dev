@@ -19,6 +19,8 @@ from helpers.log import logger
 def get_temperature_list(provider: str, model_id: str):
     if provider == Provider.OpenAI.value and model_id in ["o1-mini", "o3-mini"]:
         return ["Creative"]
+    if provider == Provider.Google.value:
+        return []
     return list(DEFAULT_TEMPERATURE.keys())
 
 
@@ -95,31 +97,37 @@ def model_config(
                     f"<strong>{feature.value}</strong>: <span style='color: {color};'>{support_strength.value}</span>",
                     unsafe_allow_html=True,
                 )
+    TEMPERATURES_LIST = get_temperature_list(provider, model_id)
 
+    if TEMPERATURES_LIST:
         st.markdown("---")
 
-    temprature_index = 0
-    for i, key in enumerate(DEFAULT_TEMPERATURE.keys()):
-        if (
-            get_temperature(provider, model_id, DEFAULT_TEMPERATURE[key]["value"])
-            == config.temperature
-        ):
-            temprature_index = i
-            break
+        temprature_index = 0
+        for i, key in enumerate(DEFAULT_TEMPERATURE.keys()):
+            if (
+                get_temperature(provider, model_id, DEFAULT_TEMPERATURE[key]["value"])
+                == config.temperature
+            ):
+                temprature_index = i
+                break
 
-    st.session_state[f"{label}_temperature"] = config.temperature = temperature = (
-        get_temperature(
-            provider,
-            model_id,
-            DEFAULT_TEMPERATURE[
-                pills(
-                    "Choose the model's creativity:",
-                    get_temperature_list(provider, model_id),
-                    index=temprature_index,
-                )
-            ]["value"],
+        st.session_state[f"{label}_temperature"] = config.temperature = temperature = (
+            get_temperature(
+                provider,
+                model_id,
+                DEFAULT_TEMPERATURE[
+                    pills(
+                        "Choose the model's creativity:",
+                        TEMPERATURES_LIST,
+                        index=temprature_index,
+                    )
+                ]["value"],
+            )
         )
-    )
+    else:
+        st.session_state[f"{label}_temperature"] = config.temperature = temperature = (
+            None
+        )
 
     max_tokens = MODEL_CONFIG.get("max_token_size")
 
@@ -297,6 +305,9 @@ def model_config(
                 "max_tokens": max_tokens,
                 "tools": tools,
             }
+            if temperature is None:
+                del new_configs["temperature"]
+
             logger.info("New configs: %s", new_configs)
             with get_db_context() as db:
                 # get the user

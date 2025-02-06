@@ -17,6 +17,8 @@ from sqlalchemy import (
     sql,
 )
 
+from app.auth import User
+
 from .base import Base
 
 
@@ -33,39 +35,58 @@ class UserSession(Base):
     )
 
     @classmethod
-    def get_session(
-        cls, db: orm.Session, session_id: str, user_id: str
-    ) -> Optional["UserSession"]:
-        return db.query(cls).filter_by(session_id=session_id, user_id=user_id).first()
+    def get_session(cls, db: orm.Session, user: User) -> Optional["UserSession"]:
+        return (
+            db.query(cls)
+            .filter_by(session_id=user.session_id, user_id=user.user_id)
+            .first()
+        )
+
+    @classmethod
+    def get_sessions(cls, db: orm.Session, user: User) -> List["UserSession"]:
+        return (
+            db.query(cls)
+            .filter_by(user_id=user.user_id)
+            .order_by(cls.created_at.desc())
+            .all()
+        )
 
     @classmethod
     def create_session(
-        cls, db: orm.Session, session_id: str, user_id: str, title: str, meta: dict = {}
+        cls, db: orm.Session, user: User, title: str, meta: dict = {}
     ) -> "UserSession":
         session = cls(
-            session_id=session_id, user_id=user_id, title=title, meta=json.dumps(meta)
+            session_id=user.session_id,
+            user_id=user.user_id,
+            title=title,
+            meta=json.dumps(meta),
         )
-        db.add(session)
-        db.commit()
-        db.refresh(session)
+        session.save(db)
         return session
 
     @classmethod
     def update_session(
-        cls, db: orm.Session, session_id: str, user_id: str, title: str, meta: dict = {}
+        cls, db: orm.Session, user: User, title: str, meta: dict = {}
     ) -> "UserSession":
-        session = cls.get_session(db, session_id, user_id)
+        session = cls.get_session(db, user)
         session.title = title
         session.meta = json.dumps(meta)
-        db.commit()
-        db.refresh(session)
+        session.save(db)
         return session
 
     @classmethod
-    def delete_session(cls, db: orm.Session, session_id: str, user_id: str) -> None:
-        session = cls.get_session(db, session_id, user_id)
-        db.delete(session)
-        db.commit()
+    def delete_session(cls, db: orm.Session, user: User) -> None:
+        session = cls.get_session(db, user)
+        if session:
+            session.delete(db)
+
+    @classmethod
+    def delete_all_sessions(
+        cls, db: orm.Session, user: User, auto_commit: bool = True
+    ) -> None:
+        db.execute(delete(cls).where(cls.user_id == user.user_id))
+        if auto_commit:
+            db.commit()
 
 
 class UserConfig(Base):

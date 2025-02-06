@@ -39,6 +39,7 @@ class SupportTypes(Enum):
     ImageIn = "Image In"
     # AudioIn = "Audio In"
     # AudioOut = "Audio Out"
+    Search = "Search"
     ImageOut = "Image Out"
     FunctionCalling = "Function Calling"
     Reasoning = "Reasoning"
@@ -83,6 +84,15 @@ MODELS = {
         },
     },
     Provider.Google.value: {
+        "gemini-2.0-flash-001": {
+            "max_token_size": 8_192,
+            "supports": {
+                SupportTypes.TextIn: SupportStrength.Full,
+                SupportTypes.TextOut: SupportStrength.Full,
+                SupportTypes.Search: SupportStrength.Full,
+                SupportTypes.FunctionCalling: SupportStrength.Acceptable,
+            },
+        },
         "gemini-2.0-flash-exp": {
             "max_token_size": 8_192,
             "supports": {
@@ -90,9 +100,31 @@ MODELS = {
                 SupportTypes.TextOut: SupportStrength.Full,
                 SupportTypes.ImageIn: SupportStrength.Full,
                 SupportTypes.FunctionCalling: SupportStrength.Acceptable,
-                SupportTypes.ParallelToolCalling: SupportStrength.NotSupported,
             },
-        }
+        },
+        "gemini-exp-1206": {
+            "max_token_size": 8_192,
+            "supports": {
+                SupportTypes.TextIn: SupportStrength.Full,
+                SupportTypes.TextOut: SupportStrength.Full,
+                SupportTypes.FunctionCalling: SupportStrength.Acceptable,
+            },
+        },
+        "gemini-2.0-flash-thinking-exp-01-21": {
+            "max_token_size": 8_192,
+            "supports": {
+                SupportTypes.TextIn: SupportStrength.Full,
+                SupportTypes.TextOut: SupportStrength.Full,
+            },
+        },
+        "gemini-2.0-pro-exp-02-05": {
+            "max_token_size": 8_192,
+            "supports": {
+                SupportTypes.TextIn: SupportStrength.Full,
+                SupportTypes.TextOut: SupportStrength.Full,
+                SupportTypes.FunctionCalling: SupportStrength.Acceptable,
+            },
+        },
     },
     Provider.Anthropic.value: {
         "claude-3-5-sonnet-20241022": {

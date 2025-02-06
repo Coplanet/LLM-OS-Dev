@@ -174,13 +174,20 @@ class AgentConfig:
         if self.max_tokens:
             configs["max_tokens"] = self.max_tokens
 
-        return model_class(
-            id=model_id,
-            provider=self.provider,
-            temperature=self.temperature,
+        kwargs = {
+            "id": model_id,
+            "provider": self.provider,
+            "temperature": self.temperature,
             **configs,
             **self.model_kwargs,
-        )
+        }
+
+        if self.provider == Provider.Google.value:
+            for key in ["temperature", "max_tokens"]:
+                if key in kwargs:
+                    del kwargs[key]
+
+        return model_class(**kwargs)
 
 
 # Create an AgentSettings object

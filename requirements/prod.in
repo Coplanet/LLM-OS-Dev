@@ -1,5 +1,7 @@
 ipython
 agno
+agno-aws
+agno-docker
 pyjwt
 
 boto3

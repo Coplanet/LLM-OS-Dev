@@ -6,6 +6,10 @@
 #
 agno==1.0.3
     # via -r requirements/prod.in
+agno-aws==0.0.1
+    # via -r requirements/prod.in
+agno-docker==0.0.1
+    # via -r requirements/prod.in
 aiohappyeyeballs==2.4.4
     # via aiohttp
 aiohttp==3.11.9
@@ -56,7 +60,9 @@ black==24.10.0
 blinker==1.8.2
     # via streamlit
 boto3==1.36.11
-    # via -r requirements/prod.in
+    # via
+    #   -r requirements/prod.in
+    #   agno-aws
 botocore==1.36.11
     # via
     #   boto3
@@ -131,6 +137,8 @@ djlint==1.36.3
     # via -r requirements/dev.in
 dnspython==2.7.0
     # via email-validator
+docker==7.1.0
+    # via agno-docker
 docstring-parser==0.16
     # via
     #   agno
@@ -572,6 +580,7 @@ requests==2.32.3
     #   -r requirements/prod.in
     #   arxiv
     #   composio-core
+    #   docker
     #   exa-py
     #   favicon
     #   google-api-core
@@ -755,6 +764,7 @@ uritemplate==4.1.1
 urllib3==2.2.3
     # via
     #   botocore
+    #   docker
     #   requests
     #   sentry-sdk
 uvicorn[standard]==0.32.0
