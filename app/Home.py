@@ -2,6 +2,7 @@ import hashlib
 import os
 import re
 import tempfile
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 from os import getenv
 from time import sleep, time
@@ -9,16 +10,12 @@ from typing import Dict, List, Optional
 from urllib.parse import urlencode
 from uuid import uuid4
 
-import anthropic
 import backoff
 import google.generativeai as genai
-import groq
 import nest_asyncio
-import openai
 import sqlalchemy as sql
 import streamlit as st
 from audio_recorder_streamlit import audio_recorder
-from bs4 import BeautifulSoup
 from composio import App
 from phi.agent import Agent
 from phi.document import Document
@@ -38,6 +35,7 @@ from phi.utils.log import logging
 from streamlit_float import float_init
 
 from ai.agents import base, settings
+from ai.agents.base import Agent as CoplanetAgent
 from ai.agents.base import Provider
 from ai.agents.settings import agent_settings
 from ai.agents.voice_transcriptor import voice2prompt
@@ -61,7 +59,13 @@ from app.models import AUDIO_SUPPORTED_MODELS
 from app.utils import rerun, run_js, run_next_run_toast, scroll_to_bottom
 from db.session import get_db_context
 from db.settings import db_settings
-from db.tables import UserBinaryData, UserConfig, UserIntegration, UserNextOp
+from db.tables import (
+    UserBinaryData,
+    UserConfig,
+    UserIntegration,
+    UserNextOp,
+    UserSession,
+)
 from helpers.log import logger
 from helpers.utils import binary2text, binary_text2data, text2binary
 from workspace.settings import extra_settings
@@ -96,9 +100,31 @@ def backoff_handler(details):
     )
 
 
+def update_session_name(generic_leader: CoplanetAgent, user):
+    logger.info("Updating session name")
+    session_name = generic_leader.generate_session_name()
+    if session_name:
+        with get_db_context() as db:
+            CREATE = True
+            if len(generic_leader.memory.runs) > 1:
+                session = UserSession.get_session(db, user)
+                if session:
+                    session.title = session_name
+                    session.save(db)
+                    CREATE = False
+
+            if CREATE:
+                UserSession.create_session(
+                    db,
+                    user,
+                    session_name,
+                )
+            logger.info("Session name updated to: '%s'", session_name)
+
+
 @backoff.on_exception(
     backoff.expo,
-    (openai.RateLimitError, groq.RateLimitError, anthropic.APIStatusError),
+    (Exception),
     max_time=60,
     max_tries=10,
     on_backoff=backoff_handler,
@@ -166,6 +192,40 @@ def run(
     logger.debug(
         "Time to response from coordinator: {:.2f} seconds".format(end - start)
     )
+
+    INLINE_TOPICS_GENERATION = len(generic_leader.memory.runs) == 1
+    SHOULD_GENERATE_TOPICS = (
+        len(generic_leader.memory.runs) == 1 or len(generic_leader.memory.runs) % 5 == 0
+    )
+
+    if not SHOULD_GENERATE_TOPICS:
+        if len(generic_leader.memory.runs) < 5:
+            user_messages = 0
+            for run in generic_leader.memory.runs:
+                if (
+                    run.response
+                    and run.response.messages
+                    and isinstance(run.response.messages, list)
+                ):
+                    for message in run.response.messages:
+                        if message.role == "user":
+                            user_messages += 1
+                            if user_messages > 2:
+                                break
+
+            if user_messages == 1:
+                SHOULD_GENERATE_TOPICS = True
+                INLINE_TOPICS_GENERATION = True
+
+    if SHOULD_GENERATE_TOPICS:
+        # for the first run, we don't need to update the session name in the background
+        if INLINE_TOPICS_GENERATION:
+            with st.spinner("Updating session name..."):
+                update_session_name(generic_leader, user)
+        else:
+            with ThreadPoolExecutor() as executor:
+                executor.submit(update_session_name, generic_leader, user)
+
     return response
 
 
@@ -225,16 +285,19 @@ def get_selected_assistant_config(user: User, label, package):
                     if tool.get("default_status", "enabled").lower() == "enabled":
                         tools[tool.get("name")] = tool
 
-        return settings.AgentConfig(
-            user=user,
-            provider=default_configs["model_type"],
-            model_id=default_configs["model_id"],
-            model_kwargs=default_configs.get("model_kwargs", {}),
-            temperature=default_configs["temperature"],
-            enabled=default_configs["enabled"],
-            max_tokens=default_configs.get("max_tokens"),
-            tools=tools,
-        )
+        kwargs = {
+            "user": user,
+            "provider": default_configs["model_type"],
+            "model_id": default_configs["model_id"],
+            "model_kwargs": default_configs.get("model_kwargs", {}),
+            "temperature": default_configs["temperature"],
+            "enabled": default_configs["enabled"],
+            "max_tokens": default_configs.get("max_tokens"),
+            "tools": tools,
+        }
+
+        return settings.AgentConfig(**kwargs)
+
     except Exception as e:
         logger.error("Error reading get_selected_assistant_config(): %s", e)
         return None
@@ -541,7 +604,7 @@ def main() -> None:
             previous_message_hash = message_hash
 
             # Skip system and tool messages
-            if message.role in ["system", "tool", "developer", "model"]:
+            if message_role in ["system", "tool", "developer", "model"]:
                 continue
 
             if message_role is not None:
@@ -716,6 +779,9 @@ def main() -> None:
                 last_message.content = "{}{}".format(
                     prefix, last_message.content.replace(prefix, "")
                 )
+
+    if isinstance(last_message, dict):
+        last_message = Message.model_validate(last_message)
 
     if last_message and last_message.role == "user":
         question = last_message.content
@@ -1213,7 +1279,11 @@ def main() -> None:
     st.sidebar.markdown("---")
 
     if generic_leader.storage:
-        sessions = generic_leader.storage.get_all_sessions(user_id=user.user_id)
+        sessions: List[UserSession] = []
+
+        with get_db_context() as db:
+            sessions = UserSession.get_sessions(db, user)
+
         session_options = {
             "Today": [],
             "Yesterday": [],
@@ -1224,33 +1294,20 @@ def main() -> None:
         yesterday = today - timedelta(days=1)
 
         for session in sessions:
-            if "summary" in session.memory and "topics" in session.memory["summary"]:
-                # Convert Unix timestamp to datetime
-                session_date = datetime.fromtimestamp(session.created_at).date()
-                topics = []
-                for topic in session.memory["summary"]["topics"]:
-                    if len(topics) >= 3:
-                        break
-                    # purge html from topic and only add if not empty do it with beautifulsoup
-                    topic = BeautifulSoup(topic, "html.parser").get_text().strip()
-                    if topic:
-                        topics.append(topic)
-
-                if not topics:
-                    topics.append("No topics found")
-
-                session_info = {
-                    "id": session.session_id,
-                    "topics": ", ".join(topics),
-                }
-                if session_date == today:
-                    session_options["Today"].append(session_info)
-                elif session_date == yesterday:
-                    session_options["Yesterday"].append(session_info)
-                elif session_date >= today - timedelta(days=7):
-                    session_options["Previous 7 Days"].append(session_info)
-                else:
-                    session_options["Older"].append(session_info)
+            # Convert Unix timestamp to datetime
+            session_date = session.created_at.date()
+            session_info = {
+                "id": session.session_id,
+                "topics": session.title,
+            }
+            if session_date == today:
+                session_options["Today"].append(session_info)
+            elif session_date == yesterday:
+                session_options["Yesterday"].append(session_info)
+            elif session_date >= today - timedelta(days=7):
+                session_options["Previous 7 Days"].append(session_info)
+            else:
+                session_options["Older"].append(session_info)
 
         # Display sessions
         for period in ["Today", "Yesterday", "Previous 7 Days"]:
@@ -1304,27 +1361,31 @@ def main() -> None:
                     on_change=on_older_session_change,
                 )
 
+        if len(generic_leader.memory.runs) > 0:
+            st.session_state["topics_loaded"] = True
+
     if not EMPTY_SESSIONS:
         st.sidebar.markdown("---")
-        CLEAN_SESSION = True
 
         if generic_leader.storage:
             if st.sidebar.button("Delete All Session", key="delete_all_session_button"):
                 ids = generic_leader.storage.get_all_session_ids(user_id=user.user_id)
                 for id in ids:
                     generic_leader.storage.delete_session(id)
+
                 if ids:
                     with get_db_context() as db:
+                        UserSession.delete_all_sessions(db, user, auto_commit=False)
                         db.execute(
                             sql.delete(UserConfig).where(UserConfig.session_id.in_(ids))
                         )
                         db.commit()
                 NEW_SESSION = True
 
-        if NEW_SESSION:
-            user.session_id = str(uuid4())
-            user.to_auth_param(add_to_query_params=True)
-            rerun(clean_session=CLEAN_SESSION)
+    if NEW_SESSION:
+        user.session_id = str(uuid4())
+        user.to_auth_param(add_to_query_params=True)
+        rerun(clean_session=True)
 
 
 if os.getenv("RUNTIME_ENV") != "prd" or user.is_authenticated or check_password():

@@ -456,7 +456,6 @@ def get_coordinator(
         memory=AgentMemory(
             db=PgMemoryDb(table_name="agent_memory", db_url=db_settings.get_db_url()),
             create_user_memories=True,
-            create_session_summary=True,
         ),
         introduction=dedent(
             """\

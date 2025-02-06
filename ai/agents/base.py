@@ -4,11 +4,14 @@ from textwrap import dedent
 from typing import Any, Dict, Generic, Iterator, List, Optional, Tuple, TypeVar, Union
 from uuid import uuid4
 
+import backoff
+import requests
 from anthropic.types import ToolUseBlock
 from composio.exceptions import ComposioSDKError
 from composio_phidata import App, ComposioToolSet
 from phi.agent import Agent as PhiAgent
 from phi.agent import RunResponse
+from phi.agent.agent import ModelResponse
 from phi.agent.session import AgentSession
 from phi.model.anthropic import Claude
 from phi.model.base import Model
@@ -118,6 +121,48 @@ class Agent(PhiAgent):
             normalize_images(self.memory.messages)
 
         return session
+
+    def generate_session_name(self) -> str:
+        """Generate a name for the session using the last 6 messages from the memory"""
+
+        if self.model is None:
+            raise Exception("Model not set")
+
+        gen_session_name_prompt = "Conversation\n"
+        messages_for_generating_session_name = []
+        try:
+            message_pars = self.memory.get_message_pairs()
+            for message_pair in message_pars[-3:]:
+                messages_for_generating_session_name.append(message_pair[0])
+                messages_for_generating_session_name.append(message_pair[1])
+        except Exception as e:
+            logger.warning(f"Failed to generate name: {e}")
+
+        for message in messages_for_generating_session_name:
+            gen_session_name_prompt += f"{message.role.upper()}: {message.content}\n"
+
+        gen_session_name_prompt += "\n\nConversation Name: "
+
+        system_message = Message(
+            role=self.system_message_role,
+            content="Please provide a suitable name for this conversation in maximum 5 words. "
+            "Remember, do not exceed 5 words.",
+        )
+        user_message = Message(
+            role=self.user_message_role, content=gen_session_name_prompt
+        )
+        generate_name_messages = [system_message, user_message]
+        generated_name: ModelResponse = self.model.response(
+            messages=generate_name_messages
+        )
+        content = generated_name.content
+        if content is None:
+            logger.error("Generated name is None. Trying again.")
+            return self.generate_session_name()
+        if len(content.split()) > 15:
+            logger.error("Generated name is too long. Trying again.")
+            return self.generate_session_name()
+        return content.replace('"', "").strip()
 
     def write_to_storage(self) -> Optional[AgentSession]:
         type_mapping = {
@@ -539,14 +584,23 @@ class ComposioAgent(Agent):
         self.user = user
         self.app_name = str(app)
 
-        if self.has_integrations:
-            self.tools = self.get_tools_as_composio_tools(
-                self.name, kwargs.get("agent_config", None), self.app
-            )
-        else:
-            self.tools = ComposioToolSet().get_tools(
-                actions=COMPOSIO_ACTIONS[self.app]["actions"]
-            )
+        @backoff.on_exception(
+            backoff.expo,
+            (requests.exceptions.RequestException),
+            max_time=60,
+            max_tries=10,
+        )
+        def run_with_backoff(self: "ComposioAgent", kwargs: dict):
+            if self.has_integrations:
+                self.tools = self.get_tools_as_composio_tools(
+                    self.name, kwargs.get("agent_config", None), self.app
+                )
+            else:
+                self.tools = ComposioToolSet().get_tools(
+                    actions=COMPOSIO_ACTIONS[self.app]["actions"]
+                )
+
+        run_with_backoff(self, kwargs)
 
     @property
     def has_integrations(self):
