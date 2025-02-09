@@ -490,10 +490,10 @@ class UserIntegration(Base):
         db: Optional[orm.Session] = None,
         auto_commit: bool = True,
     ) -> Optional["UserIntegration"]:
-        try:
 
-            def _add(db_: orm.Session) -> None:
-                nonlocal db, auto_commit
+        def _add(db_: orm.Session) -> None:
+            nonlocal db, auto_commit
+            try:
 
                 instance = cls(
                     username=username,
@@ -506,16 +506,16 @@ class UserIntegration(Base):
                     db_.commit()
                     db_.refresh(instance)
 
-                return instance
+            except exc.IntegrityError:
+                db.rollback()
+                return None
 
-            if db:
-                return _add(db)
+            return instance
 
-            from db.session import get_db_context
+        if db:
+            return _add(db)
 
-            with get_db_context() as db_:
-                return _add(db_)
+        from db.session import get_db_context
 
-        except exc.IntegrityError:
-            db.rollback()
-            return None
+        with get_db_context() as db_:
+            return _add(db_)
