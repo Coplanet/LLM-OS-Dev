@@ -526,6 +526,9 @@ def main() -> None:
     try:
         # Display existing chat messages
         for index, message in enumerate(generic_leader.memory.messages):
+            if isinstance(message, dict):
+                message = Message.model_validate(message)
+
             if isinstance(message.content, str):
                 message.content = re.sub(
                     r"[\n\s]*!\[[^\]]+?\]\([^\)]+?\)", "", message.content

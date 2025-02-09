@@ -178,6 +178,7 @@ class AgentConfig:
             "id": model_id,
             "provider": self.provider,
             "temperature": self.temperature,
+            "show_tool_calls": agent_settings.show_tool_calls,
             **configs,
             **self.model_kwargs,
         }
