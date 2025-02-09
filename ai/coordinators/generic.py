@@ -31,7 +31,6 @@ from ai.agents import (
 from ai.agents.base import AgentTeam, Provider
 from ai.agents.settings import AgentConfig, agent_settings
 from ai.tools.computer_use import ComputerUseTools
-from ai.tools.email import EmailSenderTools
 from ai.tools.file import FileIOTools
 from ai.tools.stability import Stability
 from ai.tools.website_crawler import WebSiteCrawlerTools
@@ -158,24 +157,6 @@ available_tools = [
             """
         ).strip(),
         "icon": "fa-solid fa-magnifying-glass",
-    },
-    {
-        "order": 700,
-        "instance": EmailSenderTools(
-            api_key=extra_settings.resend_api_key,
-            from_email=extra_settings.resend_email_address,
-        ),
-        "name": "Email Sender",
-        "extra_instructions": dedent(
-            """\
-            Utilize the Email Sender Tools exclusively for sending emails. This tool is designed to:
-
-            - Sending emails to the given address, if the email has not been provided ask for it.
-
-            This tool is particularly useful for communication tasks requiring email-based delivery or automation.\
-            """
-        ).strip(),
-        "icon": "fa-solid fa-envelope",
     },
     {
         "order": 800,
