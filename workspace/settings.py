@@ -83,10 +83,12 @@ class Settings:
     def knowledgebase_dir(self):
         return self.ws_root.joinpath("knowledgebase")
 
+    @property
+    def app_url(self):
+        return f"{self.domain_scheme}://{self.domain}"
+
     def get_redirect_url(self, params: dict):
-        return (
-            f"{self.domain_scheme}://{self.domain}/?callback=true&{urlencode(params)}"
-        )
+        return f"{self.app_url}/?callback=true&{urlencode(params)}"
 
 
 extra_settings = Settings()

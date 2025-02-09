@@ -50,6 +50,7 @@ from app.components.delete_knowledgebase import render_delete_knowledgebase
 from app.components.galary_display import render_galary_display
 from app.components.mask_image import render_mask_image
 from app.components.model_config import model_config
+from app.components.share_session import share_session, validate_share_session
 from app.components.sidebar import create_sidebar
 from app.components.styles import render_styles
 from app.models import AUDIO_SUPPORTED_MODELS
@@ -87,6 +88,7 @@ with st.container(key="subtitle_container"):
 
 
 user: User = auth.get_user()
+alter_user: Optional[User] = None
 
 
 def backoff_handler(details):
@@ -276,7 +278,17 @@ def main() -> None:
         user.to_auth_param(add_to_query_params=True)
         rerun()
 
-    st.sidebar.info(f":label: User: {user.username}")
+    session_user = validate_share_session()
+    SHARED_SESSION = session_user is not None
+    if not session_user:
+        session_user = user
+
+    st.sidebar.info(
+        ":label: User: {}{}".format(
+            user.username,
+            " (Shared Session)" if SHARED_SESSION else "",
+        )
+    )
 
     if "callback" in st.query_params:
         source = st.query_params.get("source")
@@ -340,7 +352,7 @@ def main() -> None:
 
     for agent, agent_config in AGENTS.items():
         config = get_selected_assistant_config(
-            user,
+            session_user,
             agent_config.get("label", agent),
             agent_config.get("package"),
         )
@@ -360,7 +372,7 @@ def main() -> None:
     ):
         logger.debug(">>> Creating leader agent with config: %s", COORDINATOR_CONFIG)
         coordinator.agent = generic_leader = coordinator.get_coordinator(
-            user=user,
+            user=session_user,
             team_config=AGENTS_CONFIG,
             config=COORDINATOR_CONFIG,
         )
@@ -392,12 +404,14 @@ def main() -> None:
         )
 
     # Create sidebar
-    create_sidebar(user.session_id, {generic_leader.name: AGENTS[generic_leader.name]})
+    create_sidebar(
+        session_user.session_id, {generic_leader.name: AGENTS[generic_leader.name]}
+    )
 
     # Sidebar checkboxes for selecting team members
     st.sidebar.markdown("### Select Team Members")
     create_sidebar(
-        user.session_id,
+        session_user.session_id,
         {k: v for k, v in AGENTS.items() if not v.get("is_leader", False)},
     )
 
@@ -412,7 +426,11 @@ def main() -> None:
             else COORDINATOR_CONFIG
         )
         model_config(
-            package.agent, user.session_id, selected_assistant, agent_config, package
+            package.agent,
+            session_user.session_id,
+            selected_assistant,
+            agent_config,
+            package,
         )
         st.session_state.show_popup = False
         st.session_state.selected_assistant = None
@@ -506,7 +524,7 @@ def main() -> None:
         with get_db_context() as db:
             for d in UserBinaryData.get_data(
                 db,
-                user.session_id,
+                session_user.session_id,
                 UserBinaryData.IMAGE,
                 UserBinaryData.DOWNSTREAM,
             ):
@@ -711,11 +729,11 @@ def main() -> None:
     with get_db_context() as db:
         mask_captured = False
         if (
-            UserNextOp.get_op(db, user.session_id, UserNextOp.GET_IMAGE_MASK)
+            UserNextOp.get_op(db, session_user.session_id, UserNextOp.GET_IMAGE_MASK)
             and render_mask_image(generic_leader)
         ) or (
             mask_captured := UserNextOp.get_op(
-                db, user.session_id, UserNextOp.EDIT_IMAGE_USING_MASK
+                db, session_user.session_id, UserNextOp.EDIT_IMAGE_USING_MASK
             )
         ):
             last_message = st.session_state["messages"][last_user_message_index]
@@ -866,11 +884,15 @@ def main() -> None:
             image_outputs: Optional[List[Image]] = generic_leader.get_images()
 
             with get_db_context() as db:
-                if UserNextOp.get_op(db, user.session_id, UserNextOp.GET_IMAGE_MASK):
+                if UserNextOp.get_op(
+                    db, session_user.session_id, UserNextOp.GET_IMAGE_MASK
+                ):
                     if render_mask_image(generic_leader):
                         run(generic_leader, question, **model_kwargs)
 
-                AUTH_USER = UserNextOp.get_op(db, user.session_id, UserNextOp.AUTH_USER)
+                AUTH_USER = UserNextOp.get_op(
+                    db, session_user.session_id, UserNextOp.AUTH_USER
+                )
                 if AUTH_USER:
                     if "app" in AUTH_USER.value_json:
                         composio_integrations(
@@ -883,7 +905,7 @@ def main() -> None:
                     AUTH_USER.delete()
 
                 COMPUTER_USE = UserNextOp.get_op(
-                    db, user.session_id, UserNextOp.COMPUTER_USE
+                    db, session_user.session_id, UserNextOp.COMPUTER_USE
                 )
                 if COMPUTER_USE:
                     computer_use(COMPUTER_USE.value_json.get("platform", "gemini"))
@@ -1081,7 +1103,9 @@ def main() -> None:
 
     with footer_container:
         IMAGE_UPLOAED = bool(
-            UserBinaryData.get_data(db, user.session_id, UserBinaryData.IMAGE).count()
+            UserBinaryData.get_data(
+                db, session_user.session_id, UserBinaryData.IMAGE
+            ).count()
             > 0
         )
         KNOWLEDGE_BASE_CREATED = bool(generic_leader.knowledge.vector_db)
@@ -1093,15 +1117,21 @@ def main() -> None:
         if KNOWLEDGE_BASE_CREATED:
             columns.append(0.05)
         # for
-        #   1. computer use
-        #   2. composio integration
-        #   3. new session
-        NUMBER_OF_RIGHT_COLUMNS = 3
+        #   1. share button
+        #   2. computer use
+        #   3. composio integration
+        #   4. new session
+        NUMBER_OF_RIGHT_COLUMNS = 4
 
         if (
             not extra_settings.anthropic_computer_url_link
             and not extra_settings.gemini_computer_url_link
         ):
+            NUMBER_OF_RIGHT_COLUMNS -= 1
+
+        SHARE_BUTTON = bool(last_user_message_index is not None or prompt or question)
+
+        if not SHARE_BUTTON:
             NUMBER_OF_RIGHT_COLUMNS -= 1
 
         for _ in range(NUMBER_OF_RIGHT_COLUMNS):
@@ -1146,20 +1176,31 @@ def main() -> None:
                 if st.button(":material/delete:", key="delete_knowledge_base"):
                     render_delete_knowledgebase(generic_leader)
 
+        INDEX = NUMBER_OF_RIGHT_COLUMNS
+
+        if SHARE_BUTTON:
+            with cols[-INDEX]:
+                if st.button(":material/share:", key="share"):
+                    share_session(user)
+            INDEX -= 1
+
         if (
             extra_settings.anthropic_computer_url_link
             or extra_settings.gemini_computer_url_link
         ):
-            with cols[-3]:
+            with cols[-INDEX]:
                 if st.button(":material/dvr:", key="computer_use"):
                     computer_use()
+            INDEX -= 1
 
-        with cols[-2]:
+        with cols[-INDEX]:
             if st.button(":material/admin_panel_settings:", key="composio_integration"):
                 composio_integrations(user, input_prompt=question)
+            INDEX -= 1
 
-        with cols[-1]:
+        with cols[-INDEX]:
             NEW_SESSION = st.button(":material/add_box:", key="add_box")
+            INDEX -= 1
 
     EMPTY_SESSIONS = True
 
@@ -1271,6 +1312,9 @@ def main() -> None:
 
     if NEW_SESSION:
         user.session_id = str(uuid4())
+        if SHARED_SESSION:
+            for key in list(st.query_params.keys()):
+                del st.query_params[key]
         user.to_auth_param(add_to_query_params=True)
         rerun(clean_session=True)
 
