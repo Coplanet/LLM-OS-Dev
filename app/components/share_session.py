@@ -5,7 +5,6 @@ from typing import Optional
 import streamlit as st
 
 from app.auth import User
-from app.utils import rerun
 from helpers.log import logger
 from workspace.settings import extra_settings
 
@@ -18,24 +17,10 @@ def generate_hash(user: User, now: int):
     ).hexdigest()
 
 
-@st.dialog("Share This Session", width="large")
-def share_session(user: User):
-    st.subheader("Share this session to any body with the following link")
-    st.markdown(
-        "This link won't expire. Anyone with the link will be able to view the session."
-        "Also this link **will not** expose your other topics and conversations."
-    )
-
+def generate_share_session_link(user: User):
     now = int(time())
     hash = generate_hash(user, now)
-
-    link = f"{extra_settings.app_url}?share=true&u={user.username},{now},{user.session_id}&h={hash}"
-
-    st.code(link, language="url")
-
-    st.markdown("---")
-    if st.button("Close", icon=":material/close:", type="primary"):
-        rerun()
+    return f"{extra_settings.app_url}?share=true&u={user.username},{now},{user.session_id}&h={hash}"
 
 
 def validate_share_session() -> Optional[User]:

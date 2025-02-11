@@ -31,6 +31,7 @@ from ai.agents import (
 from ai.agents.base import AgentTeam, Provider
 from ai.agents.settings import AgentConfig, agent_settings
 from ai.tools.computer_use import ComputerUseTools
+from ai.tools.datetime import DateTimeTools
 from ai.tools.email import EmailSenderTools
 from ai.tools.file import FileIOTools
 from ai.tools.stability import Stability
@@ -209,6 +210,17 @@ available_tools = [
             """
         ).strip(),
         "icon": "fa-solid fa-globe",
+    },
+    {
+        "order": 999,
+        "instance": DateTimeTools(enable_all=True),
+        "name": "Date & Time",
+        "extra_instructions": dedent(
+            """\
+            Use the DateTime tool to get the current date and time and perform date and time related operations.
+            """
+        ).strip(),
+        "icon": "fa-solid fa-calendar-days",
     },
     {
         "order": 1000,
