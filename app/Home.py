@@ -11,6 +11,7 @@ from uuid import uuid4
 
 import backoff
 import nest_asyncio
+import pyperclip
 import sqlalchemy as sql
 import streamlit as st
 from agno.agent import Agent
@@ -50,7 +51,10 @@ from app.components.delete_knowledgebase import render_delete_knowledgebase
 from app.components.galary_display import render_galary_display
 from app.components.mask_image import render_mask_image
 from app.components.model_config import model_config
-from app.components.share_session import share_session, validate_share_session
+from app.components.share_session import (
+    generate_share_session_link,
+    validate_share_session,
+)
 from app.components.sidebar import create_sidebar
 from app.components.styles import render_styles
 from app.models import AUDIO_SUPPORTED_MODELS
@@ -1181,7 +1185,9 @@ def main() -> None:
         if SHARE_BUTTON:
             with cols[-INDEX]:
                 if st.button(":material/share:", key="share"):
-                    share_session(user)
+                    pyperclip.copy(generate_share_session_link(user))
+                    st.toast("Link copied to clipboard", icon=":material/content_copy:")
+
             INDEX -= 1
 
         if (

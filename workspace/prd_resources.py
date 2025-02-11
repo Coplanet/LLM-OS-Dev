@@ -262,7 +262,8 @@ prd_docker_resources = DockerResources(
 # -*- Production AwsResources
 prd_aws_config = AwsResources(
     env=ws_settings.prd_env,
-    apps=[prd_streamlit, prd_fastapi],
+    # apps=[prd_streamlit, prd_fastapi],
+    apps=[prd_streamlit],
     resources=(
         prd_lb_sg,
         prd_sg,
