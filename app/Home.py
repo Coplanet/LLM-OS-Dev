@@ -13,7 +13,6 @@ from uuid import uuid4
 import backoff
 import google.generativeai as genai
 import nest_asyncio
-import pyperclip
 import sqlalchemy as sql
 import streamlit as st
 from audio_recorder_streamlit import audio_recorder
@@ -1303,9 +1302,30 @@ def main() -> None:
 
         if SHARE_BUTTON:
             with cols[-INDEX]:
+                run_js(
+                    """document.addEventListener('DOMContentLoaded', function () {
+                        const interval = setInterval(() => {
+                            const button = window.parent.document.querySelector('.st-key-share button');
+                            if (button) {
+                                button.addEventListener('click', function (e) {
+                                    e.preventDefault();
+                                    const link = "{share_link}";
+                                    window.parent.navigator.clipboard.writeText(link);
+                                    console.log("Shared link copied to clipboard", link);
+                                });
+                                clearInterval(interval);
+                                {cleanup_code}
+                            }
+                        }, 100);
+                    })""".replace(
+                        "{share_link}", generate_share_session_link(user)
+                    ),
+                )
                 if st.button(":material/share:", key="share"):
-                    pyperclip.copy(generate_share_session_link(user))
-                    st.toast("Link copied to clipboard", icon=":material/content_copy:")
+                    st.toast(
+                        "Share link copied to clipboard.",
+                        icon=":material/content_copy:",
+                    )
 
             INDEX -= 1
 

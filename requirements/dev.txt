@@ -512,9 +512,7 @@ pyparsing==3.2.0
 pypdf==5.0.1
     # via -r requirements/prod.in
 pyperclip==1.9.0
-    # via
-    #   -r requirements/prod.in
-    #   composio-core
+    # via composio-core
 pyproject-hooks==1.2.0
     # via
     #   build

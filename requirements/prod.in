@@ -6,7 +6,6 @@ groq
 xlrd
 arxiv
 ollama
-pyperclip
 openai>=1.59.7
 resend
 exa-py
