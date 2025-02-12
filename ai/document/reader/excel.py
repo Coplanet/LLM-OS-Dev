@@ -3,12 +3,13 @@ from typing import IO, Any, List, Union
 
 import pandas as pd
 from phi.document.base import Document
-from phi.document.reader.base import Reader
 
 from helpers.log import logger
 
+from .base import BaseReader
 
-class ExcelReader(Reader):
+
+class ExcelReader(BaseReader):
     """Reader for Excel files"""
 
     chunk: bool = False

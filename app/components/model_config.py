@@ -265,6 +265,11 @@ def model_config(
 
             col_index += 1
 
+    if callable(getattr(package, "model_config_modal_ext", None)):
+        package.model_config_modal_ext(
+            agent, session_id, assistant_name, config, package
+        )
+
     col1, col2 = st.columns(2)
     with col1:
         if st.button("Cancel", icon=":material/close:", type="secondary"):
@@ -297,6 +302,14 @@ def model_config(
                 "max_tokens": max_tokens,
                 "tools": tools,
             }
+
+            if callable(getattr(package, "model_config_modal_on_save", None)):
+                new_configs_ = package.model_config_modal_on_save(
+                    agent, session_id, assistant_name, config, package, new_configs
+                )
+                if new_configs_:
+                    new_configs = new_configs_
+
             logger.info("New configs: %s", new_configs)
             with get_db_context() as db:
                 # get the user

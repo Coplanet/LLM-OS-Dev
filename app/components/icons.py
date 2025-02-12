@@ -1,4 +1,5 @@
 from ai.agents import (
+    developer,
     funny,
     github,
     gmail,
@@ -24,4 +25,5 @@ ICONS = {
     gmail.agent_name: "fa-solid fa-envelope",
     reasoning.agent_name: "fa-solid fa-brain",
     task_generator.agent_name: "fa-brands fa-jira",
+    developer.agent_name: "fa-solid fa-code",
 }

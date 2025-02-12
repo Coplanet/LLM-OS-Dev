@@ -2,13 +2,14 @@ from pathlib import Path
 from typing import IO, Any, List, Union
 
 from phi.document.base import Document
-from phi.document.reader.base import Reader
 from pptx import Presentation
 
 from helpers.log import logger
 
+from .base import BaseReader
 
-class PPTXReader(Reader):
+
+class PPTXReader(BaseReader):
     """Reader for Excel files"""
 
     def read(self, path: Union[str, Path, IO[Any]]) -> List[Document]:

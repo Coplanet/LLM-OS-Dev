@@ -1,4 +1,5 @@
 from ai.agents import (
+    developer,
     funny,
     github,
     gmail,
@@ -60,6 +61,11 @@ AGENTS = {
         "label": to_label(task_generator.agent_name),
         "get_agent": task_generator.get_agent,
         "package": task_generator,
+    },
+    developer.agent_name: {
+        "label": to_label(developer.agent_name),
+        "get_agent": developer.get_agent,
+        "package": developer,
     },
 }
 

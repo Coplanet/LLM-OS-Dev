@@ -20,11 +20,6 @@ from composio import App
 from phi.agent import Agent
 from phi.document import Document
 from phi.document.reader import Reader
-from phi.document.reader.csv_reader import CSVReader
-from phi.document.reader.docx import DocxReader
-from phi.document.reader.json import JSONReader
-from phi.document.reader.pdf import PDFReader
-from phi.document.reader.text import TextReader
 from phi.document.reader.website import WebsiteReader
 from phi.model.content import Image
 from phi.model.message import Message
@@ -40,10 +35,8 @@ from ai.agents.base import Provider
 from ai.agents.settings import agent_settings
 from ai.agents.voice_transcriptor import voice2prompt
 from ai.coordinators import generic as coordinator
-from ai.document.reader.excel import ExcelReader
-from ai.document.reader.general import GenericReader
+from ai.document.reader.general import GeneralReader
 from ai.document.reader.image import ImageReader
-from ai.document.reader.pptx import PPTXReader
 from app.auth import Auth, User
 from app.components.available_agents import get_available_agents
 from app.components.composio_integrations import composio_integrations
@@ -1146,42 +1139,19 @@ def main() -> None:
                             st.session_state["uploaded_videos"] = []
                         st.session_state["uploaded_videos"].append(uploaded_file)
                         continue
-                    elif file_type == "pdf":
-                        reader = PDFReader()
-                    elif file_type == "csv":
-                        reader = CSVReader()
-                    elif file_type == "pptx":
-                        reader = PPTXReader()
-                    elif file_type in ["txt", "md"]:
-                        reader = TextReader()
-                    elif file_type == "docx":
-                        reader = DocxReader()
-                    elif file_type == "json":
-                        reader = JSONReader()
-                    elif file_type in ["xlsx", "xls"]:
-                        reader = ExcelReader()
-                    elif file_type in [
-                        "png",
-                        "jpg",
-                        "jpeg",
-                        "gif",
-                        "bmp",
-                        "tiff",
-                        "webp",
-                    ]:
-                        reader = ImageReader()
                     else:
-                        reader = GenericReader()
+                        reader = GeneralReader()
 
                     try:
                         auto_rag_documents: List[Document] = reader.read(uploaded_file)
 
                         if auto_rag_documents:
-                            if not isinstance(reader, ImageReader):
+                            if not isinstance(reader.handler, ImageReader):
                                 generic_leader.knowledge.load_documents(
                                     auto_rag_documents, upsert=True
                                 )
                                 st.session_state["uploaded_files"].append(document_name)
+
                             else:
                                 for image in auto_rag_documents:
                                     uploaded_images.append(text2binary(image.content))

@@ -189,7 +189,7 @@ div:has(> .stHeading) {
 .st-key-js_container_* {
     display: none !important;
 }
-.stElementContainer .stFileUploader {
+.stSidebar .stElementContainer .stFileUploader {
     display: none !important;
 }
 .st-key-css_and_theme_container {

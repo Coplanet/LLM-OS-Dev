@@ -16,6 +16,7 @@ from phi.tools.youtube_tools import YouTubeTools
 from phi.vectordb.pgvector import PgVector2
 
 from ai.agents import (
+    developer,
     funny,
     github,
     gmail,
@@ -298,6 +299,7 @@ def get_coordinator(
     conditional_agent_enable(gmail)
     conditional_agent_enable(reasoning)
     conditional_agent_enable(task_generator)
+    conditional_agent_enable(developer)
 
     tools, extra_instructions = process_tools(agent_name, config, available_tools)
 
