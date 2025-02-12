@@ -102,29 +102,6 @@ MODELS = {
                 SupportTypes.FunctionCalling: SupportStrength.Acceptable,
             },
         },
-        "gemini-exp-1206": {
-            "max_token_size": 8_192,
-            "supports": {
-                SupportTypes.TextIn: SupportStrength.Full,
-                SupportTypes.TextOut: SupportStrength.Full,
-                SupportTypes.FunctionCalling: SupportStrength.Acceptable,
-            },
-        },
-        "gemini-2.0-flash-thinking-exp-01-21": {
-            "max_token_size": 8_192,
-            "supports": {
-                SupportTypes.TextIn: SupportStrength.Full,
-                SupportTypes.TextOut: SupportStrength.Full,
-            },
-        },
-        "gemini-2.0-pro-exp-02-05": {
-            "max_token_size": 8_192,
-            "supports": {
-                SupportTypes.TextIn: SupportStrength.Full,
-                SupportTypes.TextOut: SupportStrength.Full,
-                SupportTypes.FunctionCalling: SupportStrength.Acceptable,
-            },
-        },
     },
     Provider.Anthropic.value: {
         "claude-3-5-sonnet-20241022": {

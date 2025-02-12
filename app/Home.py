@@ -11,7 +11,6 @@ from uuid import uuid4
 
 import backoff
 import nest_asyncio
-import pyperclip
 import sqlalchemy as sql
 import streamlit as st
 from agno.agent import Agent
@@ -34,6 +33,7 @@ from composio import App
 from streamlit_float import float_init
 
 from ai.agents import base, settings
+from ai.agents.base import Agent as CoplanetAgent
 from ai.agents.base import Provider
 from ai.agents.settings import agent_settings
 from ai.agents.voice_transcriptor import voice2prompt
@@ -103,7 +103,7 @@ def backoff_handler(details):
     )
 
 
-def update_session_name(generic_leader, user):
+def update_session_name(generic_leader: CoplanetAgent, user):
     logger.info("Updating session name")
     session_name = generic_leader.generate_session_name()
     if session_name:
@@ -1184,9 +1184,30 @@ def main() -> None:
 
         if SHARE_BUTTON:
             with cols[-INDEX]:
+                run_js(
+                    """document.addEventListener('DOMContentLoaded', function () {
+                        const interval = setInterval(() => {
+                            const button = window.parent.document.querySelector('.st-key-share button');
+                            if (button) {
+                                button.addEventListener('click', function (e) {
+                                    e.preventDefault();
+                                    const link = "{share_link}";
+                                    window.parent.navigator.clipboard.writeText(link);
+                                    console.log("Shared link copied to clipboard", link);
+                                });
+                                clearInterval(interval);
+                                {cleanup_code}
+                            }
+                        }, 100);
+                    })""".replace(
+                        "{share_link}", generate_share_session_link(user)
+                    ),
+                )
                 if st.button(":material/share:", key="share"):
-                    pyperclip.copy(generate_share_session_link(user))
-                    st.toast("Link copied to clipboard", icon=":material/content_copy:")
+                    st.toast(
+                        "Share link copied to clipboard.",
+                        icon=":material/content_copy:",
+                    )
 
             INDEX -= 1
 

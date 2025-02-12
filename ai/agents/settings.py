@@ -112,7 +112,14 @@ class AgentConfig:
                 "temperature": self.temperature,
                 "enabled": self.enabled,
                 "max_tokens": self.max_tokens,
-                "tools": [k for k in self.tools.keys()],
+                "tools": [
+                    k
+                    for k in (
+                        self.tools.keys()
+                        if isinstance(self.tools, dict)
+                        else self.tools
+                    )
+                ],
                 "model_kwargs": self.model_kwargs,
             }
         )
