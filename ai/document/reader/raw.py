@@ -1,4 +1,3 @@
-import base64
 from typing import IO, Any, List
 
 from phi.document.base import Document
@@ -27,7 +26,7 @@ class RawReader(BaseReader):
                     name=file_name,
                     id=f"{file_name}_{1}",
                     meta_data={"page": 1},
-                    content=base64.b64encode(file_content),
+                    content=file_content,
                 )
             ]
             if self.chunk:

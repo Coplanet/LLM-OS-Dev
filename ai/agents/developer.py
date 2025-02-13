@@ -1,4 +1,4 @@
-import os
+from math import ceil
 from time import time
 from typing import List
 from uuid import uuid4
@@ -7,7 +7,6 @@ import streamlit as st
 from phi.document.chunking.recursive import RecursiveChunking
 from phi.embedder.openai import OpenAIEmbedder
 from phi.knowledge.combined import CombinedKnowledgeBase
-from phi.reranker.cohere import CohereReranker
 from phi.tools.exa import ExaTools
 from phi.vectordb.pgvector import PgVector2
 from streamlit.runtime.uploaded_file_manager import UploadedFile
@@ -109,8 +108,8 @@ def model_config_modal_ext(
 def model_config_modal_on_save(
     agent: Agent, session_id, assistant_name, config: AgentConfig, package, new_configs
 ):
-    links: List[str] = (
-        st.session_state["developer_links"]
+    links: List[str] = list(
+        st.session_state["developer_links"].values()
         if isinstance(st.session_state["developer_links"], dict)
         else []
     )
@@ -120,10 +119,10 @@ def model_config_modal_on_save(
 
     current_step = 0
     overall_documents = []
-    steps = len(files) + len(links) + 1
+    steps = len(files) + len(links)
     progress_text = "Operation in progress. Please wait."
 
-    with st.spinner("Uploading knowledge base..."):
+    with st.spinner("Updating the knowledge base..."):
         progress = st.progress(0, text=progress_text)
 
         reader = GeneralReader()
@@ -138,45 +137,43 @@ def model_config_modal_on_save(
             if isinstance(reader, WebsiteReader) and not isinstance(file, str):
                 reader = GeneralReader()
 
-            if len(loading_entity) > 100:
-                loading_entity = loading_entity[:50] + "..." + loading_entity[-50:]
+            if len(loading_entity) > 40:
+                loading_entity = loading_entity[:20] + "..." + loading_entity[-20:]
 
             progress.progress(
-                current_step * 100 / steps,
+                current_step / steps,
                 text=progress_text.format(loading_entity, len(overall_documents)),
             )
             overall_documents.extend(reader.read(file))
             current_step += 1
 
-        progress_text = "Upserting {} documents to the knowledge base..."
-        progress.progress(
-            current_step * 100 / steps,
-            text=progress_text.format(len(overall_documents)),
-        )
-
         if overall_documents:
-            agent.knowledge.load_documents(overall_documents, upsert=True)
+            current_step = 0
+            steps = ceil(len(overall_documents) / 20)
+            progress.progress(
+                current_step / steps,
+                text="Upserting {} documents to the knowledge base...".format(
+                    len(overall_documents)
+                ),
+            )
+            progress_text = "{} of {} documents upserted to the knowledge base..."
+            for i in range(steps):
+                agent.knowledge.load_documents(
+                    overall_documents[i * 20 : (i + 1) * 20], upsert=True
+                )
+                current_step += 1
+                progress.progress(
+                    current_step / steps,
+                    text=progress_text.format((i + 1) * 20, len(overall_documents)),
+                )
 
-        progress.progress(100, text="Knowledge base updated successfully")
+        progress.progress(1, text="Knowledge base updated successfully")
 
     return new_configs
 
 
 def get_agent(config: AgentConfig = None):
     tools, _ = process_tools(agent_name, config, available_tools)
-
-    COHERE_API_KEY = os.getenv("COHERE_API_KEY")
-
-    vectordb_kwargs = {
-        "db_url": db_url,
-        "collection": "developer_kb",
-        "embedder": OpenAIEmbedder(model="text-embedding-3-large", dimensions=3072),
-    }
-
-    if COHERE_API_KEY:
-        vectordb_kwargs["reranker"] = CohereReranker(
-            model="rerank-multilingual-v3.0", api_key=COHERE_API_KEY
-        )
 
     # flake8: noqa: E501
     agent = Agent(
@@ -192,25 +189,40 @@ def get_agent(config: AgentConfig = None):
             "delegating specialized tasks to auxiliary agents for a comprehensive solution."
         ),
         knowledge=CombinedKnowledgeBase(
-            vector_db=PgVector2(**vectordb_kwargs),
+            vector_db=PgVector2(
+                db_url=db_url,
+                collection="developer_kb",
+                embedder=OpenAIEmbedder(
+                    model="text-embedding-3-large", dimensions=3072
+                ),
+            ),
             chunking_strategy=RecursiveChunking(
                 chunk_size=1000,
-                chunk_overlap=200,
+                overlap=200,
             ),
             optimize_on=1000000,
             num_documents=5,
         ),
         instructions=[
-            "Analyze the user's prompt to capture all requirements and ask clarifying questions when needed.",
-            "Leverage your internal knowledge base and previous experiences to guide solution design.",
-            "Follow best coding practices by writing modular, clean, and maintainable code.",
-            "Break down complex problems into smaller, manageable tasks with a clear roadmap.",
-            "Prioritize high-performance and scalability while recognizing potential bottlenecks.",
-            "Incorporate robust error handling and comprehensive testing to ensure code reliability.",
-            "Document your design decisions, assumptions, and implementation details thoroughly.",
-            "Iterate and refine your approach based on user feedback and testing outcomes.",
+            "Analyze the user's prompt to capture all requirements and ask clarifying questions when necessary.",
+            "<CRITICAL INSTRUCTIONS BASED ON PRIORITY>\n"
+            "1. ALWAYS begin by searching your knowledge base for relevant code patterns, solutions, and best practices - this is your primary source of truth.\n"
+            "2. When writing code, first analyze similar implementations from your knowledge base to maintain consistency and leverage proven patterns.\n"
+            "3. Analyze requirements thoroughly and ask clarifying questions when specifications are unclear.\n"
+            "4. Break down complex problems into smaller, manageable tasks with a clear, step-by-step roadmap.\n"
+            "5. Before proposing new solutions, validate against existing patterns in the knowledge base to ensure architectural consistency.\n"
+            "6. Follow best coding practices by writing modular, clean, and maintainable code that aligns with existing codebase standards.\n"
+            "7. Incorporate robust error handling and comprehensive testing, referencing similar test patterns from the knowledge base.\n"
+            "8. Prioritize high-performance and scalability while proactively identifying potential bottlenecks.\n"
+            "9. Document your design decisions, assumptions, and implementation details thoroughly.\n"
+            "10. Cross-reference your solution with similar implementations in the knowledge base before finalizing.\n"
+            "11. Provide explanations for any deviations from existing patterns found in the knowledge base.\n"
+            "12. Iteratively refine your approach based on user feedback and knowledge base patterns.\n"
+            "</CRITICAL INSTRUCTIONS BASED ON PRIORITY>",
         ],
         delegation_directives=[
+            f"ALWAYS AND MUST ask `{agent_name}` to search and analyze its knowledge base for relevant examples and patterns.",
+            f"ALWAYS AND MUST ask `{agent_name}` to first retrieve and review similar implementations from the knowledge base.",
             (
                 "You must supply the complete execution context including conversation history, current "
                 f"error/log messages, and performance metrics to ensure full situational awareness to `{agent_name}`."
@@ -223,6 +235,12 @@ def get_agent(config: AgentConfig = None):
                 "Where applicable, delegate off-scope or highly specialized tasks to auxiliary agents and collate their "
                 f"results for the primary agent to integrate to `{agent_name}`."
             ),
+            f"`{agent_name}` returns tasks based on its knowledge base and previous experiences; NEVER CHANGE ANYTHING IN ITS RESPONSE TO USER.",
+            f"All development tasks must be assigned to `{agent_name}`.",
+            f"`{agent_name}` must be the only agent that can develop the code.",
+            f"ALWAYS AND MUST ask `{agent_name}` to always verify code solutions against the knowledge base before presenting them to the user.",
+            f"ALWAYS AND MUST ask `{agent_name}` to when suggesting code modifications, reference similar changes from the knowledge base to maintain consistency.",
+            f"Always return the full code and response you receive from `{agent_name}` to user.",
         ],
     )
     return agent

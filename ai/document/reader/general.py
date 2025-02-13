@@ -12,6 +12,7 @@ from phi.document.reader.json import JSONReader
 from phi.document.reader.pdf import PDFReader
 from phi.document.reader.text import TextReader
 from pydantic import Field
+from streamlit.runtime.uploaded_file_manager import UploadedFile
 
 from .base import BaseReader
 from .excel import ExcelReader
@@ -37,7 +38,7 @@ class GeneralReader(BaseReader):
 
     def read(
         self,
-        file: Union[str, Path, IO[Any], ZipExtFile],
+        file: Union[str, Path, IO[Any], ZipExtFile, UploadedFile],
         supported_extensions: Set[str] = {"*"},
     ) -> List[Document]:
         """
@@ -72,7 +73,7 @@ class GeneralReader(BaseReader):
             if isinstance(file, str):
                 file = Path(file)
 
-            if isinstance(file, (Path, IO, ZipExtFile)):
+            if isinstance(file, (Path, IO, ZipExtFile, UploadedFile)):
                 ext = self.file_extension(file.name)
 
             if not ext:
