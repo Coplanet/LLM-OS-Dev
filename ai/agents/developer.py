@@ -11,6 +11,7 @@ from phi.tools.exa import ExaTools
 from phi.vectordb.pgvector import PgVector2
 from streamlit.runtime.uploaded_file_manager import UploadedFile
 
+from ai.agents.base import Provider
 from ai.document.reader.general import GeneralReader
 from ai.document.reader.website import WebsiteReader
 from db.session import db_url
@@ -28,14 +29,8 @@ available_tools = [
     }
 ]
 
-# default_model = "claude"
-
-# recursive chunking
-
-# develope LLM on:
-#  - hybrid search
-#  - filtering the KB result
-#  - reranker
+default_model_id = "claude-3-5-sonnet-20241022"
+default_model_type = Provider.Anthropic.value
 
 
 def model_config_modal_ext(
