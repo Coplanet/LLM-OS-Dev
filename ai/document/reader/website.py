@@ -75,10 +75,22 @@ class WebsiteReader(WR):
                         )
                     },
                 )
-                soup = BeautifulSoup(response.content, "html.parser")
+                main_content = None
+                try:
+                    soup = BeautifulSoup(response.content, "html.parser")
 
-                # Extract main content
-                main_content = self._extract_main_content(soup)
+                    # Extract main content
+                    main_content = self._extract_main_content(soup)
+
+                    if not main_content:
+                        main_content = soup.get_text()
+
+                except Exception as e:
+                    logger.debug(f"Failed to extract main content: {e}")
+
+                if not main_content:
+                    main_content = response.content
+
                 if main_content:
                     crawler_result[current_url] = main_content
                     num_links += 1
