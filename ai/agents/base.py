@@ -292,6 +292,10 @@ class Agent(PhiAgent):
                         ) or isinstance(c, ToolUseBlock):
                             TOOLUSE = True
                             break
+                    if not TOOLUSE and (
+                        isinstance(pp.tool_calls, list) and pp.tool_calls
+                    ):
+                        TOOLUSE = True
                     if not TOOLUSE:
                         index2remove.append(index)
             # remove tool uses that are not followed by a tool result
