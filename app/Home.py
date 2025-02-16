@@ -928,14 +928,14 @@ def main() -> None:
                             image_type = image.mimetype or "image/webp"
 
                 if not image_data and selected_image:
-                    image_data: Optional[UserBinaryData] = UserBinaryData.get_by_id(
+                    image: Optional[UserBinaryData] = UserBinaryData.get_by_id(
                         db,
                         generic_leader.session_id,
                         selected_image,
                     )
-                    if image_data:
-                        image_data = image_data.data_compressed
-                        image_type = image_data.mimetype or "image/webp"
+                    if image:
+                        image_data = image.data_compressed
+                        image_type = image.mimetype or "image/webp"
 
                 response = run(
                     generic_leader,

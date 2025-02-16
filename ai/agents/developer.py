@@ -50,7 +50,7 @@ def model_config_modal_ext(
         )
 
     # KB document upload section
-    uploaded_files_ = st.file_uploader(
+    st.file_uploader(
         "Add some documents to the knowledge base (.pdf, .csv, .pptx, .txt, .md, .docx, .json, .xlsx, .xls and etc)",
         key=st.session_state["developer_file_uploader_key"],
         accept_multiple_files=True,
@@ -94,15 +94,6 @@ def model_config_modal_ext(
     for index in range(st.session_state["developer_links_count"]):
         with st.container(key=f"developer_link_container-{index}"):
             add_link_button(index)
-
-    # render uploaded files and links
-
-    for uploaded_file in uploaded_files_:
-        document_name = uploaded_file.name
-        st.write(document_name)
-
-    for link in st.session_state["developer_links"].values():
-        st.write(link)
 
 
 def model_config_modal_on_save(
