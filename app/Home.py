@@ -771,308 +771,315 @@ def main() -> None:
         st.session_state["page_loaded"] = True
         scroll_to_bottom()
 
-    # If last message is from a user, generate a new response
-    last_message = (
-        st.session_state["messages"][-1] if st.session_state["messages"] else None
-    )
+    try:
+        # If last message is from a user, generate a new response
+        last_message = (
+            st.session_state["messages"][-1] if st.session_state["messages"] else None
+        )
 
-    with get_db_context() as db:
-        mask_captured = False
-        if (
-            UserNextOp.get_op(db, session_user.session_id, UserNextOp.GET_IMAGE_MASK)
-            and render_mask_image(generic_leader)
-        ) or (
-            mask_captured := UserNextOp.get_op(
-                db, session_user.session_id, UserNextOp.EDIT_IMAGE_USING_MASK
-            )
-        ):
-            last_message = st.session_state["messages"][last_user_message_index]
-            if isinstance(last_message.content, list):
-                for item in last_message.content:
-                    if item.get("type") == "text":
-                        last_message.content = item["text"]
-                        break
-            if mask_captured:
-                with st.chat_message("assistant", avatar="assistant"):
-                    st.write("Captured the mask, processing...")
-                prefix = "**Mask captured, Proceed with:** "
-                last_message.content = "{}{}".format(
-                    prefix, last_message.content.replace(prefix, "")
+        with get_db_context() as db:
+            mask_captured = False
+            if (
+                UserNextOp.get_op(
+                    db, session_user.session_id, UserNextOp.GET_IMAGE_MASK
                 )
-
-    if isinstance(last_message, dict):
-        last_message = Message.model_validate(last_message)
-
-    if last_message and last_message.role == "user":
-        question = last_message.content
-        if isinstance(question, list):
-            if question[0].get("type") == "audio":
-                current_audio_uploaded = bool(audio_bytes)
-                audio_bytes = binary_text2data(question[0]["audio"])
-                if current_audio_uploaded:
-                    generic_leader.memory.add_message(
-                        Message(role="user", content=last_message.content)
+                and render_mask_image(generic_leader)
+            ) or (
+                mask_captured := UserNextOp.get_op(
+                    db, session_user.session_id, UserNextOp.EDIT_IMAGE_USING_MASK
+                )
+            ):
+                last_message = st.session_state["messages"][last_user_message_index]
+                if isinstance(last_message.content, list):
+                    for item in last_message.content:
+                        if item.get("type") == "text":
+                            last_message.content = item["text"]
+                            break
+                if mask_captured:
+                    with st.chat_message("assistant", avatar="assistant"):
+                        st.write("Captured the mask, processing...")
+                    prefix = "**Mask captured, Proceed with:** "
+                    last_message.content = "{}{}".format(
+                        prefix, last_message.content.replace(prefix, "")
                     )
-                    generic_leader.write_to_storage()
 
-        with st.chat_message("assistant"):
-            uploaded_videos_ = []
-            uploaded_videos = st.session_state.get("uploaded_videos", [])
-            if uploaded_videos:
-                if COORDINATOR_CONFIG.provider != Provider.Google.value:
-                    st.error("Videos are only supported for Google provider")
-                else:
-                    with st.spinner("Uploading videos..."):
-                        if "genai_uploaded_videos" not in st.session_state:
-                            st.session_state["genai_uploaded_videos"] = {}
+        if isinstance(last_message, dict):
+            last_message = Message.model_validate(last_message)
 
-                        for video in uploaded_videos:
-                            # if already uploaded?
-                            if (
-                                video.file_id
-                                in st.session_state["genai_uploaded_videos"]
-                            ):
-                                uploaded_videos_.append(
-                                    st.session_state["genai_uploaded_videos"][
-                                        video.file_id
-                                    ]
-                                )
-                                continue
-                            # store audio bytes in a temp file
-                            with tempfile.NamedTemporaryFile(
-                                suffix="." + video.name.split(".")[-1]
-                            ) as temp_file:
-                                temp_file.write(video.read())
-                                temp_file_path = temp_file.name
-                                while True:
-                                    gfile = genai.upload_file(
-                                        temp_file_path, mime_type=video.type
-                                    )
-                                    if gfile and gfile.state.name != "FAILED":
-                                        break
-                                uploaded_videos_.append(gfile)
+        if last_message and last_message.role == "user":
+            question = last_message.content
+            if isinstance(question, list):
+                if question[0].get("type") == "audio":
+                    current_audio_uploaded = bool(audio_bytes)
+                    audio_bytes = binary_text2data(question[0]["audio"])
+                    if current_audio_uploaded:
+                        generic_leader.memory.add_message(
+                            Message(role="user", content=last_message.content)
+                        )
+                        generic_leader.write_to_storage()
 
-                            st.session_state["genai_uploaded_videos"][
-                                video.file_id
-                            ] = gfile
+            with st.chat_message("assistant"):
+                uploaded_videos_ = []
+                uploaded_videos = st.session_state.get("uploaded_videos", [])
+                if uploaded_videos:
+                    if COORDINATOR_CONFIG.provider != Provider.Google.value:
+                        st.error("Videos are only supported for Google provider")
+                    else:
+                        with st.spinner("Uploading videos..."):
+                            if "genai_uploaded_videos" not in st.session_state:
+                                st.session_state["genai_uploaded_videos"] = {}
 
-                        all_uploaded = False
-                        while not all_uploaded:
-                            all_uploaded = True
-                            for gfile in uploaded_videos_:
+                            for video in uploaded_videos:
+                                # if already uploaded?
                                 if (
-                                    genai.get_file(gfile.name).state.name
-                                    == "PROCESSING"
+                                    video.file_id
+                                    in st.session_state["genai_uploaded_videos"]
                                 ):
-                                    all_uploaded = False
-                                    sleep(1)
-                                    break
+                                    uploaded_videos_.append(
+                                        st.session_state["genai_uploaded_videos"][
+                                            video.file_id
+                                        ]
+                                    )
+                                    continue
+                                # store audio bytes in a temp file
+                                with tempfile.NamedTemporaryFile(
+                                    suffix="." + video.name.split(".")[-1]
+                                ) as temp_file:
+                                    temp_file.write(video.read())
+                                    temp_file_path = temp_file.name
+                                    while True:
+                                        gfile = genai.upload_file(
+                                            temp_file_path, mime_type=video.type
+                                        )
+                                        if gfile and gfile.state.name != "FAILED":
+                                            break
+                                    uploaded_videos_.append(gfile)
 
-            voice_transcribe: bool = False
-            is_prompt: bool = False
-            prompt: str = ""
-            audio_bytes_ = audio_bytes
+                                st.session_state["genai_uploaded_videos"][
+                                    video.file_id
+                                ] = gfile
 
-            if audio_bytes:
-                with st.spinner("Listening..."):
-                    start = time()
-                    is_prompt, prompt, transcription = voice2prompt(audio_bytes)
-                    end = time()
-                    logger.debug(
-                        "Time to voice2prompt: {:.2f} seconds".format(end - start)
-                    )
+                            all_uploaded = False
+                            while not all_uploaded:
+                                all_uploaded = True
+                                for gfile in uploaded_videos_:
+                                    if (
+                                        genai.get_file(gfile.name).state.name
+                                        == "PROCESSING"
+                                    ):
+                                        all_uploaded = False
+                                        sleep(1)
+                                        break
 
-                audio_bytes = None
+                voice_transcribe: bool = False
+                is_prompt: bool = False
+                prompt: str = ""
+                audio_bytes_ = audio_bytes
 
-                if is_prompt:
-                    question = prompt
+                if audio_bytes:
+                    with st.spinner("Listening..."):
+                        start = time()
+                        is_prompt, prompt, transcription = voice2prompt(audio_bytes)
+                        end = time()
+                        logger.debug(
+                            "Time to voice2prompt: {:.2f} seconds".format(end - start)
+                        )
 
-                else:
-                    voice_transcribe = True
-                    question = (
-                        "Read the following text and respond to it: " + transcription
-                    )
-                question += "\n\n**RESPONSE WITH AUDIO.**"
+                    audio_bytes = None
 
-            uploaded_images = st.session_state["uploaded_images"]
+                    if is_prompt:
+                        question = prompt
 
-            with st.spinner("Thinking..."):
-                selected_image = st.session_state.get("selected_image", None)
+                    else:
+                        voice_transcribe = True
+                        question = (
+                            "Read the following text and respond to it: "
+                            + transcription
+                        )
+                    question += "\n\n**RESPONSE WITH AUDIO.**"
 
-                image_data = None
-                image_type = "image/webp"
+                uploaded_images = st.session_state["uploaded_images"]
 
-                if not selected_image and uploaded_images:
-                    img: UserBinaryData = uploaded_images[len(uploaded_images) - 1]
-                    if img:
-                        image_data = img.data_compressed
-                        image_type = img.mimetype or "image/webp"
+                with st.spinner("Thinking..."):
+                    selected_image = st.session_state.get("selected_image", None)
 
-                if selected_image and uploaded_images:
-                    for img in uploaded_images:
-                        if img.id == selected_image:
+                    image_data = None
+                    image_type = "image/webp"
+
+                    if not selected_image and uploaded_images:
+                        img: UserBinaryData = uploaded_images[len(uploaded_images) - 1]
+                        if img:
                             image_data = img.data_compressed
                             image_type = img.mimetype or "image/webp"
-                            break
 
-                if not image_data and not selected_image and not uploaded_images:
-                    with get_db_context() as db:
-                        image = UserBinaryData.get_data(
+                    if selected_image and uploaded_images:
+                        for img in uploaded_images:
+                            if img.id == selected_image:
+                                image_data = img.data_compressed
+                                image_type = img.mimetype or "image/webp"
+                                break
+
+                    if not image_data and not selected_image and not uploaded_images:
+                        with get_db_context() as db:
+                            image = UserBinaryData.get_data(
+                                db,
+                                generic_leader.session_id,
+                                UserBinaryData.IMAGE,
+                            ).first()
+                            if image:
+                                image_data = image.data_compressed
+                                selected_image = image.id
+                                image_type = image.mimetype or "image/webp"
+
+                    if not image_data and selected_image:
+                        image: Optional[UserBinaryData] = UserBinaryData.get_by_id(
                             db,
                             generic_leader.session_id,
-                            UserBinaryData.IMAGE,
-                        ).first()
+                            selected_image,
+                        )
                         if image:
                             image_data = image.data_compressed
-                            selected_image = image.id
                             image_type = image.mimetype or "image/webp"
 
-                if not image_data and selected_image:
-                    image: Optional[UserBinaryData] = UserBinaryData.get_by_id(
-                        db,
-                        generic_leader.session_id,
-                        selected_image,
+                    response = run(
+                        generic_leader,
+                        question,
+                        [binary2text(image_data, image_type)] if image_data else [],
+                        uploaded_videos_,
+                        audio_bytes,
+                        response_in_voice,
+                        AUDIO_RESPONSE_SUPPORT,
+                        audio_bytes_,
                     )
-                    if image:
-                        image_data = image.data_compressed
-                        image_type = image.mimetype or "image/webp"
 
-                response = run(
-                    generic_leader,
-                    question,
-                    [binary2text(image_data, image_type)] if image_data else [],
-                    uploaded_videos_,
-                    audio_bytes,
-                    response_in_voice,
-                    AUDIO_RESPONSE_SUPPORT,
-                    audio_bytes_,
-                )
-
-            if AUDIO_RESPONSE_SUPPORT:
-                if (
-                    generic_leader.run_response.response_audio is not None
-                    and "data" in generic_leader.run_response.response_audio
-                ):
-                    with st.container(key="response_audio"):
-                        # flake8: noqa: E501
-                        st.markdown(
-                            f"""
-                            <audio controls autoplay="true" style="display: none" id="audio-{generic_leader.run_response.response_audio["id"]}">
-                                <source src="data:audio/wav;base64,{generic_leader.run_response.response_audio["data"]}" type="audio/wav">
-                            </audio>
-                            <script>
-                                setTimeout(function() {{
-                                    document.getElementById("audio-{generic_leader.run_response.response_audio["id"]}").play()
-                                }}, 300)
-                            </script>
-                            """,
-                            unsafe_allow_html=True,
-                        )
-                else:
-                    st.error("No audio response!")
-
-            if not voice_transcribe and is_prompt and prompt:
-                # remove the last role="user" message because since it's the generated prompt
-                # we have already have the input voice in message history and we don't need to
-                # store it the transcripted voice in the memory
-                for i in range(len(generic_leader.memory.messages) - 1, -1, -1):
-                    if generic_leader.memory.messages[i].role == "user":
-                        del generic_leader.memory.messages[i]
-                        break
-                generic_leader.write_to_storage()
-
-            if audio_bytes:
-                audio_bytes = None
-
-            requires_update = False
-            # Get the images
-            image_outputs: Optional[List[Image]] = generic_leader.get_images()
-
-            with get_db_context() as db:
-                if UserNextOp.get_op(
-                    db, session_user.session_id, UserNextOp.GET_IMAGE_MASK
-                ):
-                    if render_mask_image(generic_leader):
-                        run(
-                            generic_leader,
-                            question,
-                            uploaded_images,
-                            uploaded_videos_,
-                            audio_bytes,
-                            response_in_voice,
-                            AUDIO_RESPONSE_SUPPORT,
-                            audio_bytes_,
-                        )
-
-                AUTH_USER = UserNextOp.get_op(
-                    db, session_user.session_id, UserNextOp.AUTH_USER
-                )
-                if AUTH_USER:
-                    if "app" in AUTH_USER.value_json:
-                        composio_integrations(
-                            user,
-                            App(AUTH_USER.value_json.get("app")),
-                            input_prompt=question,
-                        )
-                    else:
-                        composio_integrations(user, input_prompt=question)
-                    AUTH_USER.delete()
-
-                COMPUTER_USE = UserNextOp.get_op(
-                    db, session_user.session_id, UserNextOp.COMPUTER_USE
-                )
-                if COMPUTER_USE:
-                    computer_use(COMPUTER_USE.value_json.get("platform", "gemini"))
-                    COMPUTER_USE.delete()
-
-            # Render the images
-            if image_outputs:
-                image_outputs_ = {}
-                for index in range(len(image_outputs)):
-                    img = image_outputs[index]
-                    if isinstance(img, dict):
-                        image_outputs[index] = Image.model_validate(img)
-                    image_outputs_[img.id] = img
-                image_outputs = list(image_outputs_.values())
-                logger.debug("Rendering '{}' images...".format(len(image_outputs)))
-                contents = []
-                contents.append({"type": "text", "text": response})
-
-                for img in image_outputs:
-                    if not isinstance(img, Image):
-                        logger.error(
-                            "Image is not a valid Image model; it is a: {} [skipping]".format(
-                                type(img)
+                if AUDIO_RESPONSE_SUPPORT:
+                    if (
+                        generic_leader.run_response.response_audio is not None
+                        and "data" in generic_leader.run_response.response_audio
+                    ):
+                        with st.container(key="response_audio"):
+                            # flake8: noqa: E501
+                            st.markdown(
+                                f"""
+                                <audio controls autoplay="true" style="display: none" id="audio-{generic_leader.run_response.response_audio["id"]}">
+                                    <source src="data:audio/wav;base64,{generic_leader.run_response.response_audio["data"]}" type="audio/wav">
+                                </audio>
+                                <script>
+                                    setTimeout(function() {{
+                                        document.getElementById("audio-{generic_leader.run_response.response_audio["id"]}").play()
+                                    }}, 300)
+                                </script>
+                                """,
+                                unsafe_allow_html=True,
                             )
-                        )
-                        continue
+                    else:
+                        st.error("No audio response!")
 
-                    contents.append(
-                        {
-                            "type": "image_url",
-                            "image_url": {"url": img.url},
-                            "image_caption": img.original_prompt,
-                        }
+                if not voice_transcribe and is_prompt and prompt:
+                    # remove the last role="user" message because since it's the generated prompt
+                    # we have already have the input voice in message history and we don't need to
+                    # store it the transcripted voice in the memory
+                    for i in range(len(generic_leader.memory.messages) - 1, -1, -1):
+                        if generic_leader.memory.messages[i].role == "user":
+                            del generic_leader.memory.messages[i]
+                            break
+                    generic_leader.write_to_storage()
+
+                if audio_bytes:
+                    audio_bytes = None
+
+                requires_update = False
+                # Get the images
+                image_outputs: Optional[List[Image]] = generic_leader.get_images()
+
+                with get_db_context() as db:
+                    if UserNextOp.get_op(
+                        db, session_user.session_id, UserNextOp.GET_IMAGE_MASK
+                    ):
+                        if render_mask_image(generic_leader):
+                            run(
+                                generic_leader,
+                                question,
+                                uploaded_images,
+                                uploaded_videos_,
+                                audio_bytes,
+                                response_in_voice,
+                                AUDIO_RESPONSE_SUPPORT,
+                                audio_bytes_,
+                            )
+
+                    AUTH_USER = UserNextOp.get_op(
+                        db, session_user.session_id, UserNextOp.AUTH_USER
                     )
-                    st.image(img.url, caption=img.original_prompt)
+                    if AUTH_USER:
+                        if "app" in AUTH_USER.value_json:
+                            composio_integrations(
+                                user,
+                                App(AUTH_USER.value_json.get("app")),
+                                input_prompt=question,
+                            )
+                        else:
+                            composio_integrations(user, input_prompt=question)
+                        AUTH_USER.delete()
 
-                generic_leader.images = []
+                    COMPUTER_USE = UserNextOp.get_op(
+                        db, session_user.session_id, UserNextOp.COMPUTER_USE
+                    )
+                    if COMPUTER_USE:
+                        computer_use(COMPUTER_USE.value_json.get("platform", "gemini"))
+                        COMPUTER_USE.delete()
 
-                st.session_state["messages"].append(
-                    {"role": "assistant", "content": contents}
-                )
-                generic_leader.memory.add_message(
-                    Message(role="assistant", content=contents[1:])
-                )
-                requires_update = True
+                # Render the images
+                if image_outputs:
+                    image_outputs_ = {}
+                    for index in range(len(image_outputs)):
+                        img = image_outputs[index]
+                        if isinstance(img, dict):
+                            image_outputs[index] = Image.model_validate(img)
+                        image_outputs_[img.id] = img
+                    image_outputs = list(image_outputs_.values())
+                    logger.debug("Rendering '{}' images...".format(len(image_outputs)))
+                    contents = []
+                    contents.append({"type": "text", "text": response})
 
-            else:
-                st.session_state["messages"].append(
-                    {"role": "assistant", "content": response}
-                )
+                    for img in image_outputs:
+                        if not isinstance(img, Image):
+                            logger.error(
+                                "Image is not a valid Image model; it is a: {} [skipping]".format(
+                                    type(img)
+                                )
+                            )
+                            continue
 
-            if requires_update:
-                generic_leader.write_to_storage()
+                        contents.append(
+                            {
+                                "type": "image_url",
+                                "image_url": {"url": img.url},
+                                "image_caption": img.original_prompt,
+                            }
+                        )
+                        st.image(img.url, caption=img.original_prompt)
+
+                    generic_leader.images = []
+
+                    st.session_state["messages"].append(
+                        {"role": "assistant", "content": contents}
+                    )
+                    generic_leader.memory.add_message(
+                        Message(role="assistant", content=contents[1:])
+                    )
+                    requires_update = True
+
+                else:
+                    st.session_state["messages"].append(
+                        {"role": "assistant", "content": response}
+                    )
+
+                if requires_update:
+                    generic_leader.write_to_storage()
+    except Exception as e:
+        st.exception(e)
+        logger.error(e)
 
     # Load knowledge base
     if generic_leader.knowledge:
