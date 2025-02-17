@@ -24,7 +24,6 @@ from ai.agents import (
     journal,
     linkedin_content_generator,
     patent_writer,
-    python,
     reasoning,
     task_generator,
     twitter,
@@ -288,7 +287,6 @@ def get_coordinator(
             pkg.agent = None
             logger.debug("DEACTICATING %s", pkg.agent_name)
 
-    conditional_agent_enable(python)
     conditional_agent_enable(journal)
     conditional_agent_enable(patent_writer)
     conditional_agent_enable(funny)

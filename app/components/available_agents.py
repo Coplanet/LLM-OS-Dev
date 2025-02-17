@@ -7,7 +7,6 @@ from ai.agents import (
     journal,
     linkedin_content_generator,
     patent_writer,
-    python,
     reasoning,
     task_generator,
     twitter,
@@ -31,11 +30,6 @@ AGENTS = {
         "label": to_label(journal.agent_name),
         "get_agent": journal.get_agent,
         "package": journal,
-    },
-    python.agent_name: {
-        "label": to_label(python.agent_name),
-        "get_agent": python.get_agent,
-        "package": python,
     },
     patent_writer.agent_name: {
         "label": to_label(patent_writer.agent_name),
