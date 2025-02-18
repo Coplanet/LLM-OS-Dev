@@ -209,6 +209,10 @@ def get_agent(config: AgentConfig = None):
             "</CRITICAL INSTRUCTIONS BASED ON PRIORITY>",
         ],
         delegation_directives=[
+            (
+                f"VERY IMPORTANT RULE FOR `{agent_name}`: Don't assume that the `{agent_name}` develop anything and "
+                f"post it anyware, the `{agent_name}` implements the code your are responsible for return the ITS RESPONSE EVERY TIME!"
+            ),
             f"<CRITICAL INSTRUCTIONS BASED ON PRIORITY FOR `{agent_name}`>\n"
             f"1. IF YOU ASSIGN A TASK TO `{agent_name}`, YOU MUST ALWAYS RETURN THE FULL RESPONSE YOU RECEIVE FROM `{agent_name}` TO THE USER.\n"
             f"2. ALWYAS AND MUST ask `{agent_name}` to search and analyze its knowledge base for relevant examples and patterns.\n"
@@ -225,7 +229,7 @@ def get_agent(config: AgentConfig = None):
             f"9. ALWAYS AND MUST ask `{agent_name}` to always verify code solutions against the knowledge base before presenting them to the user.\n"
             f"10. ALWAYS AND MUST ask `{agent_name}` to when suggesting code modifications, reference similar changes from the knowledge base to maintain consistency.\n"
             f"11. Always return the full code and response you receive from `{agent_name}` to user.\n"
-            f"</CRITICAL INSTRUCTIONS BASED ON PRIORITY FOR `{agent_name}`>"
+            f"</CRITICAL INSTRUCTIONS BASED ON PRIORITY FOR `{agent_name}`>",
         ],
     )
     return agent

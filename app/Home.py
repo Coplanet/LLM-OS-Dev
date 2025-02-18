@@ -52,7 +52,7 @@ from app.components.share_session import (
 )
 from app.components.sidebar import create_sidebar
 from app.components.styles import render_styles
-from app.models import AUDIO_SUPPORTED_MODELS
+from app.models import AUDIO_SUPPORTED_MODELS, MODELS
 from app.utils import rerun, run_js, run_next_run_toast, scroll_to_bottom
 from db.session import get_db_context
 from db.settings import db_settings
@@ -261,7 +261,9 @@ def get_selected_assistant_config(user: User, label, package):
                 "model_kwargs": {},
                 "temperature": 0,
                 "enabled": True,
-                "max_tokens": agent_settings.default_max_completion_tokens,
+                "max_tokens": MODELS[default_model_type][default_model_id].get(
+                    "max_token_size", agent_settings.default_max_completion_tokens
+                ),
                 "tools": {k: True for k in available_tools_manifest.keys()},
             },
         )
