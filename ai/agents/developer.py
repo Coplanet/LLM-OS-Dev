@@ -209,27 +209,24 @@ def get_agent(config: AgentConfig = None):
             "</CRITICAL INSTRUCTIONS BASED ON PRIORITY>",
         ],
         delegation_directives=[
-            (
-                f"VERY IMPORTANT RULE FOR `{agent_name}`: Don't assume that the `{agent_name}` develop anything and "
-                f"post it anyware, the `{agent_name}` implements the code your are responsible for return the ITS RESPONSE EVERY TIME!"
-            ),
-            f"<CRITICAL INSTRUCTIONS BASED ON PRIORITY FOR `{agent_name}`>\n"
-            f"1. IF YOU ASSIGN A TASK TO `{agent_name}`, YOU MUST ALWAYS RETURN THE FULL RESPONSE YOU RECEIVE FROM `{agent_name}` TO THE USER.\n"
-            f"2. ALWYAS AND MUST ask `{agent_name}` to search and analyze its knowledge base for relevant examples and patterns.\n"
-            f"3. ALWYAS AND MUST ask `{agent_name}` to first retrieve and review similar implementations from the knowledge base.\n"
-            f"4. You must supply the complete execution context including conversation history, current "
-            f"error/log messages, and performance metrics to ensure full situational awareness to `{agent_name}`.\n"
-            "5. Before passing tasks to the agent, preprocess and format all incoming requirements to segment them into "
-            f"actionable items; include any necessary sub-task details to `{agent_name}`.\n"
-            "6. Where applicable, delegate off-scope or highly specialized tasks to auxiliary agents and collate their "
-            f"results for the primary agent to integrate to `{agent_name}`.\n"
-            f"7. `{agent_name}` returns tasks based on its knowledge base and previous experiences; NEVER CHANGE ANYTHING IN ITS RESPONSE TO USER.\n"
-            f"8. All development tasks must be assigned to `{agent_name}`.\n"
-            f"`{agent_name}` must be the only agent that can develop the code.\n"
-            f"9. ALWAYS AND MUST ask `{agent_name}` to always verify code solutions against the knowledge base before presenting them to the user.\n"
-            f"10. ALWAYS AND MUST ask `{agent_name}` to when suggesting code modifications, reference similar changes from the knowledge base to maintain consistency.\n"
-            f"11. Always return the full code and response you receive from `{agent_name}` to user.\n"
-            f"</CRITICAL INSTRUCTIONS BASED ON PRIORITY FOR `{agent_name}`>",
+            f"CRITICAL: `{agent_name}` is the sole code developer. You must return its complete response to the user without modifications.",
+            f"<PRIORITY INSTRUCTIONS FOR COORDINATING WITH `{agent_name}`>\n"
+            f"1. `{agent_name}` is the only agent authorized to write and modify code.\n"
+            f"2. You MUST return `{agent_name}`'s complete response to the user without any alterations.\n"
+            f"3. Before tasking `{agent_name}`, ensure you provide:\n"
+            f"   - Full conversation context\n"
+            f"   - Any error messages or logs\n"
+            f"   - Clear requirements broken into subtasks\n"
+            f"4. When working with `{agent_name}`:\n"
+            f"   - Request knowledge base searches for similar patterns\n"
+            f"   - Include all relevant context and requirements\n"
+            f"   - Never modify `{agent_name}`'s code output\n"
+            f"   - Forward complete responses to the user\n"
+            f"5. For complex tasks:\n"
+            f"   - Break them down before sending to `{agent_name}`\n"
+            f"   - Collect auxiliary agent inputs if needed\n"
+            f"   - Let `{agent_name}` make final code decisions\n"
+            f"</PRIORITY INSTRUCTIONS FOR COORDINATING WITH `{agent_name}`>",
         ],
     )
     return agent
