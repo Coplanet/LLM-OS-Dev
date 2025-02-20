@@ -23,9 +23,9 @@ streamlit-float
 streamlit-pills
 streamlit-extras
 streamlit-image-select
-composio_openai>=0.7.2
-composio-core>=0.7.2
-composio-phidata>=0.7.2
+composio_openai>=0.7.4
+composio-core>=0.7.4
+composio-phidata>=0.7.4
 duckduckgo-search
 google-generativeai
 youtube-transcript-api
